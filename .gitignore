@@ -1,0 +1,10 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+data/
+figs/
+output/
+*.Rproj
+diagnostics/
+.DS_store
