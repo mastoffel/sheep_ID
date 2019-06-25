@@ -1,3 +1,5 @@
+# Exploring ROH through plots
+
 library(data.table)
 library(dplyr)
 library(tidyr)
@@ -8,7 +10,6 @@ library(forcats)
 library(readxl)
 library(tidyverse)
 library(zoo)
-#source("scripts/theme_emily.R")
 options(scipen=999)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
