@@ -7,4 +7,4 @@ figs/
 *.Rproj
 diagnostics/
 .DS_store
-output/ROH/
+output/
