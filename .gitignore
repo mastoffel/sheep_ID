@@ -8,3 +8,5 @@ figs/
 diagnostics/
 .DS_store
 output/
+model_out/
+model_in/

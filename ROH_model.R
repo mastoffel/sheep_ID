@@ -53,7 +53,6 @@ file_path <- "output/ROH/roh_nofilt.hom"
 file <- "roh_nofilt"
 roh_lengths <- fread(file_path)
 
-
 ROH_mod <- function(ROH_criterion) {
         
 froh <- roh_lengths %>%
@@ -65,7 +64,7 @@ froh <- roh_lengths %>%
         #filter((KB > 12500)) %>% 
         dplyr::summarise(KBAVG = mean(KB), KBSUM = sum(KB)) %>%
         mutate(MBSUM = KBSUM / 1000) %>% 
-        mutate(FROH = KBSUM/2869490) %>% 
+        mutate(FROH = KBSUM/2534344) %>% 
         rename(ID = FID)
 
 # create data.frame for modeling
