@@ -4,7 +4,7 @@
 .Ruserdata
 data/
 figs/
-output/
 *.Rproj
 diagnostics/
 .DS_store
+output/ROH

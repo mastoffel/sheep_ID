@@ -10,6 +10,7 @@ library(forcats)
 library(readxl)
 library(tidyverse)
 library(zoo)
+source("theme_clean.R")
 options(scipen=999)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -48,6 +49,7 @@ p_dist <- ggplot(froh, aes(FROH)) +
     annotate("text",  median(froh$FROH) + 0.05, 80, label = paste0("median = ", round(median(froh$FROH), 2))) +
     geom_vline(xintercept = max(froh$FROH), alpha = 0.5) +
     annotate("text",  max(froh$FROH) - 0.04, 80, label = paste0("max = ", round(max(froh$FROH), 2))) 
+p_dist
 
 ggsave("figs/FROH_dist.jpg", p_dist, width = 5, height = 3)
 
@@ -92,6 +94,7 @@ p_roh <- ggplot(prop_IBD_df, aes(length_class, prop_IBD)) +
         theme_clean() +
         #theme(axis.ticks.x = element_line(colour = "#cccccc", size = 0.3)) +
         xlab("ROH class (Mb)") + ylab("Proportion of genome in ROH")
+p_roh
 ggsave("figs/roh_classes_boxplots.jpg", p_roh, width = 8, height = 5)
 
 # ind basis

@@ -47,11 +47,11 @@ hindleg_df <- Capture %>%
         top_n(n = 1, CapDay)
 
 
+
 ##### ROH data #####
 file_path <- "output/ROH/roh_nofilt.hom"
 file <- "roh_nofilt"
 roh_lengths <- fread(file_path)
-
 
 
 ROH_mod <- function(ROH_criterion) {
