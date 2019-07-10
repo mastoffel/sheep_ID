@@ -1,7 +1,7 @@
 # run on server
 library(brms)
 library(dplyr)
-
+library(MCMCglmm)
 load("model_in/lrt_roh_df.RData")
 load("model_in/sheep_ped.RData")
 
@@ -19,10 +19,10 @@ lrt_roh_df_mod1 <- lrt_roh_df %>%
 model1 <- brm(
         n_offspring ~ 1 + FROH + (1|MumID) + (1|BirthYear) + (1|DeathYear) + (1|animal), data = lrt_roh_df_mod1 , 
         family = negbinomial(), cov_ranef = list(animal = sheep_ped_inv),
-        chains = 4, cores = 4, warmup = 1000, iter = 6000, thin = 5
+        chains = 2, cores = 2, warmup = 100, iter = 200, thin = 1
         #control = list(adapt_delta = 0.9)
 )
-
+save(model1, file = "model_out/lrt_negbinomial")
 # model2 <- brm(
 #         n_offspring ~ 1 + FROH + (1|MumID) + (1|BirthYear) + (1|DeathYear) + (1|animal), data = lrt_roh_df_mod1 , 
 #         family = poisson(), cov_ranef = list(animal = A),
