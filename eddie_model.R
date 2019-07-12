@@ -37,6 +37,7 @@ start_time <- Sys.time()
 nitt   <- 1100000
 burnin <- 100000
 thin <- 1000
+
 mod1_chain1 <- MCMCglmm(n_offspring ~ 1 + FROH, random = ~animal + MumID + BirthYear + DeathYear, 
                             prior = prior, pedigree = sheep_ped_MCMCglmm, 
                             data = lrt_roh_df_mod1, family = "poisson",
