@@ -3,6 +3,9 @@ library(brms)
 library(dplyr)
 library(MCMCglmm)
 library(tidyverse)
+library(INLA)
+library(AnimalINLA)
+
 load("model_in/lrt_roh_df.RData")
 load("model_in/sheep_ped.RData")
 
@@ -15,7 +18,7 @@ lrt_roh_df_mod1 <- lrt_roh_df %>%
         filter(Sex == 1) %>% 
         filter(!is.na(MumID)) %>% 
         filter(!is.na(BirthYear)) %>% 
-        filter(!is.na(DeathYear))
+        filter(!is.na(DeathYear)) 
 
 
 ggplot(lrt_roh_df, aes(FROH, n_offspring)) +

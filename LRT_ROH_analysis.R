@@ -29,8 +29,6 @@ tblPreg <- dbGetQuery(con, "Select * from tblPregnancies")
 dbDisconnect(con)
 
 # get LRS
-sheep_ped <- read_csv("../sheep_pedigree/Jisca_sequoia/sheeppedigree/Pedigree_SoaySheep_2019-07-03_toDB.csv") 
-
 sheep_ped <- read_delim("../sheep/data/SNP_chip/20190208_Full_Pedigree.txt", delim = "\t")[c(1,3,2)] %>%
         as.data.frame() %>%
         orderPed() %>%

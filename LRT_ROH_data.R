@@ -29,7 +29,7 @@ tblPreg <- dbGetQuery(con, "Select * from tblPregnancies")
 dbDisconnect(con)
 
 # get LRS
-sheep_ped <- read_csv("../sheep_pedigree/Jisca_sequoia/sheeppedigree/Pedigree_SoaySheep_2019-07-03_toDB.csv") 
+#sheep_ped <- read_csv("../sheep_pedigree/Jisca_sequoia/sheeppedigree/Pedigree_SoaySheep_2019-07-03_toDB.csv") 
 
 sheep_ped <- read_delim("../sheep/data/SNP_chip/20190208_Full_Pedigree.txt", delim = "\t")[c(1,3,2)] %>%
         as.data.frame() %>%
@@ -37,47 +37,80 @@ sheep_ped <- read_delim("../sheep/data/SNP_chip/20190208_Full_Pedigree.txt", del
         rename(Mother = MOTHER, Father = FATHER)
 #save(sheep_ped,  file = "model_in/sheep_ped.RData")
 
-# females: offspring
-sheep_ped %>% 
-        group_by(Mother) %>% 
-        tally() %>% 
-        filter(!is.na(Mother)) %>% 
-        rename(ID = Mother) -> female_LRT
+# # females: offspring
+# sheep_ped %>% 
+#         group_by(Mother) %>% 
+#         tally() %>% 
+#         filter(!is.na(Mother)) %>% 
+#         rename(ID = Mother) -> female_LRT
+# 
+# # males: offspring
+# sheep_ped %>% 
+#         group_by(Father) %>% 
+#         tally() %>% 
+#         filter(!is.na(Father)) %>% 
+#         rename(ID = Father) -> male_LRT
+# # Inds with no offspring
+# no_offspring <- sheep_ped %>% 
+#       #  rename(ID = Code) %>% 
+#         mutate(n = ifelse( !((ID %in% .$Mother) | (ID %in% .$Father)), 0, NA)) %>% 
+#         filter(n == 0) %>% 
+#         dplyr::select(ID, n)
+# 
+# # put together
+# LRT_df <- rbind(female_LRT, male_LRT) %>% 
+#                 rbind(no_offspring) %>% 
+#                 rename(n_offspring = n)
+# 
+# Sheep$ID <- as.numeric(Sheep$ID) # for joining
+# 
+# # add other variables and filter out living individuals
+# LRT <- LRT_df %>% 
+#         left_join(Sheep, by="ID") %>% 
+#         left_join(tblPreg, by = "BirthRef") %>% 
+#         dplyr::select(ID, n_offspring, BirthRef, Status, Sex, DeathYear, BirthWt,
+#                       BirthYear, MumID) %>% 
+#         filter(Status %in% c("Dead", "EstDead")) %>% 
+#         mutate_at(c("ID", "MumID", "BirthYear", "DeathYear", "Sex"), as.character)
 
-# males: offspring
-sheep_ped %>% 
-        group_by(Father) %>% 
-        tally() %>% 
-        filter(!is.na(Father)) %>% 
-        rename(ID = Father) -> male_LRT
-# Inds with no offspring
-no_offspring <- sheep_ped %>% 
-      #  rename(ID = Code) %>% 
-        mutate(n = ifelse( !((ID %in% .$Mother) | (ID %in% .$Father)), 0, NA)) %>% 
-        filter(n == 0) %>% 
-        dplyr::select(ID, n)
 
-# put together
-LRT_df <- rbind(female_LRT, male_LRT) %>% 
-                rbind(no_offspring) %>% 
-                rename(n_offspring = n)
-
-Sheep$ID <- as.numeric(Sheep$ID) # for joining
-
-# add other variables and filter out living individuals
-LRT <- LRT_df %>% 
-        left_join(Sheep, by="ID") %>% 
-        left_join(tblPreg, by = "BirthRef") %>% 
-        dplyr::select(ID, n_offspring, BirthRef, Status, Sex, DeathYear, BirthWt,
-                      BirthYear, MumID) %>% 
-        filter(Status %in% c("Dead", "EstDead")) %>% 
-        mutate_at(c("ID", "MumID", "BirthYear", "DeathYear", "Sex"), as.character)
-
+# annual fitness
+annual_fitness <- read_delim("data/1_Annual_Fitness_Measures_April_20190501.txt", delim = "\t")
+annual_fitness %<>% 
+  dplyr::select(-contains("EASTING")) %>% 
+  dplyr::select(-contains("NORTHING")) %>% 
+  dplyr::select(-contains("Cartesian"))
 
 ##### ROH data #####
 file_path <- "output/ROH/roh_nofilt.hom"
 file <- "roh_nofilt"
 roh_lengths <- fread(file_path)
+
+library(rlang)
+
+# roh_crit = c("short", "medium", "long", "all")
+calc_froh_classes <- function(roh_crit, roh_lengths) {
+  
+  roh_filt <- dplyr::case_when(
+    roh_crit == "short"  ~ expr(KB < 3130),
+    roh_crit == "medium" ~ expr((KB > 3130)&(KB < 12500)),
+    roh_crit == "long"   ~ expr(KB > 12500),
+    roh_crit == "all" ~ expr(KB > 0)
+  )
+  
+  roh_lengths %>%
+    dplyr::group_by(FID) %>%
+    #filter({{ roh_filt }}) %>% 
+    filter(!!roh_filt) %>% 
+    dplyr::summarise(KBSUM = sum(KB)) %>% 
+    mutate(FROH = KBSUM / 2534344) %>% 
+    dplyr::select(FID, FROH) %>% 
+    rename(ID = FID, !! paste0("FROH_", roh_crit) := FROH)
+  
+}
+
+froh <- purrr::map(c("short", "medium", "long", "all"), calc_froh_classes,  roh_lengths) %>% 
+          purrr::reduce(left_join, by = "ID")
 
 froh <- roh_lengths %>%
         dplyr::group_by(FID) %>%
