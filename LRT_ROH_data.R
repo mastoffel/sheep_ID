@@ -80,11 +80,21 @@ froh <- purrr::map(c("short", "medium", "long", "all"), calc_froh_classes,  roh_
           replace_na(list(FROH_long = 0))
 
 
+# add death year
+load("model_in/lrt_roh_df.RData")
+lrt_roh_df <- lrt_roh_df %>% rename(ID = animal) %>% 
+  dplyr::select(ID, DeathYear) %>% 
+  mutate(ID = as.numeric(as.character(ID)))
+
 # dataset for modeling
 fitness_data <- annual_fitness %>% 
   dplyr::select(ID, OffspringBorn, OffspringSurvived, SheepYear, Age, Survival,
          BIRTHYEAR, SEX, MOTHER, BIRTHWT, CapMonth, Weight, Hindleg, ID.CapYear) %>% 
-  left_join(froh, by = "ID")
+  rename() %>% 
+  left_join(froh, by = "ID") %>% 
+  left_join(lrt_roh_df, by = "ID")
+
+
 
 save(fitness_data, file = "model_in/fitness_roh_df.RData")
 save(sheep_ped, file = "model_in/sheep_ped.RData")
