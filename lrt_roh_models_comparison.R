@@ -7,6 +7,8 @@ library(broom.mixed)
 library(AnimalINLA)
 library(ggregplot)
 library(INLAutils)
+devtools::install_github("briencj/asremlPlus")
+
 library(INLAOutputs)
 load("model_in/fitness_roh_df.RData")
 load("model_in/sheep_ped.RData")
@@ -16,7 +18,7 @@ load("model_in/sheep_ped.RData")
 # sheep_ped_inv <- solve(inv.phylo$Ainv)
 # rownames(sheep_ped_inv) <- rownames(inv.phylo$Ainv)
 
-LBS_male <- fitness_data %>% 
+LBS <- fitness_data %>% 
         group_by(ID) %>% 
         summarise(LBS = sum(OffspringBorn, na.rm = TRUE),
                   birth_year = first(BIRTHYEAR),
@@ -28,19 +30,25 @@ LBS_male <- fitness_data %>%
                   FROH_long = first(FROH_long),
                   FROH_all = first(FROH_all)) %>% 
         filter(!is.na(FROH_all)) %>% 
-        filter(sex == "M") %>% 
+        # filter(sex == "M") %>% 
         filter(!(is.na(birth_year) | is.na(death_year) | is.na(MumID))) %>% 
         mutate(olre = factor(1:nrow(.))) %>% 
         mutate(ID = as.factor(ID)) %>% 
         mutate_at(c("birth_year", "death_year", "MumID"), as.factor) %>% 
         as.data.frame() 
 
-hindleg <- fitness_data %>% 
+traits <- fitness_data %>% 
         filter(CapMonth == 8) %>% 
         filter(SheepYear == BIRTHYEAR) %>% 
         mutate(ID = as.factor(ID), SEX = as.factor(SEX)) %>% 
         mutate(MOTHER = as.factor(MOTHER),
-        BIRTHYEAR = as.factor(BIRTHYEAR))
+        BIRTHYEAR = as.factor(BIRTHYEAR)) %>% 
+        rename(birth_year = BIRTHYEAR,
+               sex = SEX,
+               MumID = MOTHER,
+               weight = Weight,
+               hindleg = Hindleg)
+
 
 ####################### ASREML ######################
 # pedigree format: Needs to be sorted, and individual, father, mother
@@ -51,14 +59,15 @@ sheep_ped_asr <- read_delim("../sheep/data/SNP_chip/20190208_Full_Pedigree.txt",
 # inverse relationship mat
 sheep_ainv <- asreml::ainverse(sheep_ped_asr)
 
-mod_asr <- asreml(fixed = Weight ~ 1 + FROH_long, random = ~vm(ID, sheep_ainv) + idv(MOTHER) + idv(BIRTHYEAR), 
-              data = hindleg, na.action = na.method(x=c("omit"))) # "omit" "include"
+mod_asr <- asreml(fixed = weight ~ 1 + FROH_long, random = ~vm(ID, sheep_ainv) + idv(MumID) + idv(birth_year), 
+              data = traits, na.action = na.method(x=c("omit"))) # "omit" "include"
+
 mod_sum <- summary(mod_asr, coef = TRUE)
-mod_sum$varcomp
-mod_sum$coef.fixed
+mod_sum$varcomp[3,1] / sum(mod_sum$varcomp[,1]) # var(fitted(mod_asr), na.rm = TRUE))
+
+
 
 ######################## INLA ######################
-
 
 sheep_ped_inla <- sheep_ped %>% 
                         mutate(Father = ifelse(is.na(Father), 0, Father)) %>% 
@@ -69,20 +78,20 @@ xx = compute.Ainverse(sheep_ped_inla)
 Ainv = xx$Ainverse
 map = xx$map
 Cmatrix = sparseMatrix(i=Ainv[,1],j=Ainv[,2],x=Ainv[,3])
-Ndata = dim(hindleg)[1]
+Ndata = dim(traits)[1]
 
 ## Mapping the same index number for "Individual" as in Ainv
 ## The IndexA column is the index in the A inverse matrix
-hindleg$IndexA = rep(0,Ndata)
+traits$IndexA = rep(0,Ndata)
 for(i in 1:Ndata)
-        hindleg$IndexA[i] = which(map[,1]==hindleg$ID[i])
+        traits$IndexA[i] = which(map[,1]==traits$ID[i])
 
 #Including an extra column for individual effect
 #sparrowGaussian$IndexA.2=sparrowGaussian$IndexA
 
-formula = Weight ~ FROH_long + 
-                f(BIRTHYEAR, model = "iid") +
-                f(MOTHER, model="iid") + 
+formula <- weight ~ 1 + FROH_long + 
+                f(birth_year, model = "iid") +
+                f(MumID, model="iid") + 
                 f(IndexA ,model="generic0", Cmatrix=Cmatrix,
                 constr=TRUE,param = c(0.5, 0.5)) #+
       #  f(IndexA.2,model="iid",param = c(1,0.001), constr=TRUE)
@@ -90,16 +99,25 @@ formula = Weight ~ FROH_long +
 # y, IndexA and IndexA.2 is the individuals in the
 # data (these have to be given different names) where IndexA is the additive genetic effect and IndexA.2 is
 # the individual random effect.
-model = inla(formula=formula, family="gaussian",
-             data=hindleg,
+mod_inla <- inla(formula=formula, family="gaussian",
+             data=traits,
              control.predictor=list(compute=TRUE), 
              control.family=list(hyper = list(theta = list(param = c(0.5, 0.5), fixed = FALSE))),
              only.hyperparam =FALSE,control.compute=list(dic=T))
-summary(model)
+summary(mod_inla)
+mod_inla$internal.marginals.hyperpar
+inla.show.hyperspec(mod_inla)
+mod_sum <-INLARep(mod_inla)
+mod_sum[3,1] / sum(mod_sum$Mean) 
+mod_inla$summary.random
+mod_inla$summary.fixed
+mod_inla$marginals.hyperpar
 
+plot(mod_inla, plot.fixed.effects = TRUE, plot.lincomb = FALSE, plot.random.effects = FALSE, plot.hyperparameters = TRUE,
+     plot.predictor = FALSE, plot.q = FALSE, plot.cpo = FALSE, single = FALSE)
 
 Efxplot(model)
-INLARep(model)
+INLARep(mod_inla)
 
 autoplot(model)
 ggplot_inla_residuals(model, observed = hindleg$Weight)
