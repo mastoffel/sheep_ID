@@ -7,8 +7,6 @@ library(broom.mixed)
 library(AnimalINLA)
 library(ggregplot)
 library(INLAutils)
-devtools::install_github("briencj/asremlPlus")
-
 library(INLAOutputs)
 load("model_in/fitness_roh_df.RData")
 load("model_in/sheep_ped.RData")
@@ -43,7 +41,7 @@ traits <- fitness_data %>%
         mutate(ID = as.factor(ID), SEX = as.factor(SEX)) %>% 
         mutate(MOTHER = as.factor(MOTHER),
         BIRTHYEAR = as.factor(BIRTHYEAR)) %>% 
-        rename(birth_year = BIRTHYEAR,
+        dplyr::rename(birth_year = BIRTHYEAR,
                sex = SEX,
                MumID = MOTHER,
                weight = Weight,
@@ -53,9 +51,9 @@ traits <- fitness_data %>%
 ####################### ASREML ######################
 # pedigree format: Needs to be sorted, and individual, father, mother
 sheep_ped_asr <- read_delim("../sheep/data/SNP_chip/20190208_Full_Pedigree.txt", delim = "\t")[c(1,3,2)] %>% 
-        as.data.frame() %>% 
+        as.data.frame() 
     #    filter(ID %in% hindleg $ID) %>% 
-        orderPed() 
+#        orderPed() 
 # inverse relationship mat
 sheep_ainv <- asreml::ainverse(sheep_ped_asr)
 
@@ -82,14 +80,19 @@ Ndata = dim(traits)[1]
 
 ## Mapping the same index number for "Individual" as in Ainv
 ## The IndexA column is the index in the A inverse matrix
-traits$IndexA = rep(0,Ndata)
-for(i in 1:Ndata)
-        traits$IndexA[i] = which(map[,1]==traits$ID[i])
+traits$IndexA <- rep(0,Ndata)
+for(i in 1:Ndata) traits$IndexA[i] = which(map[,1]==traits$ID[i])
 
 #Including an extra column for individual effect
 #sparrowGaussian$IndexA.2=sparrowGaussian$IndexA
 
-formula <- weight ~ 1 + FROH_long + 
+traits <- traits %>% mutate(
+  FROH_short_std = scale(FROH_short),
+  FROH_medium_std = scale(FROH_medium),
+  FROH_long_std = scale(FROH_long)
+)
+
+formula <- hindleg ~ 1 + FROH_long_std + sex + 
                 f(birth_year, model = "iid") +
                 f(MumID, model="iid") + 
                 f(IndexA ,model="generic0", Cmatrix=Cmatrix,
@@ -99,14 +102,37 @@ formula <- weight ~ 1 + FROH_long +
 # y, IndexA and IndexA.2 is the individuals in the
 # data (these have to be given different names) where IndexA is the additive genetic effect and IndexA.2 is
 # the individual random effect.
-mod_inla <- inla(formula=formula, family="gaussian",
+mod_inla3 <- inla(formula=formula, family="gaussian",
              data=traits,
              control.predictor=list(compute=TRUE), 
              control.family=list(hyper = list(theta = list(param = c(0.5, 0.5), fixed = FALSE))),
              only.hyperparam =FALSE,control.compute=list(dic=T))
-summary(mod_inla)
+
+summary(mod_inla1)
+bri.fixed.plot(mod_inla1)
+brinla::bri.hyperpar.plot(mod_inla)
+
+
+bri.fixed.plot(mod_inla1)
+bri.fixed.plot(mod_inla3)
+bri.fixed.plot(mod_inla2)
+
+invsqrt <- function(x) 1/sqrt(x)
+sdt <- invsqrt(mod_inla$summary.hyperpar[,-2]) # no sd
+row.names(sdt) <- c("SD of epsilson","SD of birth year", "SD of MumID", "SD of additive genetic")
+prec.birth_year <- mod_inla$marginals.hyperpar$"Precision for birth_year"
+prec.epsilon <- imod$marginals.hyperpar$"Precision for the Gaussian observations"
+c(epsilon=inla.emarginal(invsqrt,prec.epsilon),
+  site=inla.emarginal(invsqrt,prec.birth_year))
+sigma.birth_year <- inla.tmarginal(invsqrt, prec.birth_year)
+sigma.epsilon <- inla.tmarginal(invsqrt, prec.epsilon)
+sampvars <- 1/inla.hyperpar.sample(1000,mod_inla)
+sampicc <- sampvars[,2]/(rowSums(sampvars))
+quantile(sampicc, c(0.025,0.5,0.975))
+bri.hyperpar.summary(mod_inla)
+alpha <- data.frame(mod_inla$marginals.fixed[[1]])
+
 mod_inla$internal.marginals.hyperpar
-inla.show.hyperspec(mod_inla)
 mod_sum <-INLARep(mod_inla)
 mod_sum[3,1] / sum(mod_sum$Mean) 
 mod_inla$summary.random
@@ -116,11 +142,44 @@ mod_inla$marginals.hyperpar
 plot(mod_inla, plot.fixed.effects = TRUE, plot.lincomb = FALSE, plot.random.effects = FALSE, plot.hyperparameters = TRUE,
      plot.predictor = FALSE, plot.q = FALSE, plot.cpo = FALSE, single = FALSE)
 
-Efxplot(model)
-INLARep(mod_inla)
 
-autoplot(model)
-ggplot_inla_residuals(model, observed = hindleg$Weight)
+
+
+# inla LBS
+LBS_male <- LBS %>% filter(sex == 'M')
+Ndata = dim(LBS_male)[1]
+LBS_male$IndexA <- rep(0,Ndata)
+for(i in 1:Ndata) LBS_male$IndexA[i] = which(map[,1]==LBS_male$ID[i])
+
+formula <- LBS ~ 1 + FROH_short +
+  f(olre, model = "iid") +
+  f(birth_year, model = "iid") +
+  f(MumID, model="iid") + 
+  f(IndexA, model = "generic0", constr = TRUE, 
+    Cmatrix = Cmatrix)
+  # f(IndexA ,model="generic0", Cmatrix=Cmatrix,
+  #   constr=TRUE,param = c(0.5, 0.5)) #+
+
+# the individual random effect.
+mod_inla_lbs3 <- inla(formula=formula, family="poisson",
+                  data=LBS_male,
+                  control.predictor=list(compute=TRUE), 
+                 # control.family=list(hyper = list(theta = list(param = c(0.5, 0.5), fixed = FALSE))),
+                  only.hyperparam =FALSE,control.compute=list(dic=T))
+
+bri.fixed.plot(mod_inla_lbs3)
+brinla::bri.hyperpar.plot(mod_inla_lbs3)
+
+## rstanarm
+library(rstanarm)
+
+traits_sub <- traits %>% sample_frac( size = 0.05)
+mod_rstan <- stan_lmer( weight ~ 1 + FROH_long + (1|MumID) + (1|birth_year),
+                        data = traits_sub,
+                        seed = 355)
+summary(mod_rstan)
+tidy(mod_rstan)
+
 
 
 #Example finding the posterior marginal distribution and mean (95% CI)
