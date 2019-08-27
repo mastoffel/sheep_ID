@@ -8,6 +8,8 @@ library(AnimalINLA)
 library(ggregplot)
 library(INLAutils)
 library(INLAOutputs)
+library(INLA)
+library(brinla)
 load("model_in/fitness_roh_df.RData")
 load("model_in/sheep_ped.RData")
 
@@ -19,6 +21,7 @@ load("model_in/sheep_ped.RData")
 LBS <- fitness_data %>% 
         group_by(ID) %>% 
         summarise(LBS = sum(OffspringBorn, na.rm = TRUE),
+                  lifespan = max(SheepYear) - min(SheepYear),
                   birth_year = first(BIRTHYEAR),
                   death_year = first(DeathYear),
                   sex = first(SEX),
@@ -29,11 +32,17 @@ LBS <- fitness_data %>%
                   FROH_all = first(FROH_all)) %>% 
         filter(!is.na(FROH_all)) %>% 
         # filter(sex == "M") %>% 
-        filter(!(is.na(birth_year) | is.na(death_year) | is.na(MumID))) %>% 
+        filter(!(is.na(birth_year) | is.na(MumID))) %>% 
         mutate(olre = factor(1:nrow(.))) %>% 
         mutate(ID = as.factor(ID)) %>% 
         mutate_at(c("birth_year", "death_year", "MumID"), as.factor) %>% 
+        # exclude under 1 year olds
+        filter(lifespan > 0) %>% 
         as.data.frame() 
+
+ggplot(LBS, aes(lifespan)) + geom_histogram() + facet_wrap(sex ~ ., scales = "free")
+ggplot(LBS, aes(LBS)) + geom_histogram() + facet_wrap(sex ~ ., scales = "free")
+ggplot(LBS, aes(lifespan, LBS, color = sex)) + geom_point() + geom_smooth()
 
 traits <- fitness_data %>% 
         filter(CapMonth == 8) %>% 
@@ -45,10 +54,36 @@ traits <- fitness_data %>%
                sex = SEX,
                MumID = MOTHER,
                weight = Weight,
-               hindleg = Hindleg)
+               hindleg = Hindleg) %>% 
+        filter(!is.na(weight) & !is.na(sex) & !is.na(MumID) & !is.na(birth_year) & !is.na(FROH_long)) %>% 
+        mutate(FROH_long_std = scale(FROH_long),
+               FROH_medium_std = scale(FROH_medium),
+               FROH_short_std = scale(FROH_short))
 
 
-####################### ASREML ######################
+#~~~~~~~~~~~ Gaussian weight model comparison ASREML vs INLA ~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+# asreml
+mod_asr1 <- asreml(fixed = weight ~ 1 + FROH_long_std + FROH_medium_std + FROH_short_std + sex, random = ~idv(MumID) + idv(birth_year), 
+                  data = traits, na.action = na.method(x=c("omit"))) # "omit" "include"
+mod_sum <- summary(mod_asr1, coef = TRUE)
+mod_sum$coef.fixed
+mod_sum$varcomp
+
+# inla
+formula <- weight ~ 1 + FROH_long_std + FROH_medium_std + FROH_short_std + sex + 
+           f(birth_year, model = "iid") + 
+           f(MumID, model="iid") 
+
+mod_inla1 <- inla(formula=formula, family="gaussian", data=traits)
+summary(mod_inla1)
+bri.hyperpar.summary(mod_inla1) ^ 2 # variance
+
+
+#~~~~~~~~~~~ Gaussian weight models as animal models ~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+# asreml
+
 # pedigree format: Needs to be sorted, and individual, father, mother
 sheep_ped_asr <- read_delim("../sheep/data/SNP_chip/20190208_Full_Pedigree.txt", delim = "\t")[c(1,3,2)] %>% 
         as.data.frame() 
@@ -57,42 +92,40 @@ sheep_ped_asr <- read_delim("../sheep/data/SNP_chip/20190208_Full_Pedigree.txt",
 # inverse relationship mat
 sheep_ainv <- asreml::ainverse(sheep_ped_asr)
 
-mod_asr <- asreml(fixed = weight ~ 1 + FROH_long, random = ~vm(ID, sheep_ainv) + idv(MumID) + idv(birth_year), 
+mod_asr2 <- asreml(fixed = weight ~ 1 + FROH_long_std + FROH_medium_std + FROH_short_std + sex, random = ~vm(ID, sheep_ainv) + idv(MumID) + idv(birth_year), 
               data = traits, na.action = na.method(x=c("omit"))) # "omit" "include"
 
-mod_sum <- summary(mod_asr, coef = TRUE)
+mod_sum <- summary(mod_asr2, coef = TRUE)
+mod_sum$coef.fixed
+mod_sum$varcomp
+
+# heritability
 mod_sum$varcomp[3,1] / sum(mod_sum$varcomp[,1]) # var(fitted(mod_asr), na.rm = TRUE))
 
 
+#========================#
 
-######################## INLA ######################
-
+# inla
 sheep_ped_inla <- sheep_ped %>% 
                         mutate(Father = ifelse(is.na(Father), 0, Father)) %>% 
                         mutate(Mother = ifelse(is.na(Mother), 0, Mother)) %>% 
                         as.data.frame()
 
-xx = compute.Ainverse(sheep_ped_inla)
-Ainv = xx$Ainverse
-map = xx$map
-Cmatrix = sparseMatrix(i=Ainv[,1],j=Ainv[,2],x=Ainv[,3])
-Ndata = dim(traits)[1]
+comp_inv <- AnimalINLA::compute.Ainverse(sheep_ped_inla)
+ainv <- comp_inv$Ainverse
+ainv_map <- comp_inv$map
+Cmatrix <- sparseMatrix(i=ainv[,1],j=ainv[,2],x=ainv[,3])
+Ndata <- dim(traits)[1]
 
 ## Mapping the same index number for "Individual" as in Ainv
 ## The IndexA column is the index in the A inverse matrix
 traits$IndexA <- rep(0,Ndata)
-for(i in 1:Ndata) traits$IndexA[i] = which(map[,1]==traits$ID[i])
+for(i in 1:Ndata) {
+  traits$IndexA[i] <- which(ainv_map[,1]==traits$ID[i])
+}
 
-#Including an extra column for individual effect
-#sparrowGaussian$IndexA.2=sparrowGaussian$IndexA
 
-traits <- traits %>% mutate(
-  FROH_short_std = scale(FROH_short),
-  FROH_medium_std = scale(FROH_medium),
-  FROH_long_std = scale(FROH_long)
-)
-
-formula <- hindleg ~ 1 + FROH_long_std + sex + 
+formula <- weight ~ 1 + FROH_long_std + FROH_medium_std + FROH_short_std + sex +  #  + FROH_medium + FROH_short
                 f(birth_year, model = "iid") +
                 f(MumID, model="iid") + 
                 f(IndexA ,model="generic0", Cmatrix=Cmatrix,
@@ -102,13 +135,22 @@ formula <- hindleg ~ 1 + FROH_long_std + sex +
 # y, IndexA and IndexA.2 is the individuals in the
 # data (these have to be given different names) where IndexA is the additive genetic effect and IndexA.2 is
 # the individual random effect.
-mod_inla3 <- inla(formula=formula, family="gaussian",
-             data=traits,
-             control.predictor=list(compute=TRUE), 
-             control.family=list(hyper = list(theta = list(param = c(0.5, 0.5), fixed = FALSE))),
-             only.hyperparam =FALSE,control.compute=list(dic=T))
+mod_inla <- inla(formula=formula, family="gaussian",
+             data=traits)
+             #control.predictor=list(compute=TRUE), 
+             #control.family=list(hyper = list(theta = list(param = c(0.5, 0.5), fixed = FALSE))),
+             #only.hyperparam =FALSE,control.compute=list(dic=T))
 
-summary(mod_inla1)
+summary(mod_inla)
+(bri.hyperpar.summary(mod_inla)[4, 5] / sum(bri.hyperpar.summary(mod_inla)[, 5])) ^ 2
+  
+
+
+mod_inla$marginals.fixed[[3]] %>% 
+  as.data.frame() %>% 
+  ggplot(aes(x,y)) + geom_line() 
+bri.hyperpar.plot(mod_inla)
+
 bri.fixed.plot(mod_inla1)
 brinla::bri.hyperpar.plot(mod_inla)
 

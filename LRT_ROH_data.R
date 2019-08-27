@@ -11,7 +11,8 @@ library(pedigreemm)
 library(brms)
 library(MCMCglmm)
 library(rlang)
-
+library(brinla)
+library(GGally)
 #### database connection ######
 
 dbname <- "../sheep/data/db/StKilda_Data.accdb"
@@ -50,7 +51,7 @@ annual_fitness %<>%
 file_path <- "output/ROH/roh_nofilt.hom"
 file <- "roh_nofilt"
 roh_lengths <- fread(file_path)
-
+hist(roh_lengths$KB, breaks = 1000, xlim = c(0,10000))
 
 # roh_crit = c("short", "medium", "long", "all")
 calc_froh_classes <- function(roh_crit, roh_lengths) {
@@ -79,6 +80,8 @@ froh <- purrr::map(c("short", "medium", "long", "all"), calc_froh_classes,  roh_
           purrr::reduce(left_join, by = "ID") %>% 
           replace_na(list(FROH_long = 0))
 
+# all FROH are negatively correlated
+ggpairs(froh[-1])
 
 # add death year
 load("model_in/lrt_roh_df.RData")
@@ -93,7 +96,6 @@ fitness_data <- annual_fitness %>%
   rename() %>% 
   left_join(froh, by = "ID") %>% 
   left_join(lrt_roh_df, by = "ID")
-
 
 
 save(fitness_data, file = "model_in/fitness_roh_df.RData")
