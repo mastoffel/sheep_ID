@@ -97,6 +97,11 @@ fitness_data <- annual_fitness %>%
   left_join(froh, by = "ID") %>% 
   left_join(lrt_roh_df, by = "ID")
 
+# add homozygosity not in roh
+homs <- read_delim("output/ROH/roh_nofilt_hom_not_in_roh.txt", delim = " ")
+
+fitness_data <- fitness_data %>% 
+  left_join(homs, by = "ID")
 
 save(fitness_data, file = "model_in/fitness_roh_df.RData")
 save(sheep_ped, file = "model_in/sheep_ped.RData")

@@ -25,10 +25,10 @@ LBS <- fitness_data %>%
                   twin = first(TWIN),
                   sex = first(SEX),
                   mum_id = first(MOTHER),
-                  froh_short = first(froh_short),
-                  froh_medium = first(froh_medium),
-                  froh_long = first(froh_long),
-                  froh_all = first(froh_all),
+                  froh_short =  first(FROH_short),
+                  froh_medium = first(FROH_medium),
+                  froh_long =   first(FROH_long),
+                  froh_all =    first(FROH_all),
                   froh_not_roh = first(hom),
                   counts = first(counts)) %>% 
         filter(!is.na(froh_all)) %>% 
@@ -37,7 +37,7 @@ LBS <- fitness_data %>%
         # filter(sex == "M") %>% 
         filter(!(is.na(birth_year) | is.na(mum_id))) %>% 
         mutate(olre = factor(1:nrow(.))) %>% 
-        mutate_at(c("id", "birth_year", "mum_id"), as.factor) %>% 
+        mutate_at(c("id", "birth_year", "mum_id", "sex"), as.factor) %>% 
         mutate(froh_long_std = scale(froh_long),
                froh_medium_std = scale(froh_medium),
                froh_short_std = scale(froh_short),
@@ -45,8 +45,8 @@ LBS <- fitness_data %>%
         as.data.frame() 
 
 ggplot(LBS, aes(lifespan)) + geom_histogram() + facet_wrap(sex ~ ., scales = "free")
-ggplot(LBS, aes(LBS)) + geom_histogram() + facet_wrap(sex ~ ., scales = "free")
-ggplot(LBS, aes(lifespan, LBS, color = sex)) + geom_jitter(alpha = 0.3) + geom_smooth()
+ggplot(LBS, aes(lbs)) + geom_histogram() + facet_wrap(sex ~ ., scales = "free")
+ggplot(LBS, aes(lifespan, lbs, color = sex)) + geom_jitter(alpha = 0.3) + geom_smooth()
 
 traits <- fitness_data %>% 
         # some individuals arent imputed well and should be discarded 
@@ -61,18 +61,21 @@ traits <- fitness_data %>%
                       weight = Weight,
                       hindleg = Hindleg,
                       hornlen = HornLen, 
-                      froh_short = froh_short,
-                      froh_medium = froh_medium,
-                      froh_long = froh_long,
-                      froh_all = froh_all,
+                      froh_short = FROH_short,
+                      froh_medium = FROH_medium,
+                      froh_long = FROH_long,
+                      froh_all = FROH_all,
                       froh_not_roh = hom) %>% 
         mutate_at(c("id", "birth_year", "mum_id", "sheep_year"), as.factor) %>% 
         dplyr::select(id, sheep_year, age, birth_year, sex, mum_id, twin, weight,
                       hindleg, froh_short, froh_medium, froh_long, froh_all,
-                      froh_not_roh) %>% 
-        # filter(CapMonth == 8) %>% 
+                      froh_not_roh, CapMonth) %>% 
+        # estimate from yearlings onwards
+        filter(age > 0) %>% 
+        filter(CapMonth == 8) %>% 
         filter(!is.na(sex) & !is.na(mum_id) & !is.na(birth_year) & !is.na(froh_long),
                !is.na(sheep_year), !is.na(age)) %>% 
+        mutate_at(c("id", "birth_year", "mum_id", "sex"), as.factor) %>% 
         mutate(froh_long_std =   scale(froh_long),
                froh_medium_std = scale(froh_medium),
                froh_short_std =  scale(froh_short),
@@ -82,11 +85,18 @@ traits <- fitness_data %>%
 
 #~~~~~~~~~~~ Response: 4-month weight, Gaussian. Comparison ASREML vs INLA ~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
+# ROH vs weight
 traits %>% 
-  dplyr::select(froh_short, froh_medium, froh_long, froh_not_roh, weight, hindleg, sex) %>% 
+  dplyr::select(froh_short, froh_medium, froh_long, weight, hindleg, sex) %>% 
   tidyr::pivot_longer(cols = starts_with("froh"), names_to = "froh", values_to = "prop") %>% 
   ggplot(aes(prop, weight)) + geom_point() + geom_smooth(method = "lm") + 
-   # scale_x_log() +
+  facet_wrap(sex~froh, scales = "free") 
+
+# ROH vs hindleg
+traits %>% 
+  dplyr::select(froh_short, froh_medium, froh_long, weight, hindleg, sex) %>% 
+  tidyr::pivot_longer(cols = starts_with("froh"), names_to = "froh", values_to = "prop") %>% 
+  ggplot(aes(prop, hindleg)) + geom_point() + geom_smooth(method = "lm") + 
   facet_wrap(sex~froh, scales = "free") 
 
 traits %>% 
@@ -96,53 +106,12 @@ traits %>%
 # fixed: sex, froh (maybe Litter size, Maternal age quadratic), random: birth_year, mum_id, additive genetic
 
 
-# asreml
-
-# froh_long_std + froh_medium_std + froh_short_std
-
-# when fitted separately
-# froh_long   -7.650613
-# froh_medium -6.604834
-# froh_short  -0.5301994
-# 
-
-traits$Age2 <- traits$Age^2
-#  froh_long_std + froh_medium_std + froh_short_std froh_long + froh_medium + froh_short 
-mod_asr1 <- asreml(fixed = hindleg ~ 1 + froh_long  + froh_medium + froh_short  + Age + Age2, # + froh_not_roh_std
-                   random = ~idv(MumID) + idv(birth_year) + idv(ID) + idv(SheepYear), 
-                   data = filter(traits, sex == "M"), na.action = na.method(x=c("omit"))) # "omit" "include"
-mod_sum <- summary(mod_asr1, coef = TRUE)
-mod_sum$coef.fixed
-mod_sum$varcomp
-
-# froh_long + froh_medium + froh_short
-mod_asr1 <- asreml(fixed = weight ~ 1 + froh_long_std + froh_medium_std + froh_short_std + froh_not_roh_std + sex, 
-                   random = ~idv(MumID) + idv(birth_year), 
-                  data = traits, na.action = na.method(x=c("omit"))) # "omit" "include"
-mod_sum <- summary(mod_asr1, coef = TRUE)
-mod_sum$coef.fixed
-mod_sum$varcomp
-
-
-# inla
-formula <- weight ~ 1 + froh_long + froh_medium + froh_short  + sex + Age + Age2 + # + froh_medium + froh_short
-           f(birth_year, model = "iid") + 
-           f(MumID, model="iid") +
-           f(ID, model = "iid") +
-           f(SheepYear, model = "iid")
-
-mod_inla1 <- inla(formula=formula, family="gaussian", data=traits)
-summary(mod_inla1)
-bri.hyperpar.summary(mod_inla1) ^ 2 # variance
-mod_inla1$model.matrix
-plot(mod_inla1$marginals.fixed$froh_medium_std)
-
 #~~~~~~~~~~~ Gaussian weight models as animal models ~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 # asreml
 
 # pedigree format: Needs to be sorted, and individual, father, mother
-sheep_ped_asr <- read_delim("../sheep/data/SNP_chip/20190208_Full_Pedigree.txt", delim = "\t")[c(1,3,2)] %>% 
+sheep_ped_asr <- sheep_ped[c(1,3,2)] %>% 
         as.data.frame() 
 # sheep_ped_asr <- sheep_ped %>% 
 #   as.data.frame() %>% 
@@ -156,103 +125,174 @@ sheep_ped_asr <- read_delim("../sheep/data/SNP_chip/20190208_Full_Pedigree.txt",
 # inverse relationship mat
 sheep_ainv <- asreml::ainverse(sheep_ped_asr)
 
-mod_asr2 <- asreml(fixed = hindleg ~ 1 + froh_long_std + froh_medium_std + froh_short_std + sex + Age + Age2, 
-                   random = ~vm(ID, sheep_ainv) + idv(ID) + idv(SheepYear) + idv(MumID) + idv(birth_year), 
-              data = traits, na.action = na.method(x=c("omit"))) # "omit" "include"
+traits_hindleg<- traits %>% 
+                    dplyr::filter(!is.na(hindleg))# %>% 
+                    #sample_frac(1)
 
-mod_sum <- summary(mod_asr2, coef = TRUE)
+mod_asr_hindleg <- asreml(fixed = hindleg ~ 1 + froh_long + froh_medium + froh_short + sex + age + age2 + twin, #  
+                   random = ~vm(id, sheep_ainv)+ idv(id) + idv(sheep_year)  + idv(birth_year) + idv(mum_id),  # + idv(mum_id), #  + idv(sheep_year)  + idv(birth_year),  # + idv(mum_id) #  idv(sheep_year)  + idv(birth_year)
+                   data = traits_hindleg, na.action = na.method(x=c("omit")), workspace = "800Mb") # "omit" "include"
+
+mod_sum <- summary(mod_asr_hindleg, coef = TRUE)
 mod_sum$coef.fixed
 mod_sum$varcomp
 
 # heritability
-mod_sum$varcomp[3,1] / sum(mod_sum$varcomp[,1]) # var(fitted(mod_asr), na.rm = TRUE))
+mod_sum$varcomp[4,1] / sum(mod_sum$varcomp[,1]) # var(fitted(mod_asr), na.rm = TRUE))
 
 
 #========================#
 
 # inla
 sheep_ped_inla <- sheep_ped %>% 
-                        filter(!is.na(id)) %>% 
-                        mutate(Father = ifelse(is.na(Father), 0, Father)) %>% 
-                        mutate(Mother = ifelse(is.na(Mother), 0, Mother)) %>% 
-                        as.data.frame()
+                        as_tibble() %>% 
+                        rename(id = ID,
+                               mother = MOTHER,
+                               father = FATHER) %>% 
+                        mutate_at(c("id", "mother", "father"), function(x) str_replace(x, "F", "888")) %>% 
+                        mutate_at(c("id", "mother", "father"), function(x) str_replace(x, "M", "999")) %>% 
+                        #filter(!is.na(id)) %>% 
+                        mutate(father = ifelse(is.na(father), 0, father)) %>% 
+                        mutate(mother = ifelse(is.na(mother), 0, mother)) %>% 
+                        mutate_if(is.character, list(as.numeric)) %>% 
+                        as.data.frame() 
 
 comp_inv <- AnimalINLA::compute.Ainverse(sheep_ped_inla)
 ainv <- comp_inv$Ainverse
 ainv_map <- comp_inv$map
 Cmatrix <- sparseMatrix(i=ainv[,1],j=ainv[,2],x=ainv[,3])
-Ndata <- dim(traits)[1]
+
 
 ## Mapping the same index number for "Individual" as in Ainv
 ## The IndexA column is the index in the A inverse matrix
-traits$IndexA <- rep(0,Ndata)
-for(i in 1:Ndata) {
-  traits$IndexA[i] <- which(ainv_map[,1]==traits$ID[i])
+traits_hindleg <- traits %>% 
+  dplyr::filter(!is.na(hindleg))
+
+add_index_inla <- function(traits) {
+  Ndata <- dim(traits)[1]
+  traits$IndexA <- rep(0, times = Ndata)
+  for(i in 1:Ndata) {
+    traits$IndexA[i] <- which(ainv_map[,1]==traits$id[i])
+  }
+  traits
 }
 
-formula <- hindleg ~ 1 + froh_long_std + froh_medium_std + froh_short_std + sex +  #  froh_long_std + froh_medium_std + froh_short_std
-                f(birth_year, model = "iid") +
-                f(MumID, model="iid") + 
-                f(IndexA ,model="generic0", Cmatrix=Cmatrix,
-                constr=TRUE,param = c(0.5, 0.5)) #+
-      #  f(IndexA.2,model="iid",param = c(1,0.001), constr=TRUE)
-# 12474
-# y, IndexA and IndexA.2 is the individuals in the
+ainv_map
+traits_hindleg <- add_index_inla(traits_hindleg)
+
+
+prec_prior <- list(prior = "loggamma", param = c(0.5, 0.05))
+
+formula <- hindleg ~ 1 + froh_long + froh_medium + froh_short +  sex + age + age2 + twin + 
+                f(birth_year, model = "iid", hyper = list(prec = prec_prior)) +
+                f(sheep_year, model = "iid", hyper = list(prec = prec_prior)) +
+                f(id, model = "iid", hyper = list(prec = prec_prior)) +
+                f(mum_id, model="iid",  hyper = list(prec = prec_prior)) + 
+                f(IndexA, 
+                  model="generic0",
+                  hyper = list(theta = list(param = c(0.5, 0.5))),
+                  Cmatrix=Cmatrix) #+ # constr=TRUE
+
 # data (these have to be given different names) where IndexA is the additive genetic effect and IndexA.2 is
 # the individual random effect.
-mod_inla <- inla(formula=formula, family="gaussian",
-             data=traits, 
+mod_inla2 <- inla(formula=formula, family="gaussian",
+             data=traits_hindleg, 
              control.compute = list(dic = TRUE))
+             #control.family = list(hyper = list(theta = list(initial = 10, fixed = TRUE))))
              #control.predictor=list(compute=TRUE), 
              #control.family=list(hyper = list(theta = list(param = c(0.5, 0.5), fixed = FALSE))),
              #only.hyperparam =FALSE,control.compute=list(dic=T))
+summary(mod_inla2)
+bri.hyperpar.summary(mod_inla2)^2
+hrtblt2 <- (bri.hyperpar.summary(mod_inla2)[6, ] / sum(bri.hyperpar.summary(mod_inla2)[, 1])) 
+ind_rpt <- (bri.hyperpar.summary(mod_inla)[4, ] / sum(bri.hyperpar.summary(mod_inla)[, 1])) 
 
-summary(mod_inla)
-(bri.hyperpar.summary(mod_inla)[4, 1] / sum(bri.hyperpar.summary(mod_inla)[, 1])) 
-  
+
+# weight
+
+traits_weight <- traits %>% 
+  dplyr::filter(!is.na(weight))
+
+add_index_inla <- function(traits) {
+  Ndata <- dim(traits)[1]
+  traits$IndexA <- rep(0, times = Ndata)
+  for(i in 1:Ndata) {
+    traits$IndexA[i] <- which(ainv_map[,1]==traits$id[i])
+  }
+  traits
+}
+
+traits_weight<- add_index_inla(traits_weight)
+
+prec_prior <- list(prior = "loggamma", param = c(0.5, 5e-02))
+
+formula <- weight ~ 1 + froh_long + froh_medium + froh_short +  sex + age + age2 + twin + 
+  f(birth_year, model = "iid", hyper = list(prec = prec_prior)) +
+  f(sheep_year, model = "iid", hyper = list(prec = prec_prior)) +
+  f(id, model = "iid", hyper = list(prec = prec_prior)) +
+  f(mum_id, model="iid",  hyper = list(prec = prec_prior)) + 
+  f(IndexA, 
+    model="generic0",
+    hyper = list(theta = list(param = c(0.5, 0.5))),
+    Cmatrix=Cmatrix) #+ # constr=TRUE
+
+# data (these have to be given different names) where IndexA is the additive genetic effect and IndexA.2 is
+# the individual random effect.
+mod_inla0 <- inla(formula=formula, family="gaussian",
+                  data=traits_weight, 
+                  control.compute = list(dic = TRUE))
+
+summary(mod_inla0)
+bri.hyperpar.summary(mod_inla2)^2
+hrtblt <- (bri.hyperpar.summary(mod_inla0)[6, ] / sum(bri.hyperpar.summary(mod_inla0)[, 1])) 
+
+
+
 
 
 #~~~~~~~~~~~ LBS models ~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-# inla
-sheep_ped_inla <- sheep_ped %>% 
-  mutate(Father = ifelse(is.na(Father), 0, Father)) %>% 
-  mutate(Mother = ifelse(is.na(Mother), 0, Mother)) %>% 
-  as.data.frame()
+# ROH vs LBS
+LBS %>% 
+  dplyr::select(froh_short, froh_medium, froh_long, froh_all, lbs, lifespan, sex) %>% 
+  tidyr::pivot_longer(cols = starts_with("froh"), names_to = "froh", values_to = "prop") %>% 
+  ggplot(aes(lbs, prop)) + geom_point() + geom_smooth(method = "lm") + 
+  facet_wrap(sex~froh, scales = "free") 
 
-comp_inv <- AnimalINLA::compute.Ainverse(sheep_ped_inla)
-ainv <- comp_inv$Ainverse
-ainv_map <- comp_inv$map
-Cmatrix <- sparseMatrix(i=ainv[,1],j=ainv[,2],x=ainv[,3])
-Ndata <- dim(LBS)[1]
 
-## Mapping the same index number for "Individual" as in Ainv
-## The IndexA column is the index in the A inverse matrix
-LBS$IndexA <- rep(0,Ndata)
-for(i in 1:Ndata) {
-  LBS$IndexA[i] <- which(ainv_map[,1]==LBS$ID[i])
+LBS_m <- LBS %>% 
+  dplyr::filter(!is.na(lbs)) %>% 
+  dplyr::filter(sex == "M") %>% 
+  mutate(olre = 1:nrow(.))
+
+add_index_inla <- function(traits) {
+  Ndata <- dim(traits)[1]
+  traits$IndexA <- rep(0, times = Ndata)
+  for(i in 1:Ndata) {
+    traits$IndexA[i] <- which(ainv_map[,1]==traits$id[i])
+  }
+  traits
 }
 
-formula <- LBS ~ 1  + froh_not_roh + lifespan + #  + froh_long_std + froh_medium_std + froh_short_std + froh_not_roh_std 
-  f(birth_year, model = "iid") +
-  f(MumID, model="iid") + 
-  f(olre, model="iid") +
-  f(IndexA ,model="generic0", Cmatrix=Cmatrix,
-    constr=TRUE,param = c(0.5, 0.5)) #+
-#  f(IndexA.2,model="iid",param = c(1,0.001), constr=TRUE)
-# 12474
-# y, IndexA and IndexA.2 is the individuals in the
-# data (these have to be given different names) where IndexA is the additive genetic effect and IndexA.2 is
-# the individual random effect.
+LBS_m <- add_index_inla(LBS_m)
 
-LBS_female <- LBS %>% filter(sex == "F") %>% 
-                mutate(olre = 1:nrow(.))
+
+prec_prior <- list(prior = "loggamma", param = c(0.5, 5e-02))
+
+formula <- lbs ~ 1  + froh_long + froh_medium + froh_short + lifespan + #  + froh_long_std + froh_medium_std + froh_short_std + froh_not_roh_std 
+  f(birth_year, model = "iid", hyper = list(prec = prec_prior)) +
+  f(mum_id, model="iid", hyper = list(prec = prec_prior)) + 
+  f(olre, model="iid", hyper = list(prec = prec_prior)) +
+  f(IndexA ,model="generic0", Cmatrix=Cmatrix,
+    constr=TRUE, param = c(0.5, 0.5)) #+
 
 mod_inla1 <- inla(formula=formula, family="poisson",
-                 data=LBS_female, 
+                 data=LBS_m, 
                  control.compute = list(dic = TRUE))
 
+
 summary(mod_inla1)
+
 exp(0.21)
 EY <- mean(LBS_female$LBS)
 estdv_link = log(1/EY+1)

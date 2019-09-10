@@ -22,10 +22,17 @@ chr_data <- read_delim("../sheep/data/chromosome_data.txt", delim = "\t") %>%
                         mutate(size_KB = `Size (Mb)` * 1000,
                                size_BP = size_KB * 1000) %>% 
                         rename(CHR = Name) %>% 
-                        select(CHR, size_KB, size_BP)
+                        dplyr::select(CHR, size_KB, size_BP)
                 
 
-#2570000
+# add homozygosity not in roh
+homs <- read_delim("output/ROH/roh_nofilt_hom_not_in_roh.txt", delim = " ") %>% 
+            rename(prop_IBD = hom, 
+                   FID = ID) %>% 
+            mutate(FID = as.character(FID)) %>% 
+            mutate(length_class = as.factor(rep("not_in_ROH", nrow(.))))
+                
+
 #2439314
 # sheep gen    me size 2869490 KB 
 #~~ Length distribution
@@ -36,19 +43,13 @@ roh_lengths <- fread(file_path)
 froh <- roh_lengths %>%
         dplyr::group_by(FID) %>%
         dplyr::summarise(KBAVG = mean(KB), KBSUM = sum(KB)) %>%
-        mutate(FROH = KBSUM/2869490)
+        mutate(FROH = KBSUM/2619054)
 
 # FROH across individuals
 p_dist <- ggplot(froh, aes(FROH)) +
-    geom_histogram(bins = 1000) +
+    geom_histogram(bins = 500) +
     theme_clean() +
-    ylab("individual count") +
-    geom_vline(xintercept = min(froh$FROH), alpha = 0.5) +
-    annotate("text",  min(froh$FROH) + 0.04, 80, label = paste0("min = ", round(min(froh$FROH), 2))) +
-    geom_vline(xintercept = median(froh$FROH), alpha = 0.8) +
-    annotate("text",  median(froh$FROH) + 0.05, 80, label = paste0("median = ", round(median(froh$FROH), 2))) +
-    geom_vline(xintercept = max(froh$FROH), alpha = 0.5) +
-    annotate("text",  max(froh$FROH) - 0.04, 80, label = paste0("max = ", round(max(froh$FROH), 2))) 
+    ylab("individual count") 
 p_dist
 
 ggsave("figs/FROH_dist.jpg", p_dist, width = 5, height = 3)
@@ -58,44 +59,105 @@ ggsave("figs/FROH_dist.jpg", p_dist, width = 5, height = 3)
 # a separation of m meisies (2m generations) results in segment lengths that are
 # exponentially distributied with mean 100/m cM
 
-length_dist <- data.frame(g = c(1, 2,2^2,2^3,2^4,2^5,2^6,2^7,2^8,2^9,2^10,2^11,2^12,2^13)) %>%
-        mutate(ROH_length_Mb = 100 / (2*g))
+
+# 1.451221 cM/Mb for Males
+# 1.037693 cM/Mb for Females
+# 1.279305 cM/Mb sex-averaged
+# 
+# 1cM is 0.6890747 in males
+# 1cM is 0.9636761 in females
+# 1cM is 0.7816743 sex-averaged
+
+length_dist <- data.frame(g = c(1, 2,2^2, 2^3, 2^4,2^5,2^6,2^7,2^8,2^9,2^10,2^11,2^12,2^13)) %>%
+        mutate(ROH_length_cM = 100 / (2*g)) %>% 
+        mutate(ROH_length_Mb = ROH_length_cM * 0.7816743)
 
 prop_IBD_df <- roh_lengths %>%
         mutate(length_Mb = KB/1000) %>%
-        mutate(class = case_when(length_Mb >= 50.00000000 ~ 1,
-                                 length_Mb < 50.000000000 & length_Mb >= 25.000000 ~ 2,
-                                 length_Mb < 25.000000000 & length_Mb >= 12.500000000 ~ 4,
-                                 length_Mb < 12.500000000 & length_Mb >= 6.250000000 ~ 8,
-                                 length_Mb < 6.250000000 & length_Mb >= 3.125000000 ~ 16,
-                                 length_Mb < 3.125000000 & length_Mb >= 1.562500000 ~ 32,
-                                 length_Mb < 1.562500000 & length_Mb >= 0.781250000 ~ 64)) %>%
+        mutate(class = case_when(length_Mb >= 39.083715000 ~ 1,
+                                 length_Mb < 39.083715000 & length_Mb >= 19.541857500 ~ 2,
+                                 length_Mb < 19.541857500 & length_Mb >= 9.770928750 ~ 4,
+                                 #length_Mb < 9.770928750 & length_Mb >= 6.513952500 ~ 6,
+                                 length_Mb < 9.770928750& length_Mb >= 4.885464375 ~ 8,
+                                # length_Mb < 4.885464375 & length_Mb >= 3.908371500 ~ 10,
+                                 length_Mb < 4.885464375 & length_Mb >= 2.442732188 ~ 16,
+                                 length_Mb < 2.442732188 & length_Mb >= 1.221366094 ~ 32,
+                                 length_Mb < 1.221366094 & length_Mb >= 0.5 ~ 64)) %>% # 0.610683047
         mutate(length_class = case_when(
-          class == 1 ~ "> 50 (1G)",
-          class == 2 ~ "25-50 (2G)",
-          class == 4 ~ "12.5-25 (4G)",
-          class == 8 ~ "6.3-12.5 (8G)",
-          class == 16 ~ "3.13-6.3 (16G)",
-          class == 32 ~ "1.6-3.13 (32G)",
-          class == 64 ~ "0.78-1.6 (64G)"
+          class == 1 ~ "> 39 (1G)",
+          class == 2 ~ "19.5-39 (2G)",
+          class == 4 ~ "9.8-19.5 (4G)",
+         # class == 6 ~ "6.5-9.7 (6G)",
+          class == 8 ~ "4.9-6.5 (8G)",
+         # class == 10 ~ "3.9-4.9 (10G",
+          class == 16 ~ "2.4-4.9 (16G)",
+          class == 32 ~ "1.2-2.4 (32G)",
+          class == 64 ~ "0.6-1.2 (64G)"
         )) %>% 
         mutate(length_class = fct_reorder(length_class, class)) %>% 
         mutate(FID = as.character(FID)) %>% 
         group_by(FID, class, length_class) %>%
-        dplyr::summarise(prop_IBD = sum(length_Mb / 2869))
+        dplyr::summarise(prop_IBD = sum(length_Mb / 2619)) #%>% 
+        # add IBD of non-ROH snps if wanted
+      #  bind_rows(homs) 
 
-# pop wide
-col <- wes_palette("Moonrise2")
-col <- col[c(1,2,3)]
+prop_IBD_df_with_0 <- prop_IBD_df %>% 
+        # add missing length classes as 0
+        ungroup() %>% 
+        tidyr::complete(length_class, nesting(FID)) %>% 
+        mutate(class = ifelse(is.na(class), length_class, class)) %>% 
+        mutate(prop_IBD = ifelse(is.na(prop_IBD), 0, prop_IBD))
+ 
 
-p_roh <- ggplot(prop_IBD_df, aes(length_class, prop_IBD)) +
+# ROH class distributions as prop. 
+
+prop_IBD_df
+p_roh <- ggplot(prop_IBD_df_with_0, aes(length_class, prop_IBD)) +
         geom_jitter(alpha = 0.3, width = 0.2) +
         geom_boxplot(outlier.shape = NA, color = "lightgrey", alpha = 0.7) +
         theme_clean() +
         #theme(axis.ticks.x = element_line(colour = "#cccccc", size = 0.3)) +
         xlab("ROH class (Mb)") + ylab("Proportion of genome in ROH")
 p_roh
-ggsave("figs/roh_classes_boxplots.jpg", p_roh, width = 8, height = 5)
+ggsave("figs/roh_classes_boxplots_many_categories.jpg", p_roh, width = 10, height = 5)
+
+library(ggridges)
+library(viridis)
+
+IBD_across_classes <- prop_IBD_df %>% 
+  #sample_frac(0.05) %>% 
+  ggplot(aes(prop_IBD, length_class)) +
+  #geom_density_ridges(scale = 2, jittered_points=TRUE, point_shape = "|",
+  #                    position = position_points_jitter(height = 0),) +
+  stat_density_ridges(quantile_lines = TRUE,bandwidth = 0.003) + # , bandwidth = 0.002
+  scale_y_discrete(limits = rev(levels(prop_IBD_df$length_class))) +
+  ylab("ROH length class in Mb (generations)") +
+  xlab("Proportion of the genome") + 
+  #scale_fill_viridis(name = "Temp. [F]", option = "C")  +
+  theme_clean()
+IBD_across_classes
+ggsave("figs/roh_classes_ridgeplot.jpg", IBD_across_classes, width = 10, height = 10)
+
+
+library(GGally)
+library("naniar")
+
+?ggpairs
+
+ROH_classes_pairs <- prop_IBD_df_with_0 %>% 
+  split(prop_IBD_df_with_0$length_class) %>% 
+  reduce(left_join, by = "FID") %>% 
+  dplyr::select(contains("prop_IBD")) %>% 
+  rename_all(~ levels(prop_IBD_df_with_0$length_class)) %>% 
+ # sample_frac(0.01) %>% 
+ # mutate_all(funs(ifelse(. == 0, NA, .)))
+  replace_with_na_all(condition = ~.x == 0) %>% 
+  ggscatmat(alpha = 0.3) +
+  geom_smooth(method = "lm") +
+  theme_clean()
+
+ggsave("figs/roh_classes_pairs_many_cat.jpg", ROH_classes_pairs, width = 13, height = 12)
+
 
 # ind basis
 prop_IBD_df %>% 
@@ -104,12 +166,12 @@ prop_IBD_df %>%
   filter(FID %chin% sample(as.character(unique(prop_IBD_df$FID)), 
                            100, replace = FALSE)) -> plot_ibd_df
 
-col_pal <- rev(c(brewer.pal(6, "YlGnBu"), "#A42820"))
+col_pal <- rev(c(brewer.pal(7, "YlGnBu"), "#A42820"))
 
 prop_IBD_df %>% 
   ungroup() %>% 
   # filter(class %in% c(1,2,4)) %>% 
-  filter(FID %chin% sample(as.character(unique(prop_IBD_df$FID)), 400, replace = FALSE)) %>% 
+  filter(FID %chin% sample(as.character(unique(prop_IBD_df$FID)), 500, replace = FALSE)) %>% 
   ggplot(aes(x=FID, y=prop_IBD, fill=length_class)) +
           geom_bar(stat="identity") +
          # scale_fill_brewer(palette = "YlGnBu", name = "ROH class (Mb)", direction = -1) +
@@ -121,10 +183,8 @@ prop_IBD_df %>%
           xlab("Individuals") + 
           scale_x_discrete(expand = c(0, 0)) + 
           scale_y_continuous(expand = c(0, 0)) -> p_roh2
-p_roh1
+p_roh2
 ggsave("figs/roh_classes_subset_inds.jpg", p_roh2, width = 20, height = 5)
-
-
 
 
 #~~~ ROH density
@@ -137,8 +197,8 @@ hom_sum <- hom_sum %>%
 
 
 # Here's how you can do this with the dplyr functions group_by and do:
-window_width <- 200
-jumps <- 200
+window_width <- 100
+jumps <- 100
 running_roh <- hom_sum %>% 
   group_by(CHR) %>% 
   do(
@@ -149,20 +209,37 @@ running_roh <- hom_sum %>%
     )
   )
 
-running_roh$index = 1:nrow(x)
+# running_roh$index = 1:nrow(x)
 p_running_roh <- running_roh %>% 
   filter(CHR %in% 1:26) %>% 
   ggplot(aes(window.start, ninds)) +
   geom_line() +
-  scale_y_continuous(breaks = c(1844, 5531), labels = c("25%", "75%")) +
+  scale_y_continuous(breaks = c(369, 1844, 5531, 7005), labels = c("5%", "25%", "75%", "95%"),
+                     limits = c(0,7374)) +
   theme_clean() + 
   ggtitle("Average ROH across the genome of 7374 Soay sheep") +
   xlab("Window start (in Base Pairs) of 200 BP window") +
   ylab("Individuals with ROH") + 
   annotate("rect", xmin=-Inf, xmax=Inf, ymin=1844, ymax=5531, alpha=0.1) +
+  geom_hline(yintercept = 369, size = 0.3) +
+  geom_hline(yintercept = 7005, size = 0.3) +
   facet_grid(CHR~.) 
+p_running_roh 
 
-ggsave("figs/roh_across_genome.jpg", p_running_roh, width = 8, height = 8)
+ggsave("figs/roh_across_genome2.jpg", p_running_roh, width = 8, height = 8)
+
+
+
+# variance per IBD class
+library(mclust)
+?mclust
+roh_lengths %>% 
+  group_by(FID) %>% 
+  summarise(KB = mean(KB))
+  
+out <- Mclust(roh_lengths$KB)
+summary(out)
+plot(out)
 
 
 #~~ Runs of ROH
