@@ -1,13 +1,9 @@
 library(tidyverse)
 library(MasterBayes)
 library(data.table)
+
 # annual measures of traits and fitness
 annual_fitness <- read_delim("../sheep/data/1_Annual_Fitness_Measures_April_20190501.txt", delim = "\t")
-# sheep_ped <- annual_fitness %>% 
-#         dplyr::select(ID, MOTHER, FATHER) %>% 
-#         group_by(ID) %>% 
-#         summarise(Mother = first(MOTHER),
-#                   Father = first(FATHER))
 
 # get LRS
 sheep_ped <- read_delim("../sheep/data/SNP_chip/20190711_Full_Pedigree.txt", 
