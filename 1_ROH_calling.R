@@ -10,10 +10,17 @@ library(snpStats)
 # # test ROH on subset
 # system("~/programs/plink --bfile data/sheep_imp --keep data/subset_inds.txt --make-bed --out data/geno_sub --sheep")
 
-# calculate ROH according to Joshi et al. (unpruned)
+# calculate ROH 
 system(paste0("~/programs/plink --bfile ../sheep/data/SNP_chip/sheep_geno_imputed_04092019 --sheep --out output/ROH/roh_nofilt ",
-              "--homozyg --homozyg-window-snp 50 --homozyg-snp 50 --homozyg-kb 500 ",
-              "--homozyg-gap 250 --homozyg-density 50 --homozyg-window-missing 5 ",
+              "--homozyg --homozyg-window-snp 30 --homozyg-snp 50 --homozyg-kb 300 ",
+              "--homozyg-gap 300 --homozyg-density 50 --homozyg-window-missing 3 ",
+              "--homozyg-het 3 ",
+              "--homozyg-window-het 1"))
+
+system(paste0("~/programs/plink --bfile ../sheep/data/SNP_chip/sheep_geno_imputed_04092019 --sheep --out output/ROH/roh_nofilt_1Mb ",
+              "--homozyg --homozyg-window-snp 50 --homozyg-snp 50 --homozyg-kb 1000 ",
+              "--homozyg-gap 500 --homozyg-density 50 --homozyg-window-missing 5 ",
+              "--homozyg-het 3 ",
               "--homozyg-window-het 1"))
 
 file_path <- "output/ROH/roh_nofilt.hom"

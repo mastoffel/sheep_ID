@@ -1,7 +1,46 @@
 library(dplyr)
-
+library(tidyverse)
+library(ggridges)
 # ROH across the lifetime
 load("model_in/fitness_roh_df.RData")
+
+fitness_data %>% 
+        group_by(age) 
+
+fitness_data %>% 
+        filter(Age<11) %>% 
+        mutate(Age = as.factor(Age)) %>% 
+        pivot_longer(cols = starts_with("FROH"),
+                     names_to = "roh_class",
+                     values_to = "prop_roh") %>% 
+        ggplot(aes(prop_roh)) +
+        geom_histogram(bins = 200) +
+        #facet_wrap(Age ~ roh_class,  ncol = 4) +
+        facet_grid(Age ~ roh_class, scales = "free_x") +
+        scale_y_log10()
+
+
+fitness_data %>% 
+        filter(Age<11) %>% 
+        mutate(Age = as.factor(Age)) %>% 
+        group_by(Age) %>% 
+        summarise_at(vars(FROH_short:FROH_long), funs(median, mean))
+
+fitness_data %>% 
+        filter(Age == 0 | Age == 1) %>% 
+        filter(!is.na(Survival)) %>% 
+        mutate(Survival = as.factor(Survival)) %>% 
+        ggplot(aes(Survival, FROH_long)) +
+        geom_boxplot() 
+
+
+
+fitness_data %>% 
+        filter(Age<11) %>% 
+        mutate(Age = as.factor(Age)) %>% 
+        ggplot(aes(FROH_long, Age)) +
+        stat_binline() 
+
 
 fitness_data %>% 
         group_by(Age) %>% 

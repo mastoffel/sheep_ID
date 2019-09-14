@@ -46,11 +46,33 @@ LBS <- fitness_data %>%
                froh_short_std = scale(froh_short),
                froh_not_roh_std = scale(froh_not_roh)) %>% 
         as.data.frame() 
-
 # general plots
 ggplot(LBS, aes(lifespan)) + geom_histogram() + facet_wrap(sex ~ ., scales = "free")
 ggplot(LBS, aes(lbs)) + geom_histogram() + facet_wrap(sex ~ ., scales = "free")
 ggplot(LBS, aes(lifespan, lbs, color = sex)) + geom_jitter(alpha = 0.3) + geom_smooth()
+
+
+Early_survival <- fitness_data %>% 
+  dplyr::rename(birth_year = BIRTHYEAR,
+                age = Age,
+                id = ID,
+                twin = TWIN,
+                sex = SEX,
+                mum_id = MOTHER,
+                froh_short = FROH_short,
+                froh_medium = FROH_medium,
+                froh_long = FROH_long,
+                froh_all = FROH_all,
+                froh_not_roh = hom,
+                survival = Survival) %>% 
+  # some individuals arent imputed well and should be discarded 
+  filter(!(id %in% IDs_lots_missing)) %>% 
+  filter(age == 0) %>% 
+  filter(!is.na(froh_all)) %>% 
+  filter(!(is.na(birth_year) | is.na(mum_id))) %>% 
+  mutate_at(c("id", "birth_year", "mum_id", "sex"), as.factor) %>% 
+  as.data.frame() 
+
 
 traits <- fitness_data %>% 
         # some individuals arent imputed well and should be discarded 
@@ -75,7 +97,7 @@ traits <- fitness_data %>%
                       hindleg, froh_short, froh_medium, froh_long, froh_all,
                       froh_not_roh, CapMonth) %>% 
         # estimate from yearlings onwards
-        filter(age > 0) %>% 
+        # filter(age > 0) %>% # later on
         filter(CapMonth == 8) %>% 
         filter(!is.na(sex) & !is.na(mum_id) & !is.na(birth_year) & !is.na(froh_long),
                !is.na(sheep_year), !is.na(age)) %>% 
@@ -134,10 +156,20 @@ Cmatrix <- sparseMatrix(i=ainv[,1],j=ainv[,2],x=ainv[,3])
 
 ## Mapping the same index number for "Individual" as in Ainv
 ## The IndexA column is the index in the A inverse matrix
-traits_hindleg <- traits %>% 
+traits_hindleg_lambs <- traits %>% 
+  filter(age == 0) %>% 
   dplyr::filter(!is.na(hindleg))
 
-traits_weight <- traits %>% 
+traits_weight_lambs <- traits %>% 
+  filter(age == 0) %>% 
+  dplyr::filter(!is.na(weight))
+
+traits_hindleg_adults <- traits %>% 
+  filter(age > 0) %>% 
+  dplyr::filter(!is.na(hindleg))
+
+traits_weight_adults <- traits %>% 
+  filter(age > 0) %>% 
   dplyr::filter(!is.na(weight))
 
 add_index_inla <- function(traits) {
@@ -149,8 +181,11 @@ add_index_inla <- function(traits) {
   traits
 }
 
-traits_hindleg <- add_index_inla(traits_hindleg)
-traits_weight<- add_index_inla(traits_weight)
+# add index to all datasets
+traits_hindleg_adults <- add_index_inla(traits_hindleg_adults)
+traits_weight_adults  <- add_index_inla(traits_weight_adults)
+traits_hindleg_lambs <- add_index_inla(traits_hindleg_lambs)
+traits_weight_lambs  <- add_index_inla(traits_weight_lambs)
 
 # which prior? Same as for additive genetic variance seems to work well
 # for all other random effects too
@@ -159,10 +194,99 @@ prec_prior <- list(prior = "loggamma", param = c(0.5, 0.5))
 # fit a few models 
 froh_combinations <- c("froh_long + froh_medium + froh_short",
                        "froh_long_std + froh_medium_std + froh_short_std",
-                       "froh_long",
-                       "froh_medium",
-                       "froh_short",
+                      # "froh_long",
+                      # "froh_medium",
+                      # "froh_short",
                        "froh_all")
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~Lambs: Weight and Hindleg~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+# lambs 
+formula_base_lambs <- paste('sex + twin + 1', 
+                      'f(birth_year, model = "iid", hyper = list(prec = prec_prior))',
+                      'f(mum_id, model="iid",  hyper = list(prec = prec_prior))', 
+                      'f(IndexA, model="generic0", hyper = list(theta = list(param = c(0.5, 0.5))),Cmatrix=Cmatrix)', 
+                      sep = " + ")
+
+# define responses
+responses_lambs <- c('hindleg ~', 'weight ~')
+
+# create data frame with variations
+form_var_lambs <- tidyr::crossing(responses_lambs, froh_combinations) %>% 
+                    mutate(formula_base_lambs = rep(formula_base_lambs, 6))
+  
+# create complete formulas for inla
+formulas_lambs <- map2(form_var_lambs$responses_lambs, form_var_lambs$froh_combinations,
+                       function(trait, fixed_effects) {
+                         as.formula(paste(trait, fixed_effects, '+', formula_base_lambs))
+                       })
+
+# create list-column table for modeling
+mods_lambs <- tibble(response = rep(c("hindleg", "weight"), each = 3), formula = formulas_lambs) %>% 
+                      mutate(data = case_when(
+                        response == "hindleg" ~ list(traits_hindleg_lambs),
+                        response == "weight"  ~ list(traits_weight_lambs)
+                      ))
+
+# model inla for gaussian traits
+inla_gaussian_traits <- function(formula, data) {
+  mod_inla <- inla(formula=formula, family="gaussian",
+                   data=data, 
+                   control.compute = list(dic = TRUE))
+}
+
+# run all the models
+lambs_mods <- map2(mods_lambs$formula, mods_lambs$data, inla_gaussian_traits)
+
+mods_lambs$fitted <- lambs_mods
+# saveRDS(mods_lambs, "output/models/mods_lambs.RDS")
+
+
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~Adults: Weight and Hindleg~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+formula_base_adults <-  paste('sex + age + age2 + twin + 1', 
+                              'f(birth_year, model = "iid", hyper = list(prec = prec_prior))',
+                              'f(sheep_year, model = "iid", hyper = list(prec = prec_prior))',
+                              'f(id, model = "iid", hyper = list(prec = prec_prior))',
+                              'f(mum_id, model="iid",  hyper = list(prec = prec_prior))', 
+                              'f(IndexA, model="generic0", hyper = list(theta = list(param = c(0.5, 0.5))),Cmatrix=Cmatrix)', sep = " + ")
+
+# define responses
+responses_adults <- c('hindleg ~', 'weight ~')
+
+# create data frame with variations
+form_var_adults <- tidyr::crossing(responses_adults, froh_combinations) %>% 
+  mutate(formula_base_adults = rep(formula_base_adults, 6))
+
+# create complete formulas for inla
+formulas_adults <- map2(form_var_adults$responses_adults, form_var_adults$froh_combinations,
+                       function(trait, fixed_effects) {
+                         as.formula(paste(trait, fixed_effects, '+', formula_base_lambs))
+                       })
+
+# create list-column table for modeling
+mods_adults <- tibble(response = rep(c("hindleg", "weight"), each = 3), formula = formulas_adults) %>% 
+  mutate(data = case_when(
+    response == "hindleg" ~ list(traits_hindleg_adults),
+    response == "weight"  ~ list(traits_weight_adults)
+  ))
+
+
+# model inla for gaussian traits
+inla_gaussian_traits <- function(formula, data) {
+  mod_inla <- inla(formula=formula, family="gaussian",
+                   data=data, 
+                   control.compute = list(dic = TRUE))
+}
+
+# run all the models
+adults_mods <- map2(mods_adults$formula, mods_adults$data, inla_gaussian_traits)
+
+# 
+map(adults_mods, summary)
 
 # this part of the formula stays the same
 formula_base <- paste('sex + age + age2 + twin + 1', 
@@ -174,6 +298,8 @@ formula_base <- paste('sex + age + age2 + twin + 1',
 
 # make all formulas for hindleg models
 all_formulas_hindleg <- map(paste('hindleg ~', froh_combinations, ' + ', formula_base), as.formula) # env=globalenv()
+# make all formulas for weight models
+all_formulas_weight  <- map(paste('weight ~', froh_combinations, ' + ', formula_base), as.formula)
 
 # model inla for gaussian traits
 inla_gaussian_traits <- function(formula, data) {
@@ -182,40 +308,32 @@ inla_gaussian_traits <- function(formula, data) {
                      control.compute = list(dic = TRUE))
 }
 
-# run models 
+# run models for hindleg
 all_inla_mods_hindleg <- map(all_formulas_hindleg, inla_gaussian_traits, traits_hindleg)
-
-# make all formulas for weight models
-all_formulas_weight  <- map(paste('weight ~', froh_combinations, ' + ', formula_base), as.formula)
-
-# run models
+# run models for weight
 all_inla_mods_weight <- map(all_formulas_weight, inla_gaussian_traits, traits_weight)
 
 # combine into df
 gaussian_mods <- tibble(fitted = c(all_inla_mods_hindleg, all_inla_mods_weight), 
                         formulas = c(all_formulas_hindleg, all_formulas_weight),
                         response = c(rep("hindleg", 6), rep("weight", 6)))
-saveRDS(gaussian_mods, file = "output/models/gaussian_mods.rds")
-
-
-map(all_inla_mods_hindleg, function(x) x$summary.fixed)
-map(all_inla_mods_weight, function(x) x$summary.fixed)
-
-summary(mod_inla0)
-bri.hyperpar.summary(mod_inla2)^2
-hrtblt <- (bri.hyperpar.summary(mod_inla0)[6, ] / sum(bri.hyperpar.summary(mod_inla0)[, 1])) 
+saveRDS(gaussian_mods, file = "output/models/mods_adults.rds")
 
 
 
 
-#~~~~~~~~~~~ LBS models ~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ LBS models ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 # ROH vs LBS
 LBS %>% 
   dplyr::select(froh_short, froh_medium, froh_long, froh_all, lbs, lifespan, sex) %>% 
   tidyr::pivot_longer(cols = starts_with("froh"), names_to = "froh", values_to = "prop") %>% 
-  ggplot(aes(lbs, prop)) + geom_point() + geom_smooth(method = "lm") + 
+  ggplot(aes(prop, lbs)) + geom_point() + geom_smooth(method = "lm") + 
   facet_wrap(sex~froh, scales = "free", nrow= 2) 
+
+
+# prep data
 
 LBS_m <- LBS %>% 
   dplyr::filter(!is.na(lbs)) %>% 
@@ -236,53 +354,112 @@ add_index_inla <- function(traits) {
   traits
 }
 
+# add index to all datasets
 LBS_m <- add_index_inla(LBS_m)
 LBS_f <- add_index_inla(LBS_f)
 
-# prior same for all random effects
+# which prior? Same as for additive genetic variance seems to work well
+# for all other random effects too
 prec_prior <- list(prior = "loggamma", param = c(0.5, 0.5))
 
 # fit a few models 
 froh_combinations <- c("froh_long + froh_medium + froh_short",
                        "froh_long_std + froh_medium_std + froh_short_std",
-                       "froh_long",
-                       "froh_medium",
-                       "froh_short",
+                       # "froh_long",
+                       # "froh_medium",
+                       # "froh_short",
                        "froh_all")
 
-# this part of the formula stays the same
-formula_base <- paste('lifespan + twin + 1', 
-                      'f(birth_year, model = "iid", hyper = list(prec = prec_prior))',
-                      'f(mum_id, model="iid",  hyper = list(prec = prec_prior))', 
-                      'f(olre, model="iid",  hyper = list(prec = prec_prior))', 
-                      'f(IndexA, model="generic0", hyper = list(theta = list(param = c(0.5, 0.5))),Cmatrix=Cmatrix)', sep = " + ")
 
-# make all formulas for hindleg models
-all_formulas_lbs <- map(paste('lbs ~', froh_combinations, ' + ', formula_base), as.formula) # env=globalenv()
+# lambs 
+formula_base_lbs <- paste('lifespan + twin + 1', 
+                            'f(birth_year, model = "iid", hyper = list(prec = prec_prior))',
+                            'f(mum_id, model="iid",  hyper = list(prec = prec_prior))', 
+                            'f(olre, model="iid",  hyper = list(prec = prec_prior))', 
+                            'f(IndexA, model="generic0", hyper = list(theta = list(param = c(0.5, 0.5))),Cmatrix=Cmatrix)', sep = " + ")
+
+# define responses
+responses_lbs <- c('lbs ~')
+
+# create data frame with variations
+form_var_lbs <- tidyr::crossing(responses_lbs, froh_combinations) %>% 
+  mutate(formula_base_lbs  = rep(formula_base_lbs , 3))
+
+# create complete formulas for inla
+formulas_lbs <- map2(form_var_lbs$responses_lbs, form_var_lbs$froh_combinations,
+                       function(trait, fixed_effects) {
+                         as.formula(paste(trait, fixed_effects, '+', formula_base_lbs))
+                       })
+
+# create list-column table for modeling
+mods_lbs <- tibble(sex = rep(c("F", "M"), each = 3), formula = rep(formulas_lbs, 2)) %>% 
+  mutate(data = case_when(
+    sex == "F" ~ list(LBS_f),
+    sex == "M" ~ list(LBS_m)
+  ))
+
+# model inla for gaussian traits
+inla_poisson_lbs <- function(formula, data) {
+  mod_inla <- inla(formula=formula, family="poisson",
+                   data=data, 
+                   control.compute = list(dic = TRUE))
+}
+
+
+# run all the models
+lbs_mods <- map2(mods_lbs$formula, mods_lbs$data, inla_poisson_lbs)
+
+mods_lbs$fitted <- lbs_mods
+saveRDS(mods_lbs, file = "output/models/mods_lbs.rds")
+
+mod <- mods_lbs$fitted[[5]]
+summary(mod)
 
 
 
 
-formula <- lbs ~ 1  + froh_long + froh_medium + froh_short + lifespan + #  + froh_long_std + froh_medium_std + froh_short_std + froh_not_roh_std 
-  f(birth_year, model = "iid", hyper = list(prec = prec_prior)) +
-  f(mum_id, model="iid", hyper = list(prec = prec_prior)) + 
-  f(olre, model="iid", hyper = list(prec = prec_prior)) +
-  f(IndexA ,model="generic0", Cmatrix=Cmatrix,
-    constr=TRUE, param = c(0.5, 0.5)) #+
 
-mod_inla1 <- inla(formula=formula, family="poisson",
-                 data=LBS_m, 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Early survival models ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+
+Early_survival_df <- Early_survival %>% 
+  dplyr::filter(!is.na(survival)) 
+
+add_index_inla <- function(traits) {
+  Ndata <- dim(traits)[1]
+  traits$IndexA <- rep(0, times = Ndata)
+  for(i in 1:Ndata) {
+    traits$IndexA[i] <- which(ainv_map[,1]==traits$id[i])
+  }
+  traits
+}
+
+# add index to all datasets
+Early_survival_df  <- add_index_inla(Early_survival_df)
+
+formula_surv <- as.formula(paste('survival ~ froh_long + froh_medium + froh_short + age + sex + twin + 1', 
+                          'f(birth_year, model = "iid", hyper = list(prec = prec_prior))',
+                          'f(mum_id, model="iid",  hyper = list(prec = prec_prior))', 
+                          'f(IndexA, model="generic0", hyper = list(theta = list(param = c(0.5, 0.5))),Cmatrix=Cmatrix)', sep = " + "))
+
+prec_prior <- list(prior = "loggamma", param = c(0.5, 0.5))
+
+mod_inla2 <- inla(formula=formula_surv, family="binomial",
+                 data=Early_survival_df, 
                  control.compute = list(dic = TRUE))
 
+summary(mod_inla2)
 
-summary(mod_inla1)
 
-exp(0.21)
-EY <- mean(LBS_female$LBS)
-estdv_link = log(1/EY+1)
+
+
+
+# 
 library(QGglmm)
-QGparams(mu=-1.5232, var.a=0.274242132^2, var.p = sum(bri.hyperpar.summary(mod_inla1)[, 1])^2,
-                              model = "Poisson.log")
+summary(mod)
+bri.hyperpar.summary(mod) ^ 2
+
+QGparams(mu=0.0527, var.a=0.2780856, var.p = sum(bri.hyperpar.summary(mod)[, 1]^2), model = "Poisson.log")
 
 (bri.hyperpar.summary(mod_inla1)[4, 1] / (sum(bri.hyperpar.summary(mod_inla1)[, 1][-1]) + 1/ +  estdv_link))
 

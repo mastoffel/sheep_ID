@@ -82,7 +82,8 @@ prop_IBD_df <- roh_lengths %>%
                                 # length_Mb < 4.885464375 & length_Mb >= 3.908371500 ~ 10,
                                  length_Mb < 4.885464375 & length_Mb >= 2.442732188 ~ 16,
                                  length_Mb < 2.442732188 & length_Mb >= 1.221366094 ~ 32,
-                                 length_Mb < 1.221366094 & length_Mb >= 0.5 ~ 64)) %>% # 0.610683047
+                                 length_Mb < 1.221366094 & length_Mb >= 0.610683047 ~ 64,
+                                 length_Mb < 0.610683047 & length_Mb >= 0.30 ~ 128)) %>% # 0.610683047
         mutate(length_class = case_when(
           class == 1 ~ "> 39 (1G)",
           class == 2 ~ "19.5-39 (2G)",
@@ -92,7 +93,8 @@ prop_IBD_df <- roh_lengths %>%
          # class == 10 ~ "3.9-4.9 (10G",
           class == 16 ~ "2.4-4.9 (16G)",
           class == 32 ~ "1.2-2.4 (32G)",
-          class == 64 ~ "0.6-1.2 (64G)"
+          class == 64 ~ "0.6-1.2 (64G)",
+          class == 128 ~ "0.6-0.3 (128G)"
         )) %>% 
         mutate(length_class = fct_reorder(length_class, class)) %>% 
         mutate(FID = as.character(FID)) %>% 
@@ -119,7 +121,7 @@ p_roh <- ggplot(prop_IBD_df_with_0, aes(length_class, prop_IBD)) +
         #theme(axis.ticks.x = element_line(colour = "#cccccc", size = 0.3)) +
         xlab("ROH class (Mb)") + ylab("Proportion of genome in ROH")
 p_roh
-ggsave("figs/roh_classes_boxplots_many_categories.jpg", p_roh, width = 10, height = 5)
+ggsave("figs/roh_classes_boxplots.jpg", p_roh, width = 9, height = 5)
 
 library(ggridges)
 library(viridis)
@@ -136,7 +138,7 @@ IBD_across_classes <- prop_IBD_df %>%
   #scale_fill_viridis(name = "Temp. [F]", option = "C")  +
   theme_clean()
 IBD_across_classes
-ggsave("figs/roh_classes_ridgeplot.jpg", IBD_across_classes, width = 10, height = 10)
+ggsave("figs/roh_classes_ridgeplot.jpg", IBD_across_classes, width = 8, height = 8)
 
 
 library(GGally)
@@ -154,9 +156,11 @@ ROH_classes_pairs <- prop_IBD_df_with_0 %>%
   replace_with_na_all(condition = ~.x == 0) %>% 
   ggscatmat(alpha = 0.3) +
   geom_smooth(method = "lm") +
-  theme_clean()
+  theme_clean() +
+  xlab("FROH") +
+  ylab("FROH")
 
-ggsave("figs/roh_classes_pairs_many_cat.jpg", ROH_classes_pairs, width = 13, height = 12)
+ggsave("figs/roh_classes_pairs.jpg", ROH_classes_pairs, width = 13, height = 12)
 
 
 # ind basis
@@ -166,8 +170,8 @@ prop_IBD_df %>%
   filter(FID %chin% sample(as.character(unique(prop_IBD_df$FID)), 
                            100, replace = FALSE)) -> plot_ibd_df
 
-col_pal <- rev(c(brewer.pal(7, "YlGnBu"), "#A42820"))
-
+col_pal <- rev(c(brewer.pal(7, "YlGnBu"),  "firebrick1")) ##A42820
+#col_pal <- rev(c(brewer.pal(6, "YlGnBu"), "goldenrod", "firebrick1")) 
 prop_IBD_df %>% 
   ungroup() %>% 
   # filter(class %in% c(1,2,4)) %>% 
@@ -182,9 +186,10 @@ prop_IBD_df %>%
           ylab("Proportion of genome in ROH") + 
           xlab("Individuals") + 
           scale_x_discrete(expand = c(0, 0)) + 
-          scale_y_continuous(expand = c(0, 0)) -> p_roh2
+          scale_y_continuous(expand = c(0, 0)) +
+          theme(legend.position = "bottom") -> p_roh2
 p_roh2
-ggsave("figs/roh_classes_subset_inds.jpg", p_roh2, width = 20, height = 5)
+ggsave("figs/roh_classes_subset_inds.jpg", p_roh2, width = 15, height = 5)
 
 
 #~~~ ROH density
@@ -197,8 +202,8 @@ hom_sum <- hom_sum %>%
 
 
 # Here's how you can do this with the dplyr functions group_by and do:
-window_width <- 100
-jumps <- 100
+window_width <- 200
+jumps <- 200
 running_roh <- hom_sum %>% 
   group_by(CHR) %>% 
   do(
@@ -226,7 +231,7 @@ p_running_roh <- running_roh %>%
   facet_grid(CHR~.) 
 p_running_roh 
 
-ggsave("figs/roh_across_genome2.jpg", p_running_roh, width = 8, height = 8)
+ggsave("figs/roh_across_genome.jpg", p_running_roh, width = 8, height = 12)
 
 
 

@@ -23,9 +23,9 @@ hist(roh_lengths$KB, breaks = 1000, xlim = c(0,10000))
 calc_froh_classes <- function(roh_crit, roh_lengths) {
         
         roh_filt <- dplyr::case_when(
-                roh_crit == "short"  ~ expr(KB < 2443),
-                roh_crit == "medium" ~ expr((KB > 2443)&(KB < 9771)),
-                roh_crit == "long"   ~ expr(KB > 9771),
+                roh_crit == "short"  ~ expr(KB < 1221),
+                roh_crit == "medium" ~ expr((KB > 1221)&(KB < 4885)),
+                roh_crit == "long"   ~ expr(KB > 4885),
                 roh_crit == "all" ~ expr(KB > 0)
         )
         
