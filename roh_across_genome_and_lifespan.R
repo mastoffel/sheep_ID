@@ -1,28 +1,49 @@
 library(tidyverse)
 library(data.table)
 library(magrittr)
+library(rlang)
 source("theme_clean.R")
 # annual measures of traits and fitness
 load("model_in/fitness_roh_df.RData")
 library(windowscanr)
 
+# number of individuals in each age class
+max_age_df <- fitness_data %>% 
+        group_by(ID) %>% 
+        mutate(max_age = max(Age)) %>% 
+        filter(Age == max_age) %>% 
+        filter(BIRTHYEAR != 2018) %>% 
+       # filter(is.na(Survival)) %>% 
+        mutate(age_class_0 = ifelse(Age >= 0, 1, 0),
+               age_class_1 = ifelse(Age >= 1, 1, 0),
+               age_class_2 = ifelse(Age >= 2, 1, 0),
+               age_class_3 = ifelse(Age >= 3, 1, 0),
+               age_class_4 = ifelse(Age >= 4, 1, 0),
+               age_class_5 = ifelse(Age >= 5, 1, 0),
+               age_class_6 = ifelse(Age >= 6, 1, 0),
+               age_class_7 = ifelse(Age >= 7, 1, 0),
+               age_class_8 = ifelse(Age >= 8, 1, 0),
+               age_class_9 = ifelse(Age >= 9, 1, 0),
+             age_class_10 = ifelse(Age >= 10, 1, 0)
+        ) %>% 
+        ungroup() %>% 
+        filter(!is.na(FROH_all)) 
+        
+
 # number of individuals with genotype data per age class
-num_ind_per_age <- fitness_data %>% 
-        filter(!is.na(FROH_all)) %>% 
-        group_by(Age) %>% 
-        summarise(ID = n_distinct(ID))
+# num_ind_per_age <- max_age_df %>% 
+#         summarise_at(vars(age_class_0:age_class_10), sum)
 
-# which ids per age class
-filter_ids_per_age <- function(age, fitness_data) {
-        fitness_data %>% 
-                filter(!is.na(FROH_all)) %>% 
-                filter(Age == age) %>% 
-                .$ID %>% 
-                unique()
-}
+ids_per_age <- map(0:10, function(x) {
+        to_filt <- paste0("age_class_", x)
+        max_age_df %>% 
+                filter(get(to_filt) == 1) %>% 
+                dplyr::select(ID) %>% 
+                unlist()
+})
+names(ids_per_age) <- paste0("age_", c(0:10))
 
-ids_per_age <- map(0:16, filter_ids_per_age, fitness_data) 
-names(ids_per_age) <- paste0("age_", c(0:16))
+num_ind_per_age <- unlist(map(ids_per_age, length))
 
 # load ROH info
 file_path <- "output/ROH/roh_nofilt_1Mb.hom"
@@ -39,10 +60,10 @@ seq2 <- Vectorize(seq.default, vectorize.args = c("from", "to"))
 # 6908
 # work on subsets for now 
 hom_sum_sub <- hom_sum %>% 
-        filter(CHR %in% 20)
+        filter(CHR %in% c(19,20))
 
 roh_lengths_sub <- roh_lengths %>% 
-        filter(CHR %in% 20) 
+        filter(CHR %in% c(19,20))
 
 
 # function to calculate how many individuals have a given SNP in an ROH
@@ -62,8 +83,8 @@ roh_per_snps <- function(roh_lengths, hom_sum, ids = NULL, subsamp = NULL) {
         num_roh_per_snp <- tabulate(unlist(roh_lengths$all_ind), nbins = nrow(hom_sum))
 }
 
-first_age <- "age_0"
-second_age <- "age_1"
+first_age <- "age_1"
+second_age <- "age_2"
 
 roh_first_age <- roh_per_snps(roh_lengths_sub, hom_sum_sub, ids = ids_per_age[[first_age]]) / length(ids_per_age[[first_age]])
 roh_second_age <- roh_per_snps(roh_lengths_sub, hom_sum_sub, ids = ids_per_age[[second_age]]) / length(ids_per_age[[second_age]])
@@ -71,11 +92,11 @@ roh_subsamples <- 1000 %>% rerun(roh_per_snps(roh_lengths_sub, hom_sum_sub,
                                                   # subsample only ids which were present at first age class
                                                   ids = ids_per_age[[first_age]], 
                                                   # subsample as many as survived into the second age class
-                                                  subsamp = num_ind_per_age$ID[[3]])) %>% 
+                                                  subsamp = num_ind_per_age[[second_age]])) %>% 
                         bind_cols() %>% 
-                        mutate_all(function(x) x/length(ids_per_age$age_2))
+                        mutate_all(function(x) x/length(ids_per_age[[second_age]]))
 
-all_quants <- apply(roh_age_0_subsamples, 1, function(x) as.data.frame(t(quantile(x, probs = c(0.005, 0.995))))) %>% 
+all_quants <- apply(roh_subsamples, 1, function(x) as.data.frame(t(quantile(x, probs = c(0.005, 0.995))))) %>% 
                 bind_rows() %>% 
                 rename(lower_ci = `0.5%`,
                        upper_ci = `99.5%`)
@@ -83,24 +104,23 @@ all_quants <- apply(roh_age_0_subsamples, 1, function(x) as.data.frame(t(quantil
                 #       upper_ci = `97.5%`)
 
 
-roh_age_0_2_all <- hom_sum_sub %>% 
-        bind_cols(tibble(age_0 = roh_age_0, age_2 = roh_age_2 ), all_quants)
-
-
-roh_age_0_2_all %<>% 
+roh_age_0_1 <- hom_sum_sub %>% 
+        bind_cols(tibble(age_0 = roh_first_age, age_1 = roh_second_age), all_quants) %>% 
         mutate(KB = BP/1000)
 
-running_roh <- winScan(x = roh_age_0_2_all, 
+   
+
+running_roh <- winScan(x = roh_age_0_1, 
                    groups = NULL, 
                    position = "KB", 
-                   values = c("age_0", "age_2", "lower_ci", "upper_ci"), 
+                   values = c("age_0", "age_1", "lower_ci", "upper_ci"), 
                    win_size = 500,
                    win_step = 100,
                    funs = c("mean"))
 
 # mark points where ROH is lower than CI_lower 
 running_roh %<>% 
-        mutate(outliers = ifelse(age_2_mean < lower_ci_mean, 1, 0)) %>% 
+        mutate(outliers = ifelse(age_1_mean < lower_ci_mean, 1, 0)) %>% 
         mutate(outliers = as.factor(outliers))
 
 running_roh %>% 
@@ -108,10 +128,12 @@ running_roh %>%
         geom_line(aes(win_start, age_0_mean)) +
         geom_line(aes(win_start, lower_ci_mean), color = "lightgrey") +
         geom_line(aes(win_start, upper_ci_mean), color = "lightgrey") +
-        geom_line(aes(win_start, age_2_mean), color = "cornflowerblue") +
-        geom_point(aes(win_start, age_2_mean, color = outliers), size = 0.1) + 
+        geom_line(aes(win_start, age_1_mean), color = "cornflowerblue") +
+        geom_point(aes(win_start, age_1_mean, color = outliers), size = 0.1) + 
         scale_color_manual(values = c('cornflowerblue', "red")) +
-        theme_clean()
+        theme_clean() +
+        ylab("Proportion of Population with ROH") +
+        xlab("Bp")
 
 running_roh %>% filter(outliers == 1)
 
