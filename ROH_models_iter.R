@@ -46,6 +46,7 @@ LBS <- fitness_data %>%
                froh_short_std = scale(froh_short),
                froh_not_roh_std = scale(froh_not_roh)) %>% 
         as.data.frame() 
+
 # general plots
 ggplot(LBS, aes(lifespan)) + geom_histogram() + facet_wrap(sex ~ ., scales = "free")
 ggplot(LBS, aes(lbs)) + geom_histogram() + facet_wrap(sex ~ ., scales = "free")

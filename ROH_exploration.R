@@ -11,6 +11,10 @@ library(readxl)
 library(tidyverse)
 library(zoo)
 source("theme_clean.R")
+library(ggridges)
+library(viridis)
+library(GGally)
+library("naniar")
 options(scipen=999)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -18,32 +22,30 @@ options(scipen=999)
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 #~~ Chr lengths
-chr_data <- read_delim("../sheep/data/chromosome_data.txt", delim = "\t") %>% 
-                        mutate(size_KB = `Size (Mb)` * 1000,
-                               size_BP = size_KB * 1000) %>% 
-                        rename(CHR = Name) %>% 
-                        dplyr::select(CHR, size_KB, size_BP)
+chr_data <- read_delim("../sheep/data/sheep_genome/chromosome_info_ram.txt", delim = "\t") %>% 
+                        rename(size_BP = Length,
+                               CHR = Part) %>% 
+                        mutate(size_KB = size_BP * 1000)
                 
 
 # add homozygosity not in roh
-homs <- read_delim("output/ROH/roh_nofilt_hom_not_in_roh.txt", delim = " ") %>% 
-            rename(prop_IBD = hom, 
-                   FID = ID) %>% 
-            mutate(FID = as.character(FID)) %>% 
-            mutate(length_class = as.factor(rep("not_in_ROH", nrow(.))))
+# homs <- read_delim("output/ROH/roh_nofilt_hom_not_in_roh.txt", delim = " ") %>% 
+#             rename(prop_IBD = hom, 
+#                    IID = ID) %>% 
+#             mutate(IID = as.character(IID)) %>% 
+#             mutate(length_class = as.factor(rep("not_in_ROH", nrow(.))))
                 
 
 #2439314
 # sheep gen    me size 2869490 KB 
 #~~ Length distribution
-file_path <- "output/ROH/roh_nofilt.hom"
-file <- "roh_nofilt"
+file_path <- "output/ROH/roh_nofilt_ram.hom"
 roh_lengths <- fread(file_path)
 
 froh <- roh_lengths %>%
-        dplyr::group_by(FID) %>%
+        dplyr::group_by(IID) %>%
         dplyr::summarise(KBAVG = mean(KB), KBSUM = sum(KB)) %>%
-        mutate(FROH = KBSUM/2619054)
+        mutate(FROH = KBSUM/2869898)
 
 # FROH across individuals
 p_dist <- ggplot(froh, aes(FROH)) +
@@ -53,7 +55,6 @@ p_dist <- ggplot(froh, aes(FROH)) +
 p_dist
 
 ggsave("figs/FROH_dist.jpg", p_dist, width = 5, height = 3)
-
 
 # Specifiy length distributon:
 # a separation of m meisies (2m generations) results in segment lengths that are
@@ -97,16 +98,16 @@ prop_IBD_df <- roh_lengths %>%
           class == 128 ~ "0.6-0.3 (128G)"
         )) %>% 
         mutate(length_class = fct_reorder(length_class, class)) %>% 
-        mutate(FID = as.character(FID)) %>% 
-        group_by(FID, class, length_class) %>%
-        dplyr::summarise(prop_IBD = sum(length_Mb / 2619)) #%>% 
+        mutate(IID = as.character(IID)) %>% 
+        group_by(IID, class, length_class) %>%
+        dplyr::summarise(prop_IBD = sum(length_Mb / 2869)) #%>% 
         # add IBD of non-ROH snps if wanted
       #  bind_rows(homs) 
 
 prop_IBD_df_with_0 <- prop_IBD_df %>% 
         # add missing length classes as 0
         ungroup() %>% 
-        tidyr::complete(length_class, nesting(FID)) %>% 
+        tidyr::complete(length_class, nesting(IID)) %>% 
         mutate(class = ifelse(is.na(class), length_class, class)) %>% 
         mutate(prop_IBD = ifelse(is.na(prop_IBD), 0, prop_IBD))
  
@@ -123,8 +124,7 @@ p_roh <- ggplot(prop_IBD_df_with_0, aes(length_class, prop_IBD)) +
 p_roh
 ggsave("figs/roh_classes_boxplots.jpg", p_roh, width = 9, height = 5)
 
-library(ggridges)
-library(viridis)
+
 
 IBD_across_classes <- prop_IBD_df %>% 
   #sample_frac(0.05) %>% 
@@ -141,14 +141,11 @@ IBD_across_classes
 ggsave("figs/roh_classes_ridgeplot.jpg", IBD_across_classes, width = 8, height = 8)
 
 
-library(GGally)
-library("naniar")
-
 ?ggpairs
 
 ROH_classes_pairs <- prop_IBD_df_with_0 %>% 
   split(prop_IBD_df_with_0$length_class) %>% 
-  reduce(left_join, by = "FID") %>% 
+  reduce(left_join, by = "IID") %>% 
   dplyr::select(contains("prop_IBD")) %>% 
   rename_all(~ levels(prop_IBD_df_with_0$length_class)) %>% 
  # sample_frac(0.01) %>% 
@@ -166,8 +163,8 @@ ggsave("figs/roh_classes_pairs.jpg", ROH_classes_pairs, width = 13, height = 12)
 # ind basis
 prop_IBD_df %>% 
   ungroup() %>% 
-  mutate(FID = as.character(FID)) %>% 
-  filter(FID %chin% sample(as.character(unique(prop_IBD_df$FID)), 
+  mutate(IID = as.character(IID)) %>% 
+  filter(IID %chin% sample(as.character(unique(prop_IBD_df$IID)), 
                            100, replace = FALSE)) -> plot_ibd_df
 
 col_pal <- rev(c(brewer.pal(7, "YlGnBu"),  "firebrick1")) ##A42820
@@ -175,8 +172,8 @@ col_pal <- rev(c(brewer.pal(7, "YlGnBu"),  "firebrick1")) ##A42820
 prop_IBD_df %>% 
   ungroup() %>% 
   # filter(class %in% c(1,2,4)) %>% 
-  filter(FID %chin% sample(as.character(unique(prop_IBD_df$FID)), 500, replace = FALSE)) %>% 
-  ggplot(aes(x=FID, y=prop_IBD, fill=length_class)) +
+  filter(IID %chin% sample(as.character(unique(prop_IBD_df$IID)), 500, replace = FALSE)) %>% 
+  ggplot(aes(x=IID, y=prop_IBD, fill=length_class)) +
           geom_bar(stat="identity") +
          # scale_fill_brewer(palette = "YlGnBu", name = "ROH class (Mb)", direction = -1) +
           scale_fill_manual(values = col_pal, name = "ROH class (Mb)") +
@@ -188,18 +185,17 @@ prop_IBD_df %>%
           scale_x_discrete(expand = c(0, 0)) + 
           scale_y_continuous(expand = c(0, 0)) +
           theme(legend.position = "bottom") -> p_roh2
-p_roh2
+p_roh
 ggsave("figs/roh_classes_subset_inds.jpg", p_roh2, width = 15, height = 5)
 
 
 #~~~ ROH density
 
-hom_sum <- fread("output/ROH/roh_nofilt.hom.summary")
+hom_sum <- fread("output/ROH/roh_nofilt_ram.hom.summary")
 
 hom_sum <- hom_sum %>%
-  mutate(MB = BP / 100000,
+  mutate(MB = BP / 1000000,
          index = 1:nrow(.))
-
 
 # Here's how you can do this with the dplyr functions group_by and do:
 window_width <- 200
@@ -234,37 +230,39 @@ p_running_roh
 ggsave("figs/roh_across_genome.jpg", p_running_roh, width = 8, height = 12)
 
 
+#~~ ROH for some indiividuals
+all_roh <- roh_lengths %>% 
+  group_by(IID) %>% 
+  summarise(sum_roh = sum(KB)) %>% 
+  ungroup() %>% 
+  arrange(desc(sum_roh))
 
-# variance per IBD class
-library(mclust)
-?mclust
-roh_lengths %>% 
-  group_by(FID) %>% 
-  summarise(KB = mean(KB))
-  
-out <- Mclust(roh_lengths$KB)
-summary(out)
-plot(out)
+longest_roh <- all_roh %>% 
+  top_n(10)
+shortest_roh <- all_roh %>% 
+  top_n(-10)
 
+num_ind <- 20
 
-#~~ Runs of ROH
+extreme_roh <- rbind(longest_roh, shortest_roh)
+
 df <- roh_lengths %>%
         mutate(POS1 = POS1 / 1e+6,
                POS2 = POS2 / 1e+6,
                MB = KB / 1000)
-num_ind <- 30
-df <- df %>% filter(FID %in% sample(unique(df$FID), num_ind))
+df <- df %>% filter(IID %in% extreme_roh$IID) %>% 
+        mutate(IID = factor(IID, levels = extreme_roh$IID))
 
-yax <- data.frame(FID = unique(df$FID)) %>%
+yax <- data.frame(IID = fct_inorder(levels(df$IID))) %>%
         mutate(yax = seq(from = 2,
-                         to = 2*length(unique(df$FID)),
+                         to = 2*length(unique(df$IID)),
                          by = 2)) 
 
-df <- left_join(df, yax, by = "FID")
+df <- left_join(df, yax, by = "IID")
 
-col <- wes_palette("Moonrise2")
-col <- col[c(3,1,2)]
-
+library(ghibli)
+col <- wes_palette("Darjeeling2")[c(1,2)]
+col <- viridis(2, begin = 0.1, end = 0.9)
 shade <- df %>%
         group_by(CHR) %>%
         summarise(min = min(POS1), max = max(POS2)) %>%
@@ -278,18 +276,23 @@ shade <- df %>%
                                TRUE ~ max))
 
 #png(file="figs/ROH_map.png", units = "in", res = 300, height=4, width=7)
+col <- c("#82687D", "#2C5475" )
+#col <- c("#436DA2", "#1D244B")
 df %>% 
-  filter(MB > 5) %>% 
+  filter(MB > 10) %>% 
   filter(CHR %in% 1:26) %>% 
+  #mutate(CHR = factor(CHR, levels = as.character(1:26))) %>% 
   ggplot() +
+        geom_hline(data = yax, aes(yintercept = yax), color = "grey", size = 0.2) +
         geom_rect(data=shade, aes(xmin=min, xmax=max, ymin=0, ymax=num_ind*2 + 1), 
-                  fill = "grey90", alpha=0.3) +
-        geom_rect(aes(xmin = POS1, xmax = POS2, ymin = yax - 0.5, 
-                               ymax = yax + 0.5, col = as.factor(CHR))) +
+                  alpha=0.2, fill = "lightgrey") +
+        geom_rect(aes(xmin = POS1, xmax = POS2, ymin = yax - 0.5, ymax = yax + 0.5, 
+                     fill = as.factor(CHR)),  col = "black", size = 0.1, alpha = 0.8) +
         #
-       # scale_fill_manual(values = col) +
-       # scale_color_manual(values = col) +
-        geom_hline(aes(yintercept = yax), color = "grey") +
+        scale_fill_manual(values = rep(col, 18)) +
+        scale_color_manual(values = rep(col, 18)) +
+        #scale_x_discrete(labels = as.character(c(1:20, 22, 24, 26))) + 
+        scale_y_reverse(expand = c(0, 0)) +
         theme_clean() +
         facet_grid(~CHR, scales = 'free_x', space = 'free_x', switch = 'x') +
         theme(strip.placement = 'outside',
@@ -298,11 +301,14 @@ df %>%
               panel.spacing = unit(0, "lines"),
               legend.position="none",
               plot.margin = unit(c(1, 1, 1, 1), "cm"), 
-              axis.text.y = element_text(colour = "white")) +
-        xlab("CHR") +
-        ggtitle("ROH > 5Mb in 30 individuals") -> ROH_per_ind
+              axis.text.y = element_text(colour = "white"),
+              axis.line.y = element_blank(),
+              axis.title=element_text(size=15))+
+        xlab("chromosome") +
+        ylab("individuals") +
+        ggtitle("ROH > 10Mb in the 10 most and 10 least inbred individuals") -> ROH_per_ind
 
 ROH_per_ind
 #dev.off()
-ggsave("figs/roh_per_ind.jpg", ROH_per_ind, width = 12, height = 8)
+ggsave("figs/roh_per_ind_10Mb.jpg", ROH_per_ind, width = 11, height = 5)
 

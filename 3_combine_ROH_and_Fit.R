@@ -6,7 +6,7 @@ library(data.table)
 annual_fitness <- read_delim("../sheep/data/1_Annual_Fitness_Measures_April_20190501.txt", delim = "\t")
 
 # get LRS
-sheep_ped <- read_delim("../sheep/data/SNP_chip/20190711_Full_Pedigree.txt", 
+sheep_ped <- read_delim("../sheep/data/SNP_chip/20190711_Soay_Pedigree.txt", 
                         delim = "\t",
                         col_types = "ccc") %>%
         as.data.frame() %>%
@@ -14,7 +14,7 @@ sheep_ped <- read_delim("../sheep/data/SNP_chip/20190711_Full_Pedigree.txt",
 #save(sheep_ped,  file = "model_in/sheep_ped.RData")
 
 ##### ROH data #####
-file_path <- "output/ROH/roh_nofilt.hom"
+file_path <- "output/ROH/roh_nofilt_ram.hom"
 file <- "roh_nofilt"
 roh_lengths <- fread(file_path)
 hist(roh_lengths$KB, breaks = 1000, xlim = c(0,10000))

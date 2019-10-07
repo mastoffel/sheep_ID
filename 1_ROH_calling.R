@@ -11,30 +11,34 @@ library(snpStats)
 # system("~/programs/plink --bfile data/sheep_imp --keep data/subset_inds.txt --make-bed --out data/geno_sub --sheep")
 
 # calculate ROH 
-system(paste0("~/programs/plink --bfile ../sheep/data/SNP_chip/sheep_geno_imputed_04092019 --sheep --out output/ROH/roh_nofilt ",
-              "--homozyg --homozyg-window-snp 30 --homozyg-snp 50 --homozyg-kb 300 ",
-              "--homozyg-gap 300 --homozyg-density 50 --homozyg-window-missing 3 ",
-              "--homozyg-het 3 ",
+
+# system(paste0("~/programs/plink --bfile ../sheep/data/SNP_chip/ramb_mapping/sheep_geno_imputed_ram_27092019 --sheep --out output/ROH/roh_nofilt_ram ",
+#               "--homozyg --homozyg-window-snp 30 --homozyg-snp 30 --homozyg-kb 500 ",
+#               "--homozyg-gap 500 --homozyg-density 50 --homozyg-window-missing 5 ",
+#               "--homozyg-het 3 ",
+#               "--homozyg-window-het 1"))
+
+system(paste0("~/programs/plink --bfile ../sheep/data/SNP_chip/ramb_mapping/sheep_geno_imputed_ram_27092019 --sheep --out output/ROH/roh_nofilt_ram ",
+              "--homozyg --homozyg-window-snp 30 --homozyg-snp 30 --homozyg-kb 300 ",
+              "--homozyg-gap 300 --homozyg-density 50 --homozyg-window-missing 2 ",
+              "--homozyg-het 1 ",
               "--homozyg-window-het 1"))
 
-system(paste0("~/programs/plink --bfile ../sheep/data/SNP_chip/sheep_geno_imputed_04092019 --sheep --out output/ROH/roh_nofilt_1Mb ",
-              "--homozyg --homozyg-window-snp 50 --homozyg-snp 50 --homozyg-kb 1000 ",
-              "--homozyg-gap 500 --homozyg-density 50 --homozyg-window-missing 5 ",
-              "--homozyg-het 3 ",
-              "--homozyg-window-het 1"))
-
-file_path <- "output/ROH/roh_nofilt.hom"
-file <- "roh_nofilt"
+file_path <- "output/ROH/roh_nofilt_ram.hom"
+#file <- "roh_nofilt"
 roh_lengths <- fread(file_path)
 
+hist(roh_lengths$KB, breaks = 1000, xlim = c(500,5000))
+# longest ROH
+roh_lengths[which.max(roh_lengths$KB), ]
+
+# total sequence length: 2,869,914,396
 froh <- roh_lengths %>%
-        dplyr::group_by(FID) %>%
+        dplyr::group_by(IID) %>%
         dplyr::summarise(KBAVG = mean(KB), KBSUM = sum(KB)) %>%
-        mutate(FROH = KBSUM/2619054)
+        mutate(FROH = KBSUM/2869914)
 
 hist(froh$FROH, breaks = 100)
-
-
 
 # # with pruning ===========================
 # system(paste0("~/programs/plink --bfile ../sheep/data/SNP_chip/sheep_geno_imputed_04092019 --sheep --out output/ROH/sheep_geno_imputed_LDpruned ",
@@ -62,9 +66,9 @@ hist(froh$FROH, breaks = 100)
 
 #~~~~~~~~~~~~~~ calculate homozygosity in the rest of the genome ~~~~~~~~~~~~~~# =======
 
-plink_geno_path <- "../sheep/data/SNP_chip/"
+plink_geno_path <- "../sheep/data/SNP_chip/ramb_mapping/"
 # plink name
-sheep_plink_name <- "sheep_geno_imputed_04092019"
+sheep_plink_name <- "sheep_geno_imputed_ram_27092019"
 # read merged plink data
 sheep_bed <- paste0(plink_geno_path, sheep_plink_name, ".bed")
 sheep_bim <- paste0(plink_geno_path, sheep_plink_name, ".bim")

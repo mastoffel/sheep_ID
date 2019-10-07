@@ -19,6 +19,30 @@ options(error = function(){    # Beep on error
 }
 )
 
+#
+library(RJDBC)
+#### database connection ######
+dbname <- "../sheep/data/db/StKilda_Data.accdb"
+driver <- "net.ucanaccess.jdbc.UcanloadDriver"
+driverpath <- "../sheep/data/db/UCanAccess/loader/ucanload.jar"
+options <- paste0("jdbc:ucanaccess://", dbname, ";memory=false")
+
+con <- DBI::dbConnect(JDBC(driver, driverpath), options)
+# src <- src_dbi(con)
+
+tbls <- dbGetTables(con)
+flds <- dbGetFields(con, "Sheep")
+Sheep <- dbGetQuery(con, "Select * from Sheep")
+Census <- dbGetQuery(con, "Select * from CensusData")
+Capture <- dbGetQuery(con, "Select * from CaptureData")
+tblPreg <- dbGetQuery(con, "Select * from tblPregnancies")
+
+
+censusdata_new <- dbGetQuery(con, "Select * from CensusData")
+consortdata_new <- dbGetQuery(con, "Select * from Consorts")
+basedata_new <- dbGetQuery(con, "Select * from Sheep")
+
+dbDisconnect(con)
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #   1. Read in data for calculating fitness.      #
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
