@@ -12,6 +12,7 @@ library(reshape)
 library(lubridate)
 library(tidyr)
 library(dplyr)
+library(lubridate)
 
 options(error = function(){    # Beep on error
   beepr::beep()
@@ -37,23 +38,53 @@ Census <- dbGetQuery(con, "Select * from CensusData")
 Capture <- dbGetQuery(con, "Select * from CaptureData")
 tblPreg <- dbGetQuery(con, "Select * from tblPregnancies")
 
+tblSheepCore <- dbGetQuery(con, "Select * from tblSheepCoreNotes")
+# censusdata formatting to look like old file
+censusdata_new <- dbGetQuery(con, "Select * from CensusData") 
+censusdata <- censusdata_new %>% 
+                  as_tibble() %>% 
+                  dplyr::select(ID:Shelter) %>% 
+                  mutate(Date = ymd_hms(Date)) %>% 
+                  mutate(Date = date(Date)) %>% 
+                  mutate(Date = format(Date, format = "%d/%m/%Y")) %>% 
+                  mutate_at(c("Veg", "Act"), replace_na, "") %>% 
+                  mutate_if(is.double, as.integer)
 
-censusdata_new <- dbGetQuery(con, "Select * from CensusData")
 consortdata_new <- dbGetQuery(con, "Select * from Consorts")
-basedata_new <- dbGetQuery(con, "Select * from Sheep")
+consortdata <- consortdata_new %>% 
+                as_tibble() %>% 
+                dplyr::select(-RowRef) %>% 
+                mutate(Date = ymd_hms(Date)) %>% 
+                mutate(Date = format(Date, format = "%d/%m/%Y")) %>% 
+                mutate(Time = ymd_hms(Time)) %>% 
+                mutate(Time = format(Time, format = "%H:%M")) %>% 
+                mutate_at(c("UnknownTup", "UnknownEwe"), replace_na, "") %>% 
+                mutate_if(is.double, as.integer)
+
+capdata_new <- dbGetQuery(con, "Select * from CaptureData")
+capdata <- capdata_new %>% 
+                as_tibble() %>% 
+                dplyr::select(one_of(names(capdata_old)))
+write_delim(capdata, "~/Desktop/SoayCaptureData_DB,txt", delim = "\t")
+
+basedata_new <- dbGetQuery(con, "Select * from Sheep") %>% 
+                as_tibble()
 
 dbDisconnect(con)
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #   1. Read in data for calculating fitness.      #
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-censusdata  <- read.table("../sheep/data/db_tables/20190208/20190208_CensusData.txt",       sep = "\t", header = T, stringsAsFactors = F)
-consortdata <- read.table("../sheep/data/db_tables/20190208/20190208_ConsortData.txt",      sep = "\t", header = T, stringsAsFactors = F)
-basedata    <- read.table("../sheep/data/db_tables/20190208/20190208_SoayBaseData.txt",     sep = "\t", header = T, stringsAsFactors = F)
-oldpink     <- read.table("../sheep/data/db_tables/20190208/OPAges_ReproEdit.txt",          sep = "\t", header = T, stringsAsFactors = F)
-capdata     <- read.table("../sheep/data/db_tables/20190208/20190208_SoayCaptureData.txt",  sep = "\t", quote = "\"", header = T, stringsAsFactors = F)
-foetusIDs   <- read.table("../sheep/data/db_tables/20190208/20190208_FoetusTable.txt",      sep = "\t", header = T, stringsAsFactors = F)[,1]
-pedigree    <- read.table("../sheep/data/db_tables/20190208/20190208_Full_Pedigree.txt",    sep = "\t", header = T, stringsAsFactors = F)
+censusdata_old  <- read.table("../sheep/data/db_tables/20190208/20190208_CensusData.txt",       sep = "\t", header = T, stringsAsFactors = F) %>% as_tibble()
+consortdata_old <- read.table("../sheep/data/db_tables/20190208/20190208_ConsortData.txt",      sep = "\t", header = T, stringsAsFactors = F)%>% as_tibble()
+capdata_old     <- read.table("../sheep/data/db_tables/20190208/20190208_SoayCaptureData.txt",  sep = "\t", quote = "\"", header = T, stringsAsFactors = F)%>% as_tibble()
+
+basedata_old    <- read.table("../sheep/data/db_tables/20190208/20190208_SoayBaseData.txt",     sep = "\t", header = T, stringsAsFactors = F)%>% as_tibble()
+
+oldpink_old     <- read.table("../sheep/data/db_tables/20190208/OPAges_ReproEdit.txt",          sep = "\t", header = T, stringsAsFactors = F)%>% as_tibble()
+
+foetusIDs_old   <- read.table("../sheep/data/db_tables/20190208/20190208_FoetusTable.txt",      sep = "\t", header = T, stringsAsFactors = F)[,1] %>% as_tibble()
+pedigree_old    <- read.table("../sheep/data/db_tables/20190208/20190208_Full_Pedigree.txt",    sep = "\t", header = T, stringsAsFactors = F)%>% as_tibble()
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #   2. Format data                                #
