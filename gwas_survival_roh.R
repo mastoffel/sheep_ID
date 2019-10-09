@@ -2,7 +2,7 @@
 library(lme4)
 library(tidyverse)
 library(broom.mixed)
-source("theme_clean.R")
+#source("theme_clean.R")
 library(snpStats)
 library(data.table)
 library(furrr)
@@ -164,6 +164,7 @@ all_out <- purrr::map2(snps_pieces, roh_pieces, run_pieces, early_survival_gwas,
 # remove one hierarchical level
 all_out_simple <- purrr::flatten(all_out)
 
+# save as rds
 saveRDS(all_out_simple, file = paste0("output/GWAS_roh_chr", chr, ".rds"))
 
 
