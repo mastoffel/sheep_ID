@@ -138,35 +138,40 @@ run_gwas <- function(snp, data) {
         out
 }
 
+safe_run_gwas <- purrr::safely(run_gwas)
+# gwas_out <- purrr::map(snps_sub, safe_run_gwas, early_survival_gwas)
+# 
+# # save as rds
+# saveRDS(gwas_out, file = paste0("output/GWAS_roh_chr", chr, ".rds"))
+
+
 # lets split into pieces
-if (ncol(geno_sub < 10000)){
-        num_pieces <- 2     
+if (ncol(geno_sub <= 5000)){
+        num_pieces <- 2
 } else {
-        num_pieces <- round(ncol(geno_sub) / 5000, digits = 0)   
+        num_pieces <- round(ncol(geno_sub) / 2500, digits = 0)
 }
 snps_pieces <- split(snps_sub, cut(seq_along(snps_sub), num_pieces, labels = FALSE))
 roh_pieces <- map(snps_pieces, function(x) paste0("roh_", x))
 
 
-run_pieces <- function(snps_piece, roh_piece, early_survival_gwas, run_gwas){
-        
-        early_survival_gwas_piece <- 
-                early_survival_gwas %>% 
+run_pieces <- function(snps_piece, roh_piece, early_survival_gwas, safe_run_gwas){
+
+        early_survival_gwas_piece <-
+                early_survival_gwas %>%
                 dplyr::select(id:mum_id, one_of(c(snps_piece, roh_piece)))
-        
+
         plan(multiprocess, workers = 4)
-        out <- future_map(snps_piece, run_gwas, early_survival_gwas_piece)
-        
+        out <- future_map(snps_piece[1:5], safe_run_gwas, early_survival_gwas_piece)
+
 }
 
 # run gwas
-all_out <- purrr::map2(snps_pieces, roh_pieces, run_pieces, early_survival_gwas, run_gwas)
+all_out <- purrr::map2(snps_pieces, roh_pieces, run_pieces, early_survival_gwas, safe_run_gwas)
 # remove one hierarchical level
 all_out_simple <- purrr::flatten(all_out)
 
-# save as rds
 saveRDS(all_out_simple, file = paste0("output/GWAS_roh_chr", chr, ".rds"))
-
 
 
 
