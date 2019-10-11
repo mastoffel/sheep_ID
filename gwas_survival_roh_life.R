@@ -22,7 +22,8 @@ IDs_lots_missing <- read_delim("data/ids_more_than_5perc_missing.txt", delim = "
 
 # roh data
 file_path <- "data/roh_nofilt_ram.hom"
-roh_lengths <- fread(file_path)
+roh_lengths <- fread(file_path) 
+
 
 # plink name
 sheep_plink_name <- "data/sheep_geno_imputed_ram_27092019"
@@ -33,11 +34,12 @@ sheep_fam <- paste0(sheep_plink_name, ".fam")
 full_sample <- read.plink(sheep_bed, sheep_bim, sheep_fam)
 
 snps_map_sub <- full_sample$map %>% 
-        filter(chromosome == chr)  
+        filter(chromosome == chr) 
 
 # survival data
 early_survival <- fitness_data %>% 
         dplyr::rename(birth_year = BIRTHYEAR,
+                      sheep_year = SheepYear,
                       age = Age,
                       id = ID,
                       twin = TWIN,
@@ -51,17 +53,18 @@ early_survival <- fitness_data %>%
                       survival = Survival) %>% 
         # some individuals arent imputed well and should be discarded 
         filter(!(id %in% IDs_lots_missing$id)) %>% 
-        filter(age == 0) %>% 
+        #filter(age == 0) %>% 
+        filter(!is.na(survival)) %>% 
         filter(!is.na(froh_all)) %>% 
-        filter(!(is.na(birth_year) | is.na(mum_id))) %>% 
-        mutate_at(c("id", "birth_year", "mum_id", "sex"), as.factor) %>% 
+        filter(!(is.na(birth_year) | is.na(sheep_year))) %>%  # no mum_id here
+        mutate_at(c("id", "birth_year", "sex", "sheep_year"), as.factor) %>% 
         as.data.frame() 
 
 
 # prepare additive genotypes subset
 snps_sub <- full_sample$map %>% 
-                filter(chromosome == chr) %>% 
-                .$snp.name
+        filter(chromosome == chr) %>% 
+        .$snp.name
 geno_sub <- as_tibble(as(full_sample$genotypes[, snps_sub], Class = "numeric"),
                       rownames = "id")
 
@@ -74,7 +77,7 @@ seq2 <- Vectorize(seq.default, vectorize.args = c("from", "to"))
 # create indices for all rohs
 roh_snps <- roh_sub %>% 
         as_tibble() %>% 
-       # sample_frac(0.01) %>% 
+        # sample_frac(0.01) %>% 
         mutate(index1 = as.numeric(match(SNP1, names(geno_sub))),
                index2 = as.numeric(index1 + NSNP - 1)) %>% 
         mutate(all_snps = seq2(from = index1, to = index2)) %>% 
@@ -83,13 +86,16 @@ roh_snps <- roh_sub %>%
         mutate(all_snps = simplify_all(all_snps)) %>% 
         mutate(IID = as.character(IID)) %>% 
         rename(id = IID)
+
 # join roh_snps
 roh_snps_reord <- geno_sub %>% 
         dplyr::select(id) %>% 
         left_join(roh_snps, by = "id") %>% 
         dplyr::rename(id_roh = id)
+
 # prepare roh yes/no matrix
 roh_mat <- matrix(data = 0, nrow = nrow(geno_sub), ncol = ncol(geno_sub))
+
 # set 1 where SNP is in an roh
 roh_list <- pmap(roh_snps_reord, function(id_roh, all_snps) {
         df <- as.matrix(t(as.numeric(c(id_roh, rep(0, ncol(geno_sub) - 1)))))
@@ -99,8 +105,8 @@ roh_list <- pmap(roh_snps_reord, function(id_roh, all_snps) {
 
 # make a tibble like for genotypes but with 0/1 for whether a SNP is in ROH or not
 roh_df <- do.call(rbind, roh_list) %>% 
-                as_tibble() %>% 
-                mutate(V1 = as.character(V1))
+        as_tibble() %>% 
+        mutate(V1 = as.character(V1))
 names(roh_df) <- c("id", paste0("roh_", names(geno_sub)[-1]))
 
 
@@ -111,10 +117,10 @@ rm(roh_mat)
 
 # join additive and roh data to survival for gwas
 early_survival_gwas <- early_survival %>% 
-                        dplyr::select(id, survival, sex, twin, birth_year, mum_id) %>% 
-                        left_join(geno_sub, by = "id") %>% 
-                        left_join(roh_df, by = "id") %>% 
-                        as_tibble()
+        dplyr::select(id, survival, sex, twin, birth_year, sheep_year) %>% 
+        left_join(geno_sub, by = "id") %>% 
+        left_join(roh_df, by = "id") %>% 
+        as_tibble()
 
 # time saver function for modeling
 nlopt <- function(par, fn, lower, upper, control) {
@@ -130,7 +136,7 @@ nlopt <- function(par, fn, lower, upper, control) {
 
 # GWAS
 run_gwas <- function(snp, data) {
-        formula_snp <- as.formula(paste0("survival ~ 1 + sex + twin + ", snp, "+ ", paste0("roh_", snp), "+ (1|birth_year) + (1|mum_id)"))
+        formula_snp <- as.formula(paste0("survival ~ 1 + sex + twin + ", snp, "+ ", paste0("roh_", snp), "+ (1|birth_year) + (1|sheep_year) + (1|id)"))
         mod <- glmer(formula = formula_snp,
                      data = data, family = "binomial",
                      control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
@@ -153,21 +159,20 @@ safe_run_gwas <- purrr::safely(run_gwas)
 # }
 #one_piece <- round(ncol(geno_sub) / 8, digits = 0)
 
-# split into 8
-snps_pieces <- split(snps_sub, cut(seq_along(snps_sub), 8, labels = FALSE))
+# split in 4 pieces for smaller chunks for the workers
+snps_pieces <- split(snps_sub, cut(seq_along(snps_sub), 6, labels = FALSE))
 roh_pieces <- map(snps_pieces, function(x) paste0("roh_", x))
 early_survival_gwas_pieces <- 
         map2(snps_pieces, roh_pieces, function(snps_piece, roh_piece) {
-             early_survival_gwas %>% dplyr::select(id:mum_id, one_of(c(snps_piece, roh_piece)))   
+                early_survival_gwas %>% dplyr::select(id:sheep_year, one_of(c(snps_piece, roh_piece)))   
         })
 
-plan(multiprocess, workers = 8)
-
+plan(multiprocess, workers = 5)
 # increase maxSize
-options(future.globals.maxSize = 1000 * 1024^2)
-all_out <- future_map2(snps_pieces, early_survival_gwas_pieces, function(snps, data) {
-                         out <- purrr::map(snps, safe_run_gwas, data)
-                        })
+options(future.globals.maxSize = 3000 * 1024^2)
+all_out <- purrr::map2(snps_pieces, early_survival_gwas_pieces, function(snps, data) {
+        out <- future_map(snps, safe_run_gwas, data)
+})
 
 # remove one hierarchical level
 all_out_simple <- purrr::flatten(all_out)
