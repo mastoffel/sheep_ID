@@ -9,11 +9,14 @@ library(furrr)
 
 # for running on server
 chr_inp  <- commandArgs(trailingOnly=TRUE)
-if (!(length(chr_inp) == 0)) chr <- as.numeric(chr_inp[[1]])
+if (!(length(chr_inp) == 0)) {
+        chr <- as.numeric(chr_inp[[1]])
+} else {
+        # SNP data
+        # which chromosome
+        chr <- 20 
+}
 
-# SNP data
-# which chromosome
-chr <- 20
 
 # data
 load("data/fitness_roh_df.RData")
@@ -117,7 +120,7 @@ rm(roh_mat)
 
 # join additive and roh data to survival for gwas
 early_survival_gwas <- early_survival %>% 
-        dplyr::select(id, survival, sex, twin, birth_year, sheep_year) %>% 
+        dplyr::select(id, survival, sex, twin, birth_year, sheep_year, mum_id) %>% 
         left_join(geno_sub, by = "id") %>% 
         left_join(roh_df, by = "id") %>% 
         as_tibble()
@@ -160,16 +163,18 @@ safe_run_gwas <- purrr::safely(run_gwas)
 #one_piece <- round(ncol(geno_sub) / 8, digits = 0)
 
 # split in 4 pieces for smaller chunks for the workers
-snps_pieces <- split(snps_sub, cut(seq_along(snps_sub), 6, labels = FALSE))
+
+num_parts <- round(length(seq_along(snps_sub)) / 1000)
+snps_pieces <- split(snps_sub, cut(seq_along(snps_sub), num_parts, labels = FALSE))
 roh_pieces <- map(snps_pieces, function(x) paste0("roh_", x))
 early_survival_gwas_pieces <- 
         map2(snps_pieces, roh_pieces, function(snps_piece, roh_piece) {
                 early_survival_gwas %>% dplyr::select(id:sheep_year, one_of(c(snps_piece, roh_piece)))   
         })
 
-plan(multiprocess, workers = 5)
+plan(multiprocess, workers = 4)
 # increase maxSize
-options(future.globals.maxSize = 3000 * 1024^2)
+options(future.globals.maxSize = 2000 * 1024^2)
 all_out <- purrr::map2(snps_pieces, early_survival_gwas_pieces, function(snps, data) {
         out <- future_map(snps, safe_run_gwas, data)
 })
