@@ -162,17 +162,23 @@ safe_run_gwas <- purrr::safely(run_gwas)
 # }
 #one_piece <- round(ncol(geno_sub) / 8, digits = 0)
 
-# split in 4 pieces for smaller chunks for the workers
-
+# split in pieces of 1000 snps / rohs, each approximately 0.25 Gb)
 num_parts <- round(length(seq_along(snps_sub)) / 1000)
 snps_pieces <- split(snps_sub, cut(seq_along(snps_sub), num_parts, labels = FALSE))
 roh_pieces <- map(snps_pieces, function(x) paste0("roh_", x))
+
 early_survival_gwas_pieces <- 
         map2(snps_pieces, roh_pieces, function(snps_piece, roh_piece) {
                 early_survival_gwas %>% dplyr::select(id:sheep_year, one_of(c(snps_piece, roh_piece)))   
         })
 
+# clean up
+rm(early_survival, early_survival_gwas, fitness_data, geno_sub, roh_lengths, roh_pieces, 
+   roh_snps, roh_snps_reord, sheep_ped, snps_map_sub, roh_sub, roh_df)
+
+# set up plan
 plan(multiprocess, workers = 4)
+
 # increase maxSize
 options(future.globals.maxSize = 2000 * 1024^2)
 all_out <- purrr::map2(snps_pieces, early_survival_gwas_pieces, function(snps, data) {
