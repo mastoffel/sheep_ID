@@ -19,17 +19,14 @@ surv <- early_survival_gwas %>% select(id:mum_id, snps) %>%
 
 fitGene <- function(snp) {
         f <- reformulate(c(snp, "sex", "twin",  "(1|birth_year)", "(1|sheep_year)", "(1|id)"),response="survival")
-        glmer(f,data=surv, family = "binomial",
-              control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+        glmer(f,data=surv, family = "binomial")
+              #control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
 }
 
-fitGene0 <- function(snp) {
-        f <- reformulate(c(snp, "sex", "twin",  "(1|birth_year)", "(1|sheep_year)", "(1|id)"),response="survival")
-        glmer(f,data=surv, family = "binomial",
-              nAGQ=0, control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
-}
 
-mod1 <- fitGene("oar3_OAR20_137796")
+mod2 <- fitGene("oar3_OAR20_137796")
+
+
 mod2 <- fitGene0("oar3_OAR20_137796")
 
 summary(mod1)
@@ -86,9 +83,30 @@ benchmark(fitAll(fitGene),
                       "relative"))
 
 
+library("spaMM")
+library("mbest")
+
+
+#lme4
+snp <- snps[[1]]
+f <- reformulate(c(snp, "sex", "twin",  "(1|birth_year)", "(1|sheep_year)", "(1|id)"),response="survival")
+start_job <- Sys.time()
+out1 <- glmer(f,data=surv, family = "binomial", control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+end_job <- Sys.time()
+lme4_time <- end_job - start_job
 
 
 
 
 
-
+library(INLA)
+# inla
+surv_inla <- surv %>% 
+        mutate(survival = as.numeric(as.character(survival)))
+form_inla <- formula(survival ~ snp + sex + twin + f(birth_year, model = "iid") + f(sheep_year, model = "iid") + f(id, model = "iid"))
+start_job <- Sys.time()
+out2 <- inla(form_inla, family = "binomial", data = surv_inla)
+end_job <- Sys.time()
+end_job - start_job
+summary(out2)
+summary(out1)

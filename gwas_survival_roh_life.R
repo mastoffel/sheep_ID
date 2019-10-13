@@ -24,12 +24,11 @@ load("data/sheep_ped.RData")
 IDs_lots_missing <- read_delim("data/ids_more_than_5perc_missing.txt", delim = " ")
 
 # roh data
-file_path <- "data/roh_nofilt_ram.hom"
+file_path <- "data/roh_nofilt_ram_pruned.hom"
 roh_lengths <- fread(file_path) 
 
-
 # plink name
-sheep_plink_name <- "data/sheep_geno_imputed_ram_27092019"
+sheep_plink_name <- "data/sheep_geno_imputed_ram_27092019_pruned"
 # read merged plink data
 sheep_bed <- paste0(sheep_plink_name, ".bed")
 sheep_bim <- paste0(sheep_plink_name, ".bim")
@@ -61,6 +60,9 @@ early_survival <- fitness_data %>%
         filter(!is.na(froh_all)) %>% 
         filter(!(is.na(birth_year) | is.na(sheep_year))) %>%  # no mum_id here
         mutate_at(c("id", "birth_year", "sex", "sheep_year"), as.factor) %>% 
+        mutate(age2 = age^2) %>% 
+        mutate(age_std = as.numeric(scale(age)),
+               age2_std = as.numeric(scale(age2))) %>% 
         as.data.frame() 
 
 
@@ -120,7 +122,7 @@ rm(roh_mat)
 
 # join additive and roh data to survival for gwas
 early_survival_gwas <- early_survival %>% 
-        dplyr::select(id, survival, sex, twin, birth_year, sheep_year, mum_id) %>% 
+        dplyr::select(id, survival, sex, twin, birth_year, sheep_year, mum_id, age_std, age2_std) %>% 
         left_join(geno_sub, by = "id") %>% 
         left_join(roh_df, by = "id") %>% 
         as_tibble()
@@ -138,8 +140,17 @@ nlopt <- function(par, fn, lower, upper, control) {
 }
 
 # GWAS
+# run_gwas <- function(snp, data) {
+#         formula_snp <- as.formula(paste0("survival ~ 1 + sex + twin + ", snp, "+ ", paste0("roh_", snp), "+ (1|birth_year) + (1|sheep_year) + (1|id)"))
+#         mod <- glmer(formula = formula_snp,
+#                      data = data, family = "binomial",
+#                      control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+#         out <- broom.mixed::tidy(mod)
+#         out
+# }
+
 run_gwas <- function(snp, data) {
-        formula_snp <- as.formula(paste0("survival ~ 1 + sex + twin + ", snp, "+ ", paste0("roh_", snp), "+ (1|birth_year) + (1|sheep_year) + (1|id)"))
+        formula_snp <- as.formula(paste0("survival ~ 1 + sex + twin + age_std + age2_std + ", snp, "+ ", paste0("roh_", snp), "+ (1|birth_year) + (1|sheep_year) + (1|id)"))
         mod <- glmer(formula = formula_snp,
                      data = data, family = "binomial",
                      control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
@@ -149,18 +160,6 @@ run_gwas <- function(snp, data) {
 
 safe_run_gwas <- purrr::safely(run_gwas)
 # gwas_out <- purrr::map(snps_sub, safe_run_gwas, early_survival_gwas)
-# 
-# # save as rds
-# saveRDS(gwas_out, file = paste0("output/GWAS_roh_chr", chr, ".rds"))
-
-
-# lets split into pieces
-# if (ncol(geno_sub <= 5000)){
-#         num_pieces <- 2
-# } else {
-#         num_pieces <- round(ncol(geno_sub) / 4, digits = 0)
-# }
-#one_piece <- round(ncol(geno_sub) / 8, digits = 0)
 
 # split in pieces of 1000 snps / rohs, each approximately 0.25 Gb)
 num_parts <- round(length(seq_along(snps_sub)) / 1000)
@@ -169,7 +168,7 @@ roh_pieces <- map(snps_pieces, function(x) paste0("roh_", x))
 
 early_survival_gwas_pieces <- 
         map2(snps_pieces, roh_pieces, function(snps_piece, roh_piece) {
-                early_survival_gwas %>% dplyr::select(id:sheep_year, one_of(c(snps_piece, roh_piece)))   
+                early_survival_gwas %>% dplyr::select(id:age2_std, one_of(c(snps_piece, roh_piece)))   
         })
 
 # clean up
@@ -177,10 +176,10 @@ rm(early_survival, early_survival_gwas, fitness_data, geno_sub, roh_lengths, roh
    roh_snps, roh_snps_reord, sheep_ped, snps_map_sub, roh_sub, roh_df)
 
 # set up plan
-plan(multiprocess, workers = 4)
+plan(multiprocess, workers = 8)
 
 # increase maxSize
-options(future.globals.maxSize = 2000 * 1024^2)
+options(future.globals.maxSize = 3000 * 1024^2)
 all_out <- purrr::map2(snps_pieces, early_survival_gwas_pieces, function(snps, data) {
         out <- future_map(snps, safe_run_gwas, data)
 })
@@ -188,7 +187,7 @@ all_out <- purrr::map2(snps_pieces, early_survival_gwas_pieces, function(snps, d
 # remove one hierarchical level
 all_out_simple <- purrr::flatten(all_out)
 
-saveRDS(all_out_simple, file = paste0("outqput/GWAS_roh_chr", chr, ".rds"))
+saveRDS(all_out_simple, file = paste0("output/GWAS_roh_chr", chr, ".rds"))
 
 
 

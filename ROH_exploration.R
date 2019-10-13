@@ -39,7 +39,7 @@ chr_data <- read_delim("../sheep/data/sheep_genome/chromosome_info_ram.txt", del
 #2439314
 # sheep gen    me size 2869490 KB 
 #~~ Length distribution
-file_path <- "output/ROH/roh_nofilt_ram.hom"
+file_path <- "output/ROH/roh_nofilt_ram_pruned.hom"
 roh_lengths <- fread(file_path)
 
 froh <- roh_lengths %>%
@@ -83,8 +83,8 @@ prop_IBD_df <- roh_lengths %>%
                                 # length_Mb < 4.885464375 & length_Mb >= 3.908371500 ~ 10,
                                  length_Mb < 4.885464375 & length_Mb >= 2.442732188 ~ 16,
                                  length_Mb < 2.442732188 & length_Mb >= 1.221366094 ~ 32,
-                                 length_Mb < 1.221366094 & length_Mb >= 0.610683047 ~ 64,
-                                 length_Mb < 0.610683047 & length_Mb >= 0.30 ~ 128)) %>% # 0.610683047
+                                 length_Mb < 1.221366094 & length_Mb >= 0.6 ~ 64)) %>% 
+                                 #length_Mb < 0.610683047 & length_Mb >= 0.30 ~ 128)) %>% # 0.610683047
         mutate(length_class = case_when(
           class == 1 ~ "> 39 (1G)",
           class == 2 ~ "19.5-39 (2G)",
@@ -94,8 +94,8 @@ prop_IBD_df <- roh_lengths %>%
          # class == 10 ~ "3.9-4.9 (10G",
           class == 16 ~ "2.4-4.9 (16G)",
           class == 32 ~ "1.2-2.4 (32G)",
-          class == 64 ~ "0.6-1.2 (64G)",
-          class == 128 ~ "0.6-0.3 (128G)"
+          class == 64 ~ "0.6-1.2 (64G)"
+         # class == 128 ~ "0.6-0.3 (128G)"
         )) %>% 
         mutate(length_class = fct_reorder(length_class, class)) %>% 
         mutate(IID = as.character(IID)) %>% 
@@ -279,7 +279,7 @@ shade <- df %>%
 col <- c("#82687D", "#2C5475" )
 #col <- c("#436DA2", "#1D244B")
 df %>% 
-  filter(MB > 10) %>% 
+  filter(MB > 1) %>% 
   filter(CHR %in% 1:26) %>% 
   #mutate(CHR = factor(CHR, levels = as.character(1:26))) %>% 
   ggplot() +
@@ -306,9 +306,9 @@ df %>%
               axis.title=element_text(size=15))+
         xlab("chromosome") +
         ylab("individuals") +
-        ggtitle("ROH > 10Mb in the 10 most and 10 least inbred individuals") -> ROH_per_ind
+        ggtitle("ROH > 1Mb in the 10 most and 10 least inbred individuals") -> ROH_per_ind
 
 ROH_per_ind
 #dev.off()
-ggsave("figs/roh_per_ind_10Mb.jpg", ROH_per_ind, width = 11, height = 5)
+ggsave("figs/roh_per_ind_1Mb.jpg", ROH_per_ind, width = 11, height = 5)
 

@@ -1,7 +1,7 @@
 library(tidyverse)
 library(snpStats)
 source("theme_clean.R")
-gwas_files <- list.files("output", pattern = "*.rds", full.names = TRUE)
+gwas_files <- list.files("output/gwas_full_roh/", pattern = "*.rds", full.names = TRUE)
 all_gwas <- map(gwas_files, readRDS) %>% 
             flatten() %>% 
             map(function(x) x$result)
