@@ -1,21 +1,12 @@
-# # run on server
-library(lme4)
-library(tidyverse)
-library(broom.mixed)
-#source("theme_clean.R")
-library(snpStats)
-library(data.table)
-library(furrr)
+# evaluate whether additive genetic variation changes things
 
-# for running on server
-chr_inp  <- commandArgs(trailingOnly=TRUE)
-if (!(length(chr_inp) == 0)) {
-        chr <- as.numeric(chr_inp[[1]])
-} else {
-        # SNP data
-        # which chromosome
-        chr <- 1
-}
+library(tidyverse)
+library(data.table)
+library(snpStats)
+top_snps <- read_delim("output/top_snps_gwas.txt", delim = " ")
+snp <- "oar3_OAR11_8762236"
+
+chr <- 15
 
 
 # data
@@ -127,71 +118,61 @@ early_survival_gwas <- early_survival %>%
         left_join(roh_df, by = "id") %>% 
         as_tibble()
 
-# time saver function for modeling
-nlopt <- function(par, fn, lower, upper, control) {
-        .nloptr <<- res <- nloptr(par, fn, lb = lower, ub = upper, 
-                                  opts = list(algorithm = "NLOPT_LN_BOBYQA", print_level = 1,
-                                              maxeval = 1000, xtol_abs = 1e-6, ftol_abs = 1e-6))
-        list(par = res$solution,
-             fval = res$objective,
-             conv = if (res$status > 0) 0 else res$status,
-             message = res$message
-        )
+
+
+library(INLA)
+# inla
+sheep_ped_inla <- sheep_ped %>% 
+        as_tibble() %>% 
+        rename(id = ID,
+               mother = MOTHER,
+               father = FATHER) %>% 
+        mutate_at(c("id", "mother", "father"), function(x) str_replace(x, "F", "888")) %>% 
+        mutate_at(c("id", "mother", "father"), function(x) str_replace(x, "M", "999")) %>% 
+        #filter(!is.na(id)) %>% 
+        mutate(father = ifelse(is.na(father), 0, father)) %>% 
+        mutate(mother = ifelse(is.na(mother), 0, mother)) %>% 
+        mutate_if(is.character, list(as.numeric)) %>% 
+        as.data.frame() 
+
+comp_inv <- AnimalINLA::compute.Ainverse(sheep_ped_inla)
+ainv <- comp_inv$Ainverse
+ainv_map <- comp_inv$map
+Cmatrix <- sparseMatrix(i=ainv[,1],j=ainv[,2],x=ainv[,3])
+
+add_index_inla <- function(traits) {
+        Ndata <- dim(traits)[1]
+        traits$IndexA <- rep(0, times = Ndata)
+        for(i in 1:Ndata) {
+                traits$IndexA[i] <- which(ainv_map[,1]==traits$id[i])
+        }
+        traits
 }
 
-# GWAS
-# run_gwas <- function(snp, data) {
-#         formula_snp <- as.formula(paste0("survival ~ 1 + sex + twin + ", snp, "+ ", paste0("roh_", snp), "+ (1|birth_year) + (1|sheep_year) + (1|id)"))
-#         mod <- glmer(formula = formula_snp,
-#                      data = data, family = "binomial",
-#                      control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
-#         out <- broom.mixed::tidy(mod)
-#         out
-# }
+early_survival_gwas <- add_index_inla(early_survival_gwas)
+# for all other random effects too
+prec_prior <- list(prior = "loggamma", param = c(0.5, 0.5))
 
-run_gwas <- function(snp, data) {
-        formula_snp <- as.formula(paste0("survival ~ 1 + sex + twin + age_std + age2_std + ", snp, "+ ", paste0("roh_", snp), "+ (1|birth_year) + (1|sheep_year) + (1|id)"))
-        mod <- glmer(formula = formula_snp,
-                     data = data, family = "binomial",
-                     control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
-        out <- broom.mixed::tidy(mod)
-        out
-}
+formula_surv <- as.formula(paste('survival ~ oar3_OAR15_63743364 + roh_oar3_OAR15_63743364 + sex + age_std + age2_std + twin + 1', 
+                             'f(birth_year, model = "iid", hyper = list(prec = prec_prior))',
+                             'f(sheep_year, model = "iid", hyper = list(prec = prec_prior))',
+                             'f(id, model = "iid", hyper = list(prec = prec_prior))',
+                            # 'f(mum_id, model="iid",  hyper = list(prec = prec_prior))', 
+                             'f(IndexA, model="generic0", hyper = list(theta = list(param = c(0.5, 0.5))),Cmatrix=Cmatrix)', sep = " + "))
 
-safe_run_gwas <- purrr::safely(run_gwas)
-# gwas_out <- purrr::map(snps_sub, safe_run_gwas, early_survival_gwas)
+mod_inla <- inla(formula=formula_surv, family="binomial",
+                 data=early_survival_gwas, 
+                 control.compute = list(dic = TRUE))
+summary(mod_inla)
 
-# split in pieces of 1000 snps / rohs, each approximately 0.25 Gb)
-num_parts <- round(length(seq_along(snps_sub)) / 1000)
-snps_pieces <- split(snps_sub, cut(seq_along(snps_sub), num_parts, labels = FALSE))
-roh_pieces <- map(snps_pieces, function(x) paste0("roh_", x))
+formula_surv_norel <- as.formula(paste('survival ~ oar3_OAR15_63743364 + roh_oar3_OAR15_63743364 + sex + age_std + age2_std + twin + 1', 
+                                 'f(birth_year, model = "iid", hyper = list(prec = prec_prior))',
+                                 'f(sheep_year, model = "iid", hyper = list(prec = prec_prior))',
+                                 'f(id, model = "iid", hyper = list(prec = prec_prior))', sep = " + "))
+                                 # 'f(mum_id, model="iid",  hyper = list(prec = prec_prior))', 
+                                 #'f(IndexA, model="generic0", hyper = list(theta = list(param = c(0.5, 0.5))),Cmatrix=Cmatrix)', sep = " + "))
 
-early_survival_gwas_pieces <- 
-        map2(snps_pieces, roh_pieces, function(snps_piece, roh_piece) {
-                early_survival_gwas %>% dplyr::select(id:age2_std, one_of(c(snps_piece, roh_piece)))   
-        })
-
-# clean up
-rm(early_survival, early_survival_gwas, fitness_data, geno_sub, roh_lengths, roh_pieces, 
-   roh_snps, roh_snps_reord, sheep_ped, snps_map_sub, roh_sub, roh_df)
-
-# set up plan
-plan(multiprocess, workers = 8)
-
-# increase maxSize
-options(future.globals.maxSize = 3000 * 1024^2)
-all_out <- purrr::pmap(list(snps_pieces, early_survival_gwas_pieces, 1:num_parts),  function(snps, data, num_part) {
-        out <- future_map(snps, safe_run_gwas, data)
-        # remove one hierarchical level
-        all_out_simple <- purrr::flatten(out)
-        saveRDS(all_out_simple, file = paste0("output/GWAS_roh_chr", chr, "_", num_part, ".rds"))
-})
-
-
-
-
-
-
-
-
-
+mod_inla2 <- inla(formula=formula_surv_norel, family="binomial",
+                  data=early_survival_gwas, 
+                  control.compute = list(dic = TRUE))
+summary(mod_inla2)
