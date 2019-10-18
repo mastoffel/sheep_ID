@@ -7,7 +7,7 @@ library(magrittr)
 library(rlang)
 source("theme_clean.R")
 # annual measures of traits and fitness
-load("model_in/fitness_roh_df.RData")
+load("data/fitness_roh_df.RData")
 library(windowscanr)
 library(wesanderson)
 
@@ -54,7 +54,7 @@ names(ids_per_age) <- paste0("age_", c(0:10))
 num_ind_per_age <- unlist(map(ids_per_age, length))
 
 # load ROH info
-file_path <- "output/ROH/roh_nofilt_ram.hom"
+file_path <- "output/ROH/roh_nofilt_ram_pruned.hom"
 roh_lengths <- fread(file_path) 
 
 # calculate length classes
@@ -97,7 +97,7 @@ roh_plot <- roh_per_age %>%
         mutate(age = fct_inorder(age))
         
 p1 <- ggplot(roh_plot, aes(prop, fill = roh_class)) +
-        facet_wrap(age~roh_class, scales = "free_y" ,nrow = 4) + # scales = "free",
+        #facet_wrap(age~roh_class, scales = "free_y" ,nrow = 4) + # scales = "free",
         geom_histogram(bins = 100, color = "grey", lwd = 0.2) +
         scale_y_sqrt() + 
         scale_fill_brewer(palette = "YlGnBu", direction = -1) + 
@@ -139,8 +139,8 @@ prop_IBD_df <- roh_lengths %>%
                                  # length_Mb < 4.885464375 & length_Mb >= 3.908371500 ~ 10,
                                  length_Mb < 4.885464375 & length_Mb >= 2.442732188 ~ 16,
                                  length_Mb < 2.442732188 & length_Mb >= 1.221366094 ~ 32,
-                                 length_Mb < 1.221366094 & length_Mb >= 0.610683047 ~ 64,
-                                 length_Mb < 0.610683047 & length_Mb >= 0.30 ~ 128)) %>% # 0.610683047
+                                 length_Mb < 1.221366094 & length_Mb >= 0.610683047 ~ 64 )) %>%
+                                # length_Mb < 0.610683047 & length_Mb >= 0.30 ~ 128)  ) %>% # 0.610683047
         mutate(length_class = case_when(
                 class == 1 ~ "> 39 (1G)",
                 class == 2 ~ "19.5-39 (2G)",
@@ -150,8 +150,8 @@ prop_IBD_df <- roh_lengths %>%
                 # class == 10 ~ "3.9-4.9 (10G",
                 class == 16 ~ "2.4-4.9 (16G)",
                 class == 32 ~ "1.2-2.4 (32G)",
-                class == 64 ~ "0.6-1.2 (64G)",
-                class == 128 ~ "0.6-0.3 (128G)"
+                class == 64 ~ "0.6-1.2 (64G)"
+                #class == 128 ~ "0.6-0.3 (128G)"
         )) %>% 
         mutate(length_class = fct_reorder(length_class, class)) %>% 
         mutate(IID = as.character(IID)) %>% 
@@ -179,6 +179,7 @@ prop_IBD_across_time <- prop_IBD_df_with_0 %>%
 
 library(ggbeeswarm)
 p1 <- prop_IBD_across_time %>% 
+        filter(!is.na(length_class)) %>% 
         group_by(ID) %>% 
         sample_frac(1) %>% 
         ungroup() %>% 

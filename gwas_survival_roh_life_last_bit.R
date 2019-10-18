@@ -6,7 +6,7 @@ library(broom.mixed)
 library(snpStats)
 library(data.table)
 library(furrr)
-library(caret)
+
 # for running on server
 chr_inp  <- commandArgs(trailingOnly=TRUE)
 if (!(length(chr_inp) == 0)) {
@@ -14,7 +14,7 @@ if (!(length(chr_inp) == 0)) {
 } else {
         # SNP data
         # which chromosome
-        chr <- 20
+        chr <- 1
 }
 
 
@@ -22,14 +22,6 @@ if (!(length(chr_inp) == 0)) {
 load("data/fitness_roh_df.RData")
 load("data/sheep_ped.RData")
 IDs_lots_missing <- read_delim("data/ids_more_than_5perc_missing.txt", delim = " ")
-
-# pcas 
-pcs <- read_delim("data/sheep_pca_eigenvec", " ", col_names = FALSE) %>% 
-        dplyr::select(-X1) %>% 
-        dplyr::rename(id = X2) %>% 
-        dplyr::select(id, X3:X7) %>% 
-        dplyr::rename(pc1 = X3, pc2 = X4, pc3 = X5, pc4 = X6, pc5 = X7) %>% 
-        mutate(id = as.character(id))
 
 # roh data
 file_path <- "data/roh_nofilt_ram_pruned.hom"
@@ -67,31 +59,11 @@ early_survival <- fitness_data %>%
         filter(!is.na(survival)) %>% 
         filter(!is.na(froh_all)) %>% 
         filter(!(is.na(birth_year) | is.na(sheep_year))) %>%  # no mum_id here
-        mutate_at(c("id", "birth_year", "sex", "sheep_year", "survival"), as.factor) %>% 
+        mutate_at(c("id", "birth_year", "sex", "sheep_year"), as.factor) %>% 
         mutate(age2 = age^2) %>% 
         mutate(age_std = as.numeric(scale(age)),
                age2_std = as.numeric(scale(age2))) %>% 
         as.data.frame() 
-
-
-# use only training set (80% of individuals)
-sample_frac_groups = function(tbl, size, replace = FALSE, weight = NULL) {
-        # regroup when done
-        grps = tbl %>% groups %>% lapply(as.character) %>% unlist
-        # check length of groups non-zero
-        keep = tbl %>% summarise() %>% ungroup() %>% sample_frac(size, replace, weight)
-        # keep only selected groups, regroup because joins change count.
-        # regrouping may be unnecessary but joins do something funky to grouping variable
-        tbl %>% right_join(keep, by=grps) %>% group_by(.dots = grps)
-}
-
-set.seed(7336)
-early_survival <- early_survival %>% 
-        mutate(index = 1:nrow(.)) %>% 
-        group_by(id) %>% 
-        sample_frac_groups(0.8) %>% 
-        ungroup()
-write_lines(early_survival$index, "output/ind_index_test.txt")
 
 
 # prepare additive genotypes subset
@@ -151,7 +123,6 @@ rm(roh_mat)
 # join additive and roh data to survival for gwas
 early_survival_gwas <- early_survival %>% 
         dplyr::select(id, survival, sex, twin, birth_year, sheep_year, mum_id, age_std, age2_std) %>% 
-        left_join(pcs, by = "id") %>% 
         left_join(geno_sub, by = "id") %>% 
         left_join(roh_df, by = "id") %>% 
         as_tibble()
@@ -179,9 +150,7 @@ nlopt <- function(par, fn, lower, upper, control) {
 # }
 
 run_gwas <- function(snp, data) {
-        formula_snp <- as.formula(paste0("survival ~ 1 + sex + twin + age_std + age2_std + ", 
-                                         "pc1 + pc2 + pc3 + pc4 + pc5 + ",
-                                         snp, "+ ", paste0("roh_", snp), "+ (1|birth_year) + (1|sheep_year) + (1|id)"))
+        formula_snp <- as.formula(paste0("survival ~ 1 + sex + twin + age_std + age2_std + ", snp, "+ ", paste0("roh_", snp), "+ (1|birth_year) + (1|sheep_year) + (1|id)"))
         mod <- glmer(formula = formula_snp,
                      data = data, family = "binomial",
                      control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
@@ -199,7 +168,7 @@ roh_pieces <- map(snps_pieces, function(x) paste0("roh_", x))
 
 early_survival_gwas_pieces <- 
         map2(snps_pieces, roh_pieces, function(snps_piece, roh_piece) {
-                early_survival_gwas %>% dplyr::select(id:pc5, one_of(c(snps_piece, roh_piece)))   
+                early_survival_gwas %>% dplyr::select(id:age2_std, one_of(c(snps_piece, roh_piece)))   
         })
 
 # clean up
@@ -211,7 +180,7 @@ plan(multiprocess, workers = 8)
 
 # increase maxSize
 options(future.globals.maxSize = 3000 * 1024^2)
-all_out <- purrr::pmap(list(snps_pieces, early_survival_gwas_pieces, 1:num_parts),  function(snps, data, num_part) {
+all_out <- purrr::pmap(list(snps_pieces[11:15], early_survival_gwas_pieces[11:15], 11:15),  function(snps, data, num_part) {
         out <- future_map(snps, safe_run_gwas, data)
         # remove one hierarchical level
         all_out_simple <- purrr::flatten(out)

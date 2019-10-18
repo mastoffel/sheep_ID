@@ -14,8 +14,8 @@ sheep_ped <- read_delim("../sheep/data/SNP_chip/20190711_Soay_Pedigree.txt",
 #save(sheep_ped,  file = "model_in/sheep_ped.RData")
 
 ##### ROH data #####
-file_path <- "output/ROH/roh_nofilt_ram.hom"
-file <- "roh_nofilt"
+file_path <- "output/ROH/roh_nofilt_ram_pruned.hom"
+file <- "roh_nofilt_pruned"
 roh_lengths <- fread(file_path)
 hist(roh_lengths$KB, breaks = 1000, xlim = c(0,10000))
 
@@ -30,13 +30,13 @@ calc_froh_classes <- function(roh_crit, roh_lengths) {
         )
         
         roh_lengths %>%
-                dplyr::group_by(FID) %>%
+                dplyr::group_by(IID) %>%
                 #filter({{ roh_filt }}) %>% 
                 filter(!!roh_filt) %>% 
                 dplyr::summarise(KBSUM = sum(KB)) %>% 
-                mutate(FROH = KBSUM / 2534344) %>% 
-                dplyr::select(FID, FROH) %>% 
-                rename(ID = FID, !! paste0("FROH_", roh_crit) := FROH)
+                mutate(FROH = KBSUM / 2869898) %>% 
+                dplyr::select(IID, FROH) %>% 
+                rename(ID = IID, !! paste0("FROH_", roh_crit) := FROH)
         
 }
 
@@ -70,8 +70,8 @@ homs <- read_delim("output/ROH/roh_nofilt_hom_not_in_roh.txt", delim = " ")
 fitness_data <- fitness_data %>% 
         left_join(homs, by = "ID")
 
-save(fitness_data, file = "model_in/fitness_roh_df.RData")
-save(sheep_ped, file = "model_in/sheep_ped.RData")
+save(fitness_data, file = "data/fitness_roh_df.RData")
+save(sheep_ped, file = "data/sheep_ped.RData")
 
 
 

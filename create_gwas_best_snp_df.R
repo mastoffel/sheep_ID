@@ -2,13 +2,13 @@
 library(tidyverse)
 library(data.table)
 library(snpStats)
-top_snps <- read_delim("output/top_snps_gwas.txt", delim = " ")
+top_snps <- read_delim("output/top_snps_gwas_train08.txt", delim = " ")
 chrs <- unique(top_snps$chromosome)
 
 # data
 load("data/fitness_roh_df.RData")
 load("data/sheep_ped.RData")
-IDs_lots_missing <- read_delim("data/ids_more_than_5perc_missing.txt", delim = " ")
+IDs_lots_missing <- read_delim("data/ids_more_than_5perc_missing_imputation.txt", delim = " ")
 
 # roh data
 file_path <- "data/roh_nofilt_ram_pruned.hom"
@@ -129,6 +129,36 @@ rm(full_sample)
 rm(roh_list)
 rm(roh_mat)
 
+write_delim(early_survival_top_snps, "output/early_survival_top_snps_train08.txt", delim = " ")
+
+
+
+
+
+
+# get df
+early_survival_top_snps <- read_delim("output/early_survival_top_snps.txt", delim = " ") %>% 
+                                        mutate(roh_all = rowSums(select_at(., vars(contains("roh"))), na.rm = TRUE))
+# how much variation do all ROH snps explain?
+# time saver function for modeling
+nlopt <- function(par, fn, lower, upper, control) {
+        .nloptr <<- res <- nloptr(par, fn, lb = lower, ub = upper, 
+                                  opts = list(algorithm = "NLOPT_LN_BOBYQA", print_level = 1,
+                                              maxeval = 1000, xtol_abs = 1e-6, ftol_abs = 1e-6))
+        list(par = res$solution,
+             fval = res$objective,
+             conv = if (res$status > 0) 0 else res$status,
+             message = res$message
+        )
+}
+
+library(lme4)
+library(performance)
+roh_snps <- names(early_survival_top_snps)[str_detect(names(early_survival_top_snps), "roh")]
+glme_form <- reformulate(c("sex", "twin", "age_std", "age2_std", roh_snps, "(1|birth_year)", "(1|sheep_year)", "(1|id)"),response="survival")
+mod1 <- glmer(glme_form, data = early_survival_top_snps, family = "binomial",
+              control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+
 
 
 
@@ -166,6 +196,12 @@ predictInterval(mod1, newdata = survival_test,
 
 mm <- model.matrix(terms(mod1),newdat)
 pvar1 <- diag(mm %*% tcrossprod(vcov(mod1),mm))
+
+
+
+
+
+
 
 
 
