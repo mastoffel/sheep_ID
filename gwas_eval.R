@@ -1,9 +1,9 @@
 library(tidyverse)
 library(snpStats)
 source("theme_clean.R")
-gwas_files <- list.files("output/gwas_full_roh", pattern = "*.rds", full.names = TRUE)
+#gwas_files <- list.files("output/gwas_full_roh", pattern = "*.rds", full.names = TRUE)
 #gwas_files <- list.files("output/gwas_1sty_surv", pattern = "*.rds", full.names = TRUE)
-
+gwas_files <- list.files("output/gwas_full_roh_pca", pattern = "*.rds", full.names = TRUE)
 # extract results
 all_gwas <- purrr::map(gwas_files, readRDS) %>% 
             purrr::flatten() %>% 
@@ -13,11 +13,11 @@ all_gwas <- purrr::map(gwas_files, readRDS) %>%
             purrr::compact()
 
 # check errors
-# all_gwas[seq(2,length(all_gwas),by=2)] %>% 
-#         compact()
+all_gwas[seq(2,length(all_gwas),by=2)] %>% 
+      compact()
 
 # get roh pval
-gwas_res <- map_df(all_gwas, function(x) x %>% .[c(6,7), ] %>% 
+gwas_res <- map_df(all_gwas, function(x) x %>% .[c(11,12), ] %>% 
                            dplyr::select(term, estimate, p.value))
 
 # check whether roh didnt work anywhere
@@ -69,7 +69,7 @@ gwas_roh <- gwas_full %>%
 med.dat <- gwas_roh %>% dplyr::group_by(groups, chromosome) %>% 
                 dplyr::summarise(median.x = median(cumsum.tmp))
 chr_labels <- c(c(1:18),"","20","",  "22","", "24","", "26")
-chr_labels <- med.dat$chromosome
+#chr_labels <- med.dat$chromosome
 library(viridis)
 cols <- c("#336B87", "#2A3132")
 pgwas <- ggplot(data = gwas_roh) + 
@@ -86,7 +86,7 @@ pgwas <- ggplot(data = gwas_roh) +
         theme(axis.text.x = element_text(size = 10),
               axis.ticks = element_line(size = 0.1))#+
         #facet_wrap(groups~., nrow = 2)
-ggsave( "figs/survival_gwas.jpg",pgwas, height = 3, width = 12)
+ggsave( "figs/survival_gwas_pca.jpg",pgwas, height = 3, width = 12)
 
 gwas_roh %>% arrange(p.value) %>% filter(groups == "roh") %>% filter(p.value < 0.05/28946)
 
@@ -112,12 +112,13 @@ fwrite(sheep_geno_t, file = "data/geno_mat_simpleM_allchr.txt", col.names = FALS
 gwas_roh %>% arrange(p.value) %>% 
         filter(groups == "roh") %>%  # filter(p.value < 0.05/28946) 
         .[1:100, ] %>% 
-        write_delim("output/top_snps_gwas_train08.txt")
+        write_delim("output/top_snps_gwas_pca.txt")
 
 
 snps <- gwas_roh %>% arrange(p.value) %>% 
         filter(groups == "roh") %>% 
-        filter(p.value < 0.05/28946) 
+        filter(p.value < 0.05/28946) %>% 
+        write_delim("output/top_snps_gwas_pca.txt")
 
 
 

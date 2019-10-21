@@ -2,13 +2,13 @@
 library(tidyverse)
 library(data.table)
 library(snpStats)
-top_snps <- read_delim("output/top_snps_gwas_train08.txt", delim = " ")
+top_snps <- read_delim("output/top_snps_gwas_pca.txt", delim = " ")
 chrs <- unique(top_snps$chromosome)
 
 # data
 load("data/fitness_roh_df.RData")
 load("data/sheep_ped.RData")
-IDs_lots_missing <- read_delim("data/ids_more_than_5perc_missing_imputation.txt", delim = " ")
+IDs_lots_missing <- read_delim("data/ids_more_than_5perc_missing.txt", delim = " ")
 
 # roh data
 file_path <- "data/roh_nofilt_ram_pruned.hom"
@@ -25,7 +25,7 @@ full_sample <- read.plink(sheep_bed, sheep_bim, sheep_fam)
 snps_map_sub <- full_sample$map #%>% filter(chromosome %in% chrs)
 
 # survival data
-early_survival <- fitness_data %>% 
+early_survival <- fitness_data %>%
         dplyr::rename(birth_year = BIRTHYEAR,
                       sheep_year = SheepYear,
                       age = Age,
@@ -38,18 +38,18 @@ early_survival <- fitness_data %>%
                       froh_long = FROH_long,
                       froh_all = FROH_all,
                       froh_not_roh = hom,
-                      survival = Survival) %>% 
-        # some individuals arent imputed well and should be discarded 
-        filter(!(id %in% IDs_lots_missing$id)) %>% 
-        #filter(age == 0) %>% 
-        filter(!is.na(survival)) %>% 
-        filter(!is.na(froh_all)) %>% 
+                      survival = Survival) %>%
+        # some individuals arent imputed well and should be discarded
+        filter(!(id %in% IDs_lots_missing$id)) %>%
+        #filter(age == 0) %>%
+        filter(!is.na(survival)) %>%
+        filter(!is.na(froh_all)) %>%
         filter(!(is.na(birth_year) | is.na(sheep_year))) %>%  # no mum_id here
-        mutate_at(c("id", "birth_year", "sex", "sheep_year"), as.factor) %>% 
-        mutate(age2 = age^2) %>% 
+        mutate_at(c("id", "birth_year", "sex", "sheep_year", "survival"), as.factor) %>%
+        mutate(age2 = age^2) %>%
         mutate(age_std = as.numeric(scale(age)),
-               age2_std = as.numeric(scale(age2))) %>% 
-        as.data.frame() 
+               age2_std = as.numeric(scale(age2))) %>%
+        as.data.frame()
 
 
 # prepare additive genotypes subset
@@ -74,10 +74,13 @@ roh_snps <- roh_sub %>%
         mutate(all_snps = seq2(from = index1, to = index2)) %>% 
         mutate(snps_roh = map(all_snps, function(x) names(geno_sub)[x])) %>% 
         # it might be that this results in two snps for a roh
-        mutate(gwas_snp = map_chr(snps_roh, function(x) {
+        mutate(gwas_snp = map(snps_roh, function(x) {
                 snp_in_roh <- top_snps$snp.name %in% x
-                out <- ifelse(any(snp_in_roh), top_snps$snp.name[snp_in_roh], NA)
-                out
+                out <- if (any(snp_in_roh)) {
+                    out <- top_snps$snp.name[snp_in_roh]
+                } else {
+                    out <- NA
+                }
         })) %>% 
         filter(!is.na(gwas_snp)) %>% 
         group_by(IID) %>% 
@@ -85,6 +88,7 @@ roh_snps <- roh_sub %>%
         mutate(all_snps = simplify_all(all_snps)) %>% 
         mutate(IID = as.character(IID)) %>% 
         rename(id = IID)
+
 
 # filter geno_sub
 geno_sub <- geno_sub %>% 
@@ -129,7 +133,12 @@ rm(full_sample)
 rm(roh_list)
 rm(roh_mat)
 
-write_delim(early_survival_top_snps, "output/early_survival_top_snps_train08.txt", delim = " ")
+write_delim(early_survival_top_snps, "output/early_survival_top_snps_pca.txt", delim = " ")
+
+
+
+
+
 
 
 

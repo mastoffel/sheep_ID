@@ -85,13 +85,13 @@ sample_frac_groups = function(tbl, size, replace = FALSE, weight = NULL) {
         tbl %>% right_join(keep, by=grps) %>% group_by(.dots = grps)
 }
 
-# set.seed(7336)
-# early_survival <- early_survival %>% 
-#         mutate(index = 1:nrow(.)) %>% 
-#         group_by(id) %>% 
-#         sample_frac_groups(0.8) %>% 
-#         ungroup()
-# write_lines(early_survival$index, "output/ind_index_test.txt")
+set.seed(7336)
+early_survival <- early_survival %>% 
+        mutate(index = 1:nrow(.)) %>% 
+        group_by(id) %>% 
+        sample_frac_groups(0.8) %>% 
+        ungroup()
+write_lines(early_survival$index, "output/ind_index_test.txt")
 
 
 # prepare additive genotypes subset
@@ -168,61 +168,39 @@ nlopt <- function(par, fn, lower, upper, control) {
         )
 }
 
-# GWAS
-# run_gwas <- function(snp, data) {
-#         formula_snp <- as.formula(paste0("survival ~ 1 + sex + twin + ", snp, "+ ", paste0("roh_", snp), "+ (1|birth_year) + (1|sheep_year) + (1|id)"))
-#         mod <- glmer(formula = formula_snp,
-#                      data = data, family = "binomial",
-#                      control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
-#         out <- broom.mixed::tidy(mod)
-#         out
-# }
+library(lme4qtl)
 
-run_gwas <- function(snp, data) {
-        formula_snp <- as.formula(paste0("survival ~ 1 + sex + twin + age_std + age2_std + ", 
-                                         "pc1 + pc2 + pc3 + pc4 + pc5 + ",
-                                         snp, "+ ", paste0("roh_", snp), "+ (1|birth_year) + (1|sheep_year) + (1|id)"))
-        mod <- glmer(formula = formula_snp,
-                     data = data, family = "binomial",
-                     control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
-        out <- broom.mixed::tidy(mod)
-        out
-}
-
-safe_run_gwas <- purrr::safely(run_gwas)
-# gwas_out <- purrr::map(snps_sub, safe_run_gwas, early_survival_gwas)
-
-# split in pieces of 1000 snps / rohs, each approximately 0.25 Gb)
-num_parts <- round(length(seq_along(snps_sub)) / 1000)
-snps_pieces <- split(snps_sub, cut(seq_along(snps_sub), num_parts, labels = FALSE))
-roh_pieces <- map(snps_pieces, function(x) paste0("roh_", x))
-
-early_survival_gwas_pieces <- 
-        map2(snps_pieces, roh_pieces, function(snps_piece, roh_piece) {
-                early_survival_gwas %>% dplyr::select(id:pc5, one_of(c(snps_piece, roh_piece)))   
-        })
-
-# clean up
-rm(early_survival, early_survival_gwas, fitness_data, geno_sub, roh_lengths, roh_pieces, 
-   roh_snps, roh_snps_reord, sheep_ped, snps_map_sub, roh_sub, roh_df)
-
-# set up plan
-plan(multiprocess, workers = 8)
-
-# increase maxSize
-options(future.globals.maxSize = 3000 * 1024^2)
-all_out <- purrr::pmap(list(snps_pieces, early_survival_gwas_pieces, 1:num_parts),  function(snps, data, num_part) {
-        out <- future_map(snps, safe_run_gwas, data)
-        # remove one hierarchical level
-        all_out_simple <- purrr::flatten(out)
-        saveRDS(all_out_simple, file = paste0("output/GWAS_roh_chr", chr, "_", num_part, ".rds"))
-})
+formula_snp <- as.formula(paste0("survival ~ 1 + sex + twin + age_std + age2_std + ", 
+                                 "pc1 + pc2 + pc3 + pc4 + pc5 + ",
+                                 snp, "+ ", paste0("roh_", snp), "+ (1|birth_year) + (1|sheep_year) + (1|id)"))
+mod <- glmer(formula = formula_snp,
+             data = data, family = "binomial",
+             control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+out <- broom.mixed::tidy(mod)
+out
 
 
+library(pedigreemm)
+sheep_ped
+pedS4 <- pedigree(sire=as.character(sheep_ped$FATHER), dam=as.character(sheep_ped$MOTHER), label=as.character(sheep_ped$ID))  
 
 
+sleep_for_a_minute()
 
+early_survival_gwas_mod <- early_survival_gwas %>% sample_frac(0.1)
+start_time <- Sys.time()
+mod <- pedigreemm(survival ~ sex + twin + age_std + age2_std + (1|id) + (1|birth_year) + (1|sheep_year),
+                 pedigree=list(id=pedS4), data=early_survival_gwas_mod,
+                 family = "binomial",
+                 control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+end_time <- Sys.time()
 
+library(lme4qtl)
+start_time <- Sys.time()
+mod <- relmatGlmer(survival ~ sex + twin + age_std + age2_std + (1|id) + (1|birth_year) + (1|sheep_year),
+                  pedigree=list(id=pedS4), data=early_survival_gwas_mod,
+                  family = "binomial")
+end_time <- Sys.time()
 
-
-
+end_time - start_time
+summary(mod)
