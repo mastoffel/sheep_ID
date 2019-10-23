@@ -1,8 +1,14 @@
 library(tidyverse)
 library(snpStats)
 source("theme_clean.R")
-#gwas_files <- list.files("output/gwas_full_roh", pattern = "*.rds", full.names = TRUE)
-#gwas_files <- list.files("output/gwas_1sty_surv", pattern = "*.rds", full.names = TRUE)
+
+chr_info <- read_delim("../sheep/data/sheep_genome/chromosome_info_ram.txt", "\t") %>% 
+                .[-1, ] %>% 
+                rename(chromosome = Part) %>% 
+                mutate(chromosome = str_replace(chromosome, "Chromosome ", "")) %>% 
+                mutate(chromosome = as.integer(chromosome)) %>% 
+                filter(!is.na(chromosome))
+
 gwas_files <- list.files("output/gwas_full_roh_pca", pattern = "*.rds", full.names = TRUE)
 # extract results
 all_gwas <- purrr::map(gwas_files, readRDS) %>% 
@@ -13,8 +19,8 @@ all_gwas <- purrr::map(gwas_files, readRDS) %>%
             purrr::compact()
 
 # check errors
-all_gwas[seq(2,length(all_gwas),by=2)] %>% 
-      compact()
+# all_gwas[seq(2,length(all_gwas),by=2)] %>% 
+#       compact()
 
 # get roh pval
 gwas_res <- map_df(all_gwas, function(x) x %>% .[c(11,12), ] %>% 
@@ -44,7 +50,6 @@ table(full_sample$map$chromosome, useNA = "always")
 # gwas_roh <- gwas_res %>% filter(str_detect(term, "roh"))
 # gwas_roh[which(!(gwas_snp$term %in% full_sample$map$snp.name)), ]
 
-all_gwas[[11842]]
 # put into df
 gwas_full <- gwas_res %>%
         rename(snp.name = term) %>%
@@ -61,32 +66,56 @@ qqman::qq(gwas_full[gwas_full$groups == "roh", ]$p.value)
 # manhattan
 ## computing new x axis
 gwas_roh <- gwas_full %>% 
-                        filter(groups == "roh") %>% 
+                        filter(groups == "roh") #%>% 
                         #group_by(groups) %>% 
-                        arrange(chromosome, position) %>% 
-                        dplyr::mutate(tmp = 1, cumsum.tmp = cumsum(tmp))
+                        #arrange(chromosome, position) %>% 
+                        #dplyr::mutate(tmp = 1, cumsum.tmp = cumsum(tmp))
 ## calculating x axis location for chromosome label
 med.dat <- gwas_roh %>% dplyr::group_by(groups, chromosome) %>% 
                 dplyr::summarise(median.x = median(cumsum.tmp))
+
 chr_labels <- c(c(1:18),"","20","",  "22","", "24","", "26")
 #chr_labels <- med.dat$chromosome
 library(viridis)
+library(magrittr)
 cols <- c("#336B87", "#2A3132")
-pgwas <- ggplot(data = gwas_roh) + 
-        geom_point(aes(x = cumsum.tmp, y = -log10(p.value), fill = chromosome %%2 == 0),
-                   size = 2.5,color = "black", alpha = 0.7, shape = 21, stroke = 0.01) + ## create alternate coloring
-        geom_hline(yintercept = -log10(0.05/28946), linetype="dashed", color = "grey") + ## add horizontal line
-        scale_x_continuous(breaks = med.dat$median.x, labels = chr_labels) + ##  labels = chr_labels
-       # guides(colour=FALSE) +  ## remove legend
-        guides(fill=FALSE) +
+
+# get cumsums
+chr_info %<>% 
+        mutate(tot=cumsum(Length)-Length) %>% 
+        select(chromosome, tot)
+
+gwas_p <- gwas_roh %>% 
+        left_join(chr_info) %>% 
+        # Add a cumulative position of each SNP
+        arrange(chromosome, position) %>%
+        mutate(pos_cum = position + tot) 
+
+axisdf <- gwas_p %>% group_by(chromosome) %>% 
+                summarize(center = (max(pos_cum) + min(pos_cum)) / 2 )
+
+pgwas <- ggplot(gwas_p, aes(x=pos_cum, y=-log10(p.value))) +
+        # Show all points
+        geom_point(aes(color=as.factor(chromosome), fill = chromosome %%2 == 0),  
+                   size = 2,color = "black", alpha = 0.7, shape = 21, stroke = 0.01) +
+        #scale_color_manual(values = rep(cols, 26 )) +
+        geom_hline(yintercept = -log10(0.05/28946), linetype="dashed", color = "grey") +
+        # custom X axis:
+        scale_x_continuous(labels = chr_labels, breaks= axisdf$center ) +
+        scale_y_continuous(expand = c(0, 0), limits = c(0,8)) +
+        # Add label using ggrepel to avoid overlapping
+       # geom_label_repel(data=df.tmp[df.tmp$is_annotate=="yes",], aes(label=as.factor(SNP), alpha=0.7), size=5, force=1.3) +
         xlab("Chromosome") + 
         ylab(expression(-log[10](italic(p)))) + ## y label from qqman::qq
         scale_fill_manual(values = cols) +## instead of colors, go for gray
         theme_clean() +
         theme(axis.text.x = element_text(size = 10),
-              axis.ticks = element_line(size = 0.1))#+
+              axis.ticks = element_line(size = 0.1)) +
+        guides(fill=FALSE) 
         #facet_wrap(groups~., nrow = 2)
-ggsave( "figs/survival_gwas_pca.jpg",pgwas, height = 3, width = 12)
+
+pgwas
+ggsave( "figs/survival_gwas_roh_pca.jpg",pgwas, height = 3, width = 12)
 
 gwas_roh %>% arrange(p.value) %>% filter(groups == "roh") %>% filter(p.value < 0.05/28946)
 
@@ -121,5 +150,19 @@ snps <- gwas_roh %>% arrange(p.value) %>%
         write_delim("output/top_snps_gwas_pca.txt")
 
 
-
-
+# some other plots
+gwas_roh_mod <- gwas_roh %>% filter(chromosome == 10)
+ggplot(data = gwas_roh_mod) + 
+        geom_point(aes(x = cumsum.tmp, y = -log10(p.value), fill = chromosome %%2 == 0),
+                   size = 2.5,color = "black", alpha = 0.7, shape = 21, stroke = 0.01) + ## create alternate coloring
+        geom_hline(yintercept = -log10(0.05/28946), linetype="dashed", color = "grey") + ## add horizontal line
+       # scale_x_continuous(breaks = med.dat$median.x, labels = chr_labels) + ##  labels = chr_labels
+        # guides(colour=FALSE) +  ## remove legend
+        guides(fill=FALSE) +
+        xlab("Chromosome") + 
+        ylab(expression(-log[10](italic(p)))) + ## y label from qqman::qq
+        scale_fill_manual(values = cols) +## instead of colors, go for gray
+        theme_clean() +
+        theme(axis.text.x = element_text(size = 10),
+              axis.ticks = element_line(size = 0.1))+
+        facet_wrap(groups~., nrow = 2)

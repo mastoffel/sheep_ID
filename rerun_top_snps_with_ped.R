@@ -11,7 +11,9 @@ gwas_df <- read_delim("output/early_survival_top_snps_pca.txt", delim = " ") %>%
                        twin = as.factor(twin),
                       # survival = as.factor(survival),
                        birth_year = as.factor(birth_year),
-                       sheep_year = as.factor(sheep_year))
+                       sheep_year = as.factor(sheep_year)) %>% 
+                mutate(age_std = as.numeric(scale(age)),
+                       age2_std = as.numeric(scale(age2)))
 load("data/sheep_ped.RData")
 
 snps <- read_delim("output/top_snps_gwas_pca.txt", delim = " ")
@@ -47,10 +49,14 @@ gwas_df <- gwas_df %>% mutate(IndexA2 = IndexA)
 
 # model
 prec_prior <- list(prior = "loggamma", param = c(0.5, 0.5))
-
+#prec_prior <- list(prior = "loggamma", param = c(1, 0.00005)) # defaukt
 # get snps
-top_snps <- gwas_df %>% dplyr::select(contains("roh")) %>% names(.) %>% str_replace(., "roh_", "")
+top_snps <- gwas_df %>% dplyr::select(contains("roh")) %>% 
+                rename(froh=froh_all) %>% 
+                names(.) %>% str_replace(., "roh_", "") %>% 
+                .[-1]
 
+snp <- "oar3_OAR15_64094588"
 # inla model
 run_mod <- function(snp) {
         formula_surv <- as.formula(paste('survival ~ 1 + sex + age_std + age2_std + twin', snp, paste0("roh_", snp),
@@ -60,20 +66,32 @@ run_mod <- function(snp) {
                                          'f(IndexA, model="generic0", hyper = list(theta = list(param = c(0.5, 0.5))),Cmatrix=Cmatrix)', sep = " + "))
         
         mod_inla <- inla(formula=formula_surv, family="binomial",
-                         data=gwas_df, control.compute = list(dic = TRUE))
+                         data=gwas_df, control.compute = list(dic = TRUE),
+                         num.threads = 1)
+        
+        saveRDS(mod_inla, file = paste0("output/inla_mods_gwas_top/", snp, ".rds"))
         
 }
 
 # set up plan
-plan(multiprocess, workers = 8)
+plan(multiprocess, workers = 6)
 # run in parallel
-all_top_snp_fits <- future_map(top_snps, run_mod)
-
-saveRDS(all_top_snp_fits, file = "output/inla_fits_top_snps.rds")
+all_top_snp_fits <- future_map(top_snps[7:length(top_snps)], run_mod)
 
 
 
 
+library(glmmLasso)
+help("glmmLasso")
+dat <- gwas_df %>% 
+       drop_na()
+# sex + age_std + age2_std + twin +
+formula_lasso <- as.formula(paste('survival ~ 1 +', paste(top_snps, collapse = " + "), paste(paste0("roh_", top_snps), collapse = " + "),
+                                sep = " + "))
+
+glm1 <- glmmLasso(formula_lasso, rnd = list(birth_year=~1),  
+                  family = binomial(link = logit), data = dat,
+                  lambda = 10) 
 
 
 # 
