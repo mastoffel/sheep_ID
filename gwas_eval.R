@@ -9,7 +9,7 @@ chr_info <- read_delim("../sheep/data/sheep_genome/chromosome_info_ram.txt", "\t
                 mutate(chromosome = as.integer(chromosome)) %>% 
                 filter(!is.na(chromosome))
 
-gwas_files <- list.files("output/gwas_full_roh_pca", pattern = "*.rds", full.names = TRUE)
+gwas_files <- list.files("output/gwas_full_roh_pca_08", pattern = "*.rds", full.names = TRUE)
 # extract results
 all_gwas <- purrr::map(gwas_files, readRDS) %>% 
             purrr::flatten() %>% 
@@ -75,6 +75,7 @@ med.dat <- gwas_roh %>% dplyr::group_by(groups, chromosome) %>%
                 dplyr::summarise(median.x = median(cumsum.tmp))
 
 chr_labels <- c(c(1:18),"","20","",  "22","", "24","", "26")
+#chr_labels <- unique(gwas_roh$chromosome)
 #chr_labels <- med.dat$chromosome
 library(viridis)
 library(magrittr)
@@ -94,6 +95,7 @@ gwas_p <- gwas_roh %>%
 axisdf <- gwas_p %>% group_by(chromosome) %>% 
                 summarize(center = (max(pos_cum) + min(pos_cum)) / 2 )
 
+
 pgwas <- ggplot(gwas_p, aes(x=pos_cum, y=-log10(p.value))) +
         # Show all points
         geom_point(aes(color=as.factor(chromosome), fill = chromosome %%2 == 0),  
@@ -101,7 +103,8 @@ pgwas <- ggplot(gwas_p, aes(x=pos_cum, y=-log10(p.value))) +
         #scale_color_manual(values = rep(cols, 26 )) +
         geom_hline(yintercept = -log10(0.05/28946), linetype="dashed", color = "grey") +
         # custom X axis:
-        scale_x_continuous(labels = chr_labels, breaks= axisdf$center ) +
+       # scale_x_continuous(labels = chr_labels, breaks= axisdf$center ) +
+        scale_x_continuous(breaks= axisdf$center ) +
         scale_y_continuous(expand = c(0, 0), limits = c(0,8)) +
         # Add label using ggrepel to avoid overlapping
        # geom_label_repel(data=df.tmp[df.tmp$is_annotate=="yes",], aes(label=as.factor(SNP), alpha=0.7), size=5, force=1.3) +
@@ -118,7 +121,6 @@ pgwas
 ggsave( "figs/survival_gwas_roh_pca.jpg",pgwas, height = 3, width = 12)
 
 gwas_roh %>% arrange(p.value) %>% filter(groups == "roh") %>% filter(p.value < 0.05/28946)
-
 
 
 # prepare genotypes for simpleM

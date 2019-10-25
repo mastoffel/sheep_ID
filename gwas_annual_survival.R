@@ -24,11 +24,7 @@ load("data/sheep_ped.RData")
 IDs_lots_missing <- read_delim("data/ids_more_than_5perc_missing.txt", delim = " ")
 
 # pcas 
-pcs <- read_delim("data/sheep_pca_eigenvec", " ", col_names = FALSE) %>% 
-        dplyr::select(-X1) %>% 
-        dplyr::rename(id = X2) %>% 
-        dplyr::select(id, X3:X7) %>% 
-        dplyr::rename(pc1 = X3, pc2 = X4, pc3 = X5, pc4 = X6, pc5 = X7) %>% 
+pcs <- read_delim("data/ann_surv_pca.txt", " ", col_names = TRUE) %>% 
         mutate(id = as.character(id))
 
 # roh data
@@ -47,7 +43,7 @@ snps_map_sub <- full_sample$map %>%
         filter(chromosome == chr) 
 
 # survival data
-early_survival <- fitness_data %>% 
+annual_survival <- fitness_data %>% 
         dplyr::rename(birth_year = BIRTHYEAR,
                       sheep_year = SheepYear,
                       age = Age,
@@ -74,25 +70,25 @@ early_survival <- fitness_data %>%
         as.data.frame() 
 
 
-# use only training set (80% of individuals)
-sample_frac_groups = function(tbl, size, replace = FALSE, weight = NULL) {
-        # regroup when done
-        grps = tbl %>% groups %>% lapply(as.character) %>% unlist
-        # check length of groups non-zero
-        keep = tbl %>% summarise() %>% ungroup() %>% sample_frac(size, replace, weight)
-        # keep only selected groups, regroup because joins change count.
-        # regrouping may be unnecessary but joins do something funky to grouping variable
-        tbl %>% right_join(keep, by=grps) %>% group_by(.dots = grps)
-}
-
-# set.seed(7336)
-# early_survival <- early_survival %>% 
-#         mutate(index = 1:nrow(.)) %>% 
-#         group_by(id) %>% 
-#         sample_frac_groups(0.8) %>% 
+# #use only training set (80% of individuals)
+# sample_frac_groups = function(tbl, size, replace = FALSE, weight = NULL) {
+#         # regroup when done
+#         grps = tbl %>% groups %>% lapply(as.character) %>% unlist
+#         # check length of groups non-zero
+#         keep = tbl %>% summarise() %>% ungroup() %>% sample_frac(size, replace, weight)
+#         # keep only selected groups, regroup because joins change count.
+#         # regrouping may be unnecessary but joins do something funky to grouping variable
+#         tbl %>% right_join(keep, by=grps) %>% group_by(.dots = grps)
+# }
+# 
+# # set.seed(7336)
+# early_survival <- early_survival %>%
+#         mutate(index = 1:nrow(.)) %>%
+#         group_by(id) %>%
+#         sample_frac_groups(0.8) %>%
 #         ungroup()
-# write_lines(early_survival$index, "output/ind_index_test.txt")
-
+#write_lines(early_survival$index, "output/ind_index_test.txt")
+#write_lines(unique(early_survival$id), "data/ind_testset_80.txt")
 
 # prepare additive genotypes subset
 snps_sub <- full_sample$map %>% 
@@ -149,7 +145,7 @@ rm(roh_list)
 rm(roh_mat)
 
 # join additive and roh data to survival for gwas
-early_survival_gwas <- early_survival %>% 
+annual_survival_gwas <- annual_survival %>% 
         dplyr::select(id, survival, sex, twin, birth_year, sheep_year, mum_id, age_std, age2_std) %>% 
         left_join(pcs, by = "id") %>% 
         left_join(geno_sub, by = "id") %>% 
@@ -180,7 +176,7 @@ nlopt <- function(par, fn, lower, upper, control) {
 
 run_gwas <- function(snp, data) {
         formula_snp <- as.formula(paste0("survival ~ 1 + sex + twin + age_std + age2_std + ", 
-                                         "pc1 + pc2 + pc3 + pc4 + pc5 + ",
+                                         "pc1 + pc2 + pc3 + pc4 + pc5 + pc6 + pc7 + ",
                                          snp, "+ ", paste0("roh_", snp), "+ (1|birth_year) + (1|sheep_year) + (1|id)"))
         mod <- glmer(formula = formula_snp,
                      data = data, family = "binomial",
@@ -197,13 +193,13 @@ num_parts <- round(length(seq_along(snps_sub)) / 1000)
 snps_pieces <- split(snps_sub, cut(seq_along(snps_sub), num_parts, labels = FALSE))
 roh_pieces <- map(snps_pieces, function(x) paste0("roh_", x))
 
-early_survival_gwas_pieces <- 
+annual_survival_gwas_pieces <- 
         map2(snps_pieces, roh_pieces, function(snps_piece, roh_piece) {
-                early_survival_gwas %>% dplyr::select(id:pc5, one_of(c(snps_piece, roh_piece)))   
+                annual_survival_gwas %>% dplyr::select(id:pc7, one_of(c(snps_piece, roh_piece)))   
         })
 
 # clean up
-rm(early_survival, early_survival_gwas, fitness_data, geno_sub, roh_lengths, roh_pieces, 
+rm(annual_survival, annual_survival_gwas, fitness_data, geno_sub, roh_lengths, roh_pieces, 
    roh_snps, roh_snps_reord, sheep_ped, snps_map_sub, roh_sub, roh_df)
 
 # set up plan
@@ -211,7 +207,7 @@ plan(multiprocess, workers = 8)
 
 # increase maxSize
 options(future.globals.maxSize = 3000 * 1024^2)
-all_out <- purrr::pmap(list(snps_pieces, early_survival_gwas_pieces, 1:num_parts),  function(snps, data, num_part) {
+all_out <- purrr::pmap(list(snps_pieces, annual_survival_gwas_pieces, 1:num_parts),  function(snps, data, num_part) {
         out <- future_map(snps, safe_run_gwas, data)
         # remove one hierarchical level
         all_out_simple <- purrr::flatten(out)

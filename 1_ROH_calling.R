@@ -19,7 +19,7 @@ system(paste0("~/programs/plink --bfile ../sheep/data/SNP_chip/ramb_mapping/shee
 
 # PCA for GWAS
 system(paste0("~/programs/plink --bfile output/ROH/sheep_geno_imputed_ram_27092019_pruned --sheep ",
-              "--pca --out output/sheep_pca"))
+              "--pca --out output/sheep_pca")) # sheep_pca
 
 # calculate ROH 
 

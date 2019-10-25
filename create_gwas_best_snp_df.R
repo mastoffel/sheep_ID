@@ -2,7 +2,7 @@
 library(tidyverse)
 library(data.table)
 library(snpStats)
-top_snps <- read_delim("output/top_snps_gwas_pca.txt", delim = " ")
+top_snps <- read_delim("output/top_snps_gwas_pca_08.txt", delim = " ")
 chrs <- unique(top_snps$chromosome)
 
 # data
@@ -122,7 +122,7 @@ names(roh_df) <- c("id", paste0("roh_", names(geno_sub)[-1]))
 roh_df <- mutate(roh_df, id = as.character(id))
 
 # join additive and roh data to survival for gwas
-early_survival_top_snps <- early_survival %>% 
+ann_survival_top_snps <- early_survival %>% 
         dplyr::select(id, survival, sex, twin, birth_year, sheep_year, mum_id, age, age2, froh_all) %>% 
         left_join(geno_sub, by = "id") %>% 
         left_join(roh_df, by = "id") %>% 
