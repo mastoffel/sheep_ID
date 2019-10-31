@@ -9,7 +9,7 @@ chr_info <- read_delim("../sheep/data/sheep_genome/chromosome_info_ram.txt", "\t
                 mutate(chromosome = as.integer(chromosome)) %>% 
                 filter(!is.na(chromosome))
 
-gwas_files <- list.files("output/gwas_full_roh_pca_08", pattern = "*.rds", full.names = TRUE)
+gwas_files <- list.files("output/gwas_full_roh_pca", pattern = "*.rds", full.names = TRUE)
 # extract results
 all_gwas <- purrr::map(gwas_files, readRDS) %>% 
             purrr::flatten() %>% 
@@ -23,7 +23,7 @@ all_gwas <- purrr::map(gwas_files, readRDS) %>%
 #       compact()
 
 # get roh pval
-gwas_res <- map_df(all_gwas, function(x) x %>% .[c(11,12), ] %>% 
+gwas_res <- map_df(all_gwas, function(x) x %>% .[c(13,14), ] %>% 
                            dplyr::select(term, estimate, p.value))
 
 # check whether roh didnt work anywhere
@@ -42,6 +42,10 @@ full_sample <- read.plink(sheep_bed, sheep_bim, sheep_fam)
 snps_map <- full_sample$map 
 table(full_sample$map$chromosome, useNA = "always")
 
+full_sample$map %>% 
+        group_by(chromosome) %>% 
+        tally() %>% 
+        write_delim("data/nsnps_pruned.txt")
 
 # gwas_res_roh <- map_df(all_gwas, function(x) x %>% .[c(5), ] %>% dplyr::select(term,estimate, p.value))
 # gwas_res_snp <- map_df(all_gwas, function(x) x %>% .[c(4), ] %>% dplyr::select(term,estimate, p.value))
@@ -63,10 +67,12 @@ gwas_full <- gwas_res %>%
 qqman::qq(gwas_full[gwas_full$groups == "add", ]$p.value)
 qqman::qq(gwas_full[gwas_full$groups == "roh", ]$p.value)
 
+qualityTools::qqPlot(gwas_full[gwas_full$groups == "add", ]$p.value)
+GWASTools::qqPlot(gwas_full[gwas_full$groups == "roh", ]$p.value)
 # manhattan
 ## computing new x axis
 gwas_roh <- gwas_full %>% 
-                        filter(groups == "roh") #%>% 
+                        filter(groups == "add") #%>% 
                         #group_by(groups) %>% 
                         #arrange(chromosome, position) %>% 
                         #dplyr::mutate(tmp = 1, cumsum.tmp = cumsum(tmp))
@@ -103,8 +109,8 @@ pgwas <- ggplot(gwas_p, aes(x=pos_cum, y=-log10(p.value))) +
         #scale_color_manual(values = rep(cols, 26 )) +
         geom_hline(yintercept = -log10(0.05/28946), linetype="dashed", color = "grey") +
         # custom X axis:
-       # scale_x_continuous(labels = chr_labels, breaks= axisdf$center ) +
-        scale_x_continuous(breaks= axisdf$center ) +
+        scale_x_continuous(labels = chr_labels, breaks= axisdf$center ) +
+        #scale_x_continuous(breaks= axisdf$center ) +
         scale_y_continuous(expand = c(0, 0), limits = c(0,8)) +
         # Add label using ggrepel to avoid overlapping
        # geom_label_repel(data=df.tmp[df.tmp$is_annotate=="yes",], aes(label=as.factor(SNP), alpha=0.7), size=5, force=1.3) +

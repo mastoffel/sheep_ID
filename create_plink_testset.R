@@ -54,12 +54,12 @@ write_delim(tibble(1, all_ids), path = "data/ind_testset_80.txt",
             delim = " ", col_names = FALSE)
 
 system(paste0("~/programs/plink --bfile data/sheep_geno_imputed_ram_27092019_pruned ",
-              "--keep data/ind_testset_80.txt --make-bed --out data/sheep_geno_imputed_ram_27092019_pruned_cv80")) # --keep data/ind_testset_80.txt
+              "--keep data/ind_testset_80.txt --make-bed --sheep --out data/sheep_geno_imputed_ram_27092019_pruned_cv80")) # --keep data/ind_testset_80.txt
 
 # repeat pca
 # PCA for GWAS
 system(paste0("~/programs/plink --bfile data/sheep_geno_imputed_ram_27092019_pruned --keep data/ind_testset_80 ",
-              "--sheep --make-grm-bin --pca --out output/sheep_pca_cv80"))
+              "--sheep --pca --nonfounders --out output/sheep_pca_cv80"))
 
 # gcta64  --grm test --keep test.indi.list  --pca 20  --out test
 # plink name

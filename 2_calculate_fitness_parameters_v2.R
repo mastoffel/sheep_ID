@@ -31,8 +31,11 @@ options <- paste0("jdbc:ucanaccess://", dbname, ";memory=false")
 con <- DBI::dbConnect(JDBC(driver, driverpath), options)
 # src <- src_dbi(con)
 
+# names of tables
 tbls <- dbGetTables(con)
+# names of variables in a table
 flds <- dbGetFields(con, "Sheep")
+# get a table 
 Sheep <- dbGetQuery(con, "Select * from Sheep")
 Census <- dbGetQuery(con, "Select * from CensusData")
 Capture <- dbGetQuery(con, "Select * from CaptureData")
