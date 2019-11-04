@@ -72,7 +72,8 @@ GWASTools::qqPlot(gwas_full[gwas_full$groups == "roh", ]$p.value)
 # manhattan
 ## computing new x axis
 gwas_roh <- gwas_full %>% 
-                        filter(groups == "add") #%>% 
+                        filter(groups == "roh") %>% 
+                        filter(chromosome == 20)
                         #group_by(groups) %>% 
                         #arrange(chromosome, position) %>% 
                         #dplyr::mutate(tmp = 1, cumsum.tmp = cumsum(tmp))
@@ -90,7 +91,7 @@ cols <- c("#336B87", "#2A3132")
 # get cumsums
 chr_info %<>% 
         mutate(tot=cumsum(Length)-Length) %>% 
-        select(chromosome, tot)
+        dplyr::select(chromosome, tot)
 
 gwas_p <- gwas_roh %>% 
         left_join(chr_info) %>% 
@@ -124,7 +125,7 @@ pgwas <- ggplot(gwas_p, aes(x=pos_cum, y=-log10(p.value))) +
         #facet_wrap(groups~., nrow = 2)
 
 pgwas
-ggsave( "figs/survival_gwas_roh_pca.jpg",pgwas, height = 3, width = 12)
+ggsave( "figs/survival_gwas_roh_pca_20.jpg",pgwas, height = 3, width = 12)
 
 gwas_roh %>% arrange(p.value) %>% filter(groups == "roh") %>% filter(p.value < 0.05/28946)
 

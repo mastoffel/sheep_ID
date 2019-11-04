@@ -3,13 +3,62 @@ library(lme4)
 library(performance)
 
 # get df
-survival_top_snps <- read_delim("output/early_survival_top_snps_pca.txt", delim = " ") %>% 
+surv_df <- read_delim("output/early_survival_top_snps_pca.txt", delim = " ") %>% 
                                 mutate(age_std = as.numeric(scale(age)),
                                        age2_std = as.numeric(scale(age2))) %>% 
                                 mutate(sex = as.factor(sex), twin = as.factor(twin),
                                        birth_year = as.factor(birth_year),
                                        sheep_year = as.factor(sheep_year),
-                                       id = as.factor(id))
+                                       id = as.factor(id)) %>% 
+                                filter(!is.na(sex) & !is.na(twin))
+
+
+library(BGLR)
+y <- surv_df$survival
+X <- surv_df[, grep( "roh", names(surv_df))[-1]] %>% 
+        impute_mean()
+X_add <- surv_df %>% dplyr::select(oar3_OAR15_63743364:oar3_OAR15_64194091) %>% 
+        impute_mean()
+#2# Setting the linear predictor
+ETA<-list( list(~factor(sex)+factor(twin)+factor(age_std)+factor(age2_std),
+                data=surv_df,model='FIXED'),
+           list(~factor(id) + factor(sheep_year) + factor(birth_year), data=surv_df, model='BRR'),
+           list(X=X, model='BL'),
+           list(X_add=X_add, model = 'BL')
+)
+#3# Fitting the model
+fm<-BGLR(y=y,ETA=ETA, nIter=1000, burnIn=200)
+save(fm,file='fm.rda')
+
+#1# Estimated Marker Effects & posterior SDs
+bHat<- fm$ETA[[3]]$b
+SD.bHat<- fm$ETA[[3]]$SD.b
+plot(bHat^2, ylab='Estimated Squared-Marker Effect',
+     type='o',cex=.5,col=4,main='Marker Effects')
+
+bHat<- fm$ETA[[4]]$b
+SD.bHat<- fm$ETA[[4]]$SD.b
+plot(bHat^2, ylab='Estimated Squared-Marker Effect',
+     type='o',cex=.5,col=4,main='Marker Effects')
+
+#3# Godness of fit and related statistics
+fm$fit
+fm$varE # compare to var(y)
+#4# Trace plots
+list.files()
+# Residual variance
+varE<-scan('varE.dat')
+plot(varE,type='o',col=2,cex=.5,ylab=expression(var[e]));
+abline(h=fm$varE,col=4,lwd=2);
+abline(v=fm$burnIn/fm$thin,col=4)
+# lambda (regularization parameter of the Bayesian Lasso)
+lambda<-scan('ETA_3_lambda.dat')
+plot(lambda,type='o',col=2,cex=.5,ylab=expression(lambda));
+abline(h=fm$ETA[[3]]$lambda,col=4,lwd=2);
+abline(v=fm$burnIn/fm$thin,col=4)
+
+
+
 
 # how much variation do all ROH snps explain?
 # time saver function for modeling
