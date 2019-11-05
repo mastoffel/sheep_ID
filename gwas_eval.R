@@ -42,10 +42,10 @@ full_sample <- read.plink(sheep_bed, sheep_bim, sheep_fam)
 snps_map <- full_sample$map 
 table(full_sample$map$chromosome, useNA = "always")
 
-full_sample$map %>% 
-        group_by(chromosome) %>% 
-        tally() %>% 
-        write_delim("data/nsnps_pruned.txt")
+# full_sample$map %>% 
+#         group_by(chromosome) %>% 
+#         tally() %>% 
+#         write_delim("data/nsnps_pruned.txt")
 
 # gwas_res_roh <- map_df(all_gwas, function(x) x %>% .[c(5), ] %>% dplyr::select(term,estimate, p.value))
 # gwas_res_snp <- map_df(all_gwas, function(x) x %>% .[c(4), ] %>% dplyr::select(term,estimate, p.value))
@@ -72,8 +72,8 @@ GWASTools::qqPlot(gwas_full[gwas_full$groups == "roh", ]$p.value)
 # manhattan
 ## computing new x axis
 gwas_roh <- gwas_full %>% 
-                        filter(groups == "roh") %>% 
-                        filter(chromosome == 20)
+                        filter(groups == "roh") #%>% 
+                       # filter(chromosome == 20)
                         #group_by(groups) %>% 
                         #arrange(chromosome, position) %>% 
                         #dplyr::mutate(tmp = 1, cumsum.tmp = cumsum(tmp))

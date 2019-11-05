@@ -21,20 +21,23 @@ run_gwas_per_chr <- function(chr) {
         #2# Setting the linear predictor
         ETA<-list( fixed = list(~factor(sex)+factor(twin)+age_std+age2_std,
                 data=annual_survival_gwas,model='FIXED'),
-                random = list(~factor(id) + factor(sheep_year) + factor(birth_year), data=annual_survival_gwas, model='BRR'),
+                #random = list(~factor(id) + factor(sheep_year) + factor(birth_year), data=annual_survival_gwas, model='BRR'),
+                id = list(~factor(id), data=annual_survival_gwas, model='BRR'),
+                sheep_year = list(~factor(sheep_year), data=annual_survival_gwas, model='BRR'),
+                birth_year = list(~factor(birth_year), data=annual_survival_gwas, model='BRR'),
                 roh = list(X_roh=fread("data/annual_survival_gwas_roh.txt",  select = paste0("roh_", snps_sub)) %>% as.matrix(), model='BayesC'), # , saveEffects=TRUE
                 add = list(X_add=fread("data/annual_survival_gwas_snps.txt", select = snps_sub) %>% as.matrix(), model = 'BayesC') # , saveEffects=TRUE / BayesC
         )
         
         #3# Fitting the model
-        fm <- BGLR2(y=y,ETA=ETA, nIter=100, burnIn=20, thin = 5, response_type = "ordinal",
+        fm <- BGLR2(y=y,ETA=ETA, nIter=5000, burnIn=1000, thin = 10, response_type = "ordinal",
                 saveEnv=TRUE,
                 saveAt = paste0("output/bglr/chr", chr, "_"))
         save(fm, file=paste0("output/bglr/chr_", chr, ".rda"))
         rm(ETA)
 }
 
-walk(24, run_gwas_per_chr)
+walk(20, run_gwas_per_chr)
 #out <- walk(20:26, run_gwas_per_chr)
 #out <- walk(10:19, run_gwas_per_chr)
 #out <- walk(1:9, run_gwas_per_chr)
@@ -66,7 +69,7 @@ all_roh_effs %>%
         ggplot(aes(num_snp, eff, color = as.factor(chr))) + geom_point() + theme_classic()
 
 
-load("output/bglr/chr_24.rda")
+load("output/bglr/chr_20.rda")
 out <- read_delim("output/bglr/chr24_ETA_add_parBayesC.dat", " ")
 
 fm$probs
@@ -105,8 +108,9 @@ abline(h=fm$ETA[[3]]$lambda,col=4,lwd=2);
 abline(v=fm$burnIn/fm$thin,col=4)
 
 
+
 # load("output/bglr/chr_2.rda")
-bHat <- fm$ETA[[3]]$b
+bHat <- fm$ETA$roh$b
 SD.bHat<- fm$ETA[[3]]$SD.b
 test_stat <- bHat/SD.bHat
 plot(bHat^2, ylab='Estimated Squared-Marker Effect',

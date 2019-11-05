@@ -29,26 +29,26 @@ y <- annual_survival_gwas$survival
 
 # snps for gwas
 snps_sub <- snp_map %>% 
-       # sample_frac(prop_geno) %>% 
+        #sample_frac(prop_geno) %>% 
         .$snp.name
 
 #2# Setting the linear predictor
 ETA<-list(fixed = list(~factor(sex)+factor(twin)+age_std+age2_std,
                         data=annual_survival_gwas,model='FIXED', 
                         saveEffects=TRUE),
-        random = list(~factor(id) + factor(sheep_year) + factor(birth_year), 
-                        data=annual_survival_gwas, model='BRR', 
-                        saveEffects=TRUE),
-        roh = list(X_roh=fread(paste0(input_folder, "annual_survival_gwas_roh.txt"),  
+             id = list(~factor(id), data=annual_survival_gwas, model='BRR', saveEffects=TRUE),
+     sheep_year = list(~factor(sheep_year), data=annual_survival_gwas, model='BRR', saveEffects=TRUE),
+     birth_year = list(~factor(birth_year), data=annual_survival_gwas, model='BRR', saveEffects=TRUE),
+            roh = list(X_roh=fread(paste0(input_folder, "annual_survival_gwas_roh.txt"),  
                    select = paste0("roh_", snps_sub)) %>% as.matrix(), model='BayesC', 
                    saveEffects=TRUE),
-        add = list(X_add=fread(paste0(input_folder, "annual_survival_gwas_snps.txt"), 
-                select = snps_sub) %>% as.matrix(), model = 'BayesC',
-                saveEffects=TRUE) # 
+            add = list(X_add=fread(paste0(input_folder, "annual_survival_gwas_snps.txt"), 
+                  select = snps_sub) %>% as.matrix(), model = 'BayesC',
+                  saveEffects=TRUE) # 
 )
 
 #3# Fitting the model
-fm <- BGLR2(y=y,ETA=ETA, nIter=1000, burnIn=1000, thin = 10, 
+fm <- BGLR2(y=y,ETA=ETA, nIter=5000, burnIn=2000, thin = 50, 
         response_type = "ordinal",
         saveEnv=TRUE,
         # additional iterations with the following two lines
@@ -57,16 +57,17 @@ fm <- BGLR2(y=y,ETA=ETA, nIter=1000, burnIn=1000, thin = 10,
         # where to save
         saveAt = paste0(output_folder, run_name)) 
 
-saveRDS(fm, file=paste0(output_folder, run_name, "mod.rds"))
+
+# save parts of the output
+model_overview <- fm[-length(fm)]
+eta_non_gen <- fm$ETA[1:4]
+marker_effects <- tibble(snp_roh = names(fm$ETA$roh$b), b_roh = fm$ETA$roh$b, sd_b_roh = fm$ETA$roh$SD.b,
+                 snp_add = names(fm$ETA$add$b), b_add = fm$ETA$add$b, sd_b_add = fm$ETA$add$SD.b)
+
+saveRDS(list(model_overview, eta_non_gen), file=paste0(output_folder, run_name, "mod.rds"))
+write_delim(marker_effects, path = paste0(output_folder,"marker_effects_", run_name, "mod.txt"), delim = " ")
 
 
-# mod <- readRDS("output/bglr/first_run_mod.rds")
-# summary(mod)
-# mod$ETA$add
-
-# eff_roh <- read_delim("output/bglr/first_run_ETA_roh_parBayesC.dat", " ", col_names = F)
-# eff_roh2 <- readBinMat("output/bglr/first_run_ETA_roh_b.bin")
-#save_samp_roh <- readBinMat("output/bglr/first_run_ETA_roh_b.bin")
 
 
 
