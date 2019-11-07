@@ -11,7 +11,7 @@ library(BGLR)
 # run gwas
 input_folder <- "data/"
 # prop_genome
-#prop_geno <- 0.01
+prop_geno <- 0.01
 # useful to have _ at the end as some other stuff gets attached
 run_name <- "first_run_"
 # with / at end

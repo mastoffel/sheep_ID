@@ -70,7 +70,10 @@ annual_survival <- fitness_data %>%
         as.data.frame() 
 
 
-# #use only training set (80% of individuals)
+#use only training set (80% of individuals)
+annual_survival <- annual_survival %>% filter(id %in% pcs$id)
+
+
 # sample_frac_groups = function(tbl, size, replace = FALSE, weight = NULL) {
 #         # regroup when done
 #         grps = tbl %>% groups %>% lapply(as.character) %>% unlist
@@ -89,14 +92,6 @@ annual_survival <- fitness_data %>%
 #         ungroup()
 #write_lines(early_survival$index, "output/ind_index_test.txt")
 #write_lines(unique(early_survival$id), "data/ind_testset_80.txt")
-
-set.seed(7336)
-ids <- unique(as.character(annual_survival$id)) %>% 
-        sample(length(.) * 0.8, replace = FALSE)
-
-# subset testset
-annual_survival <- annual_survival %>% 
-                        filter(id %in% ids)
 
 # prepare additive genotypes subset
 snps_sub <- full_sample$map %>% 

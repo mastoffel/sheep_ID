@@ -1,7 +1,8 @@
 library(tidyverse)
 library(snpStats)
 source("theme_clean.R")
-
+library(viridis)
+library(magrittr)
 chr_info <- read_delim("../sheep/data/sheep_genome/chromosome_info_ram.txt", "\t") %>% 
                 .[-1, ] %>% 
                 rename(chromosome = Part) %>% 
@@ -18,15 +19,11 @@ all_gwas <- purrr::map(gwas_files, readRDS) %>%
            # remove snps that didnt work
             purrr::compact()
 
-# check errors
-# all_gwas[seq(2,length(all_gwas),by=2)] %>% 
-#       compact()
-
-# get roh pval
+# get roh/add pval
 gwas_res <- map_df(all_gwas, function(x) x %>% .[c(13,14), ] %>% 
                            dplyr::select(term, estimate, p.value))
 
-# check whether roh didnt work anywhere
+# check whether snp roh didnt work in some models anywhere
 gwas_res[which(str_detect(gwas_res$term, "sd")), ]
 
 # remove those 
@@ -41,18 +38,6 @@ sheep_fam <- paste0(sheep_plink_name, ".fam")
 full_sample <- read.plink(sheep_bed, sheep_bim, sheep_fam)
 snps_map <- full_sample$map 
 table(full_sample$map$chromosome, useNA = "always")
-
-# full_sample$map %>% 
-#         group_by(chromosome) %>% 
-#         tally() %>% 
-#         write_delim("data/nsnps_pruned.txt")
-
-# gwas_res_roh <- map_df(all_gwas, function(x) x %>% .[c(5), ] %>% dplyr::select(term,estimate, p.value))
-# gwas_res_snp <- map_df(all_gwas, function(x) x %>% .[c(4), ] %>% dplyr::select(term,estimate, p.value))
-
-# check how often roh var couldnt be estimated
-# gwas_roh <- gwas_res %>% filter(str_detect(term, "roh"))
-# gwas_roh[which(!(gwas_snp$term %in% full_sample$map$snp.name)), ]
 
 # put into df
 gwas_full <- gwas_res %>%
@@ -78,14 +63,13 @@ gwas_roh <- gwas_full %>%
                         #arrange(chromosome, position) %>% 
                         #dplyr::mutate(tmp = 1, cumsum.tmp = cumsum(tmp))
 ## calculating x axis location for chromosome label
-med.dat <- gwas_roh %>% dplyr::group_by(groups, chromosome) %>% 
-                dplyr::summarise(median.x = median(cumsum.tmp))
+# med.dat <- gwas_roh %>% dplyr::group_by(groups, chromosome) %>% 
+#                 dplyr::summarise(median.x = median(cumsum.tmp))
 
 chr_labels <- c(c(1:18),"","20","",  "22","", "24","", "26")
 #chr_labels <- unique(gwas_roh$chromosome)
 #chr_labels <- med.dat$chromosome
-library(viridis)
-library(magrittr)
+
 cols <- c("#336B87", "#2A3132")
 
 # get cumsums

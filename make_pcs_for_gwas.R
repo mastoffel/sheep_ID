@@ -85,7 +85,7 @@ id_df <- data.frame(1, ids)
 write.table(id_df, "data/ids_annual_survival_testset80.txt", col.names = FALSE, row.names = FALSE, quote = FALSE)
 
 # pca using only individuals in annual survival analysis
-system(paste0("~/programs/plink --bfile data/sheep_geno_imputed_ram_27092019_pruned --sheep ",
+system(paste0("plink --bfile data/sheep_geno_imputed_ram_27092019_pruned --sheep ",
               "--pca 40 --keep data/ids_annual_survival_testset80.txt --nonfounders --out output/sheep_pca_ann_survival_testset80")) # --keep data/ind_testset_80.txt --keep data/ids_annual_survival.txt
 
 # check scree plot / looks like 7 is a good number
