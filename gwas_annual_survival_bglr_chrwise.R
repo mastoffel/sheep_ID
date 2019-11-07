@@ -4,8 +4,8 @@ library(tidyverse)
 library(snpStats)
 library(data.table)
 library(furrr)
-library(caret)
-library(tidyimpute)
+#library(caret)
+#library(tidyimpute)
 library(BGLR)
 
 # for running on server, chromosome input through array job
