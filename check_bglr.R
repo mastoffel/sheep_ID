@@ -29,6 +29,11 @@ chain_random<-read_delim('output/bglr/first_run_ETA_random_varB.dat', " ", col_n
         mutate(iter = 1:nrow(.))
 ggplot(chain_roh, aes(iter, X1)) + geom_line()
 
+chain_random<-read_delim('output/bglr/first_run_ETA_sheep_year_varB.dat', " ", col_names = FALSE) %>% 
+        mutate(iter = 1:nrow(.))
+ggplot(chain_roh, aes(iter, X2)) + geom_line()
+
+
 roh <- read_delim("output/bglr/first_run_ETA_roh_parBayesC.dat", " ", col_names = FALSE)
 plot(roh[, 2])
 
@@ -42,6 +47,10 @@ install.packages("benchmarkme")
 benchmarkme::get_ram()
 
 str(mod)
+
+marker_effs <- read_delim("output/bglr/marker_effects_second_run_mod.txt", " ") %>% 
+                mutate(num_snp = 1:nrow(.))
+ggplot(marker_effs, aes(num_snp, b_roh^2)) + geom_point()
 
 bHat <- mod$ETA$roh$b
 plot(bHat^2, ylab='Estimated Squared-Marker Effect',
