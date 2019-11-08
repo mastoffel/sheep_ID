@@ -42,9 +42,11 @@ run_gwas_per_chr <- function(chr) {
                 add = list(X_add=fread("data/annual_survival_gwas_snps.txt", select = snps_sub) %>% as.matrix(), model = 'BayesC') # , saveEffects=TRUE / BayesC
         )
         
-        #3# Fitting the model
-        fm <- BGLR2(y=y,ETA=ETA, nIter=50000, burnIn=20000, thin = 30, response_type = "ordinal",
+        #3# Fitting the model / previous 10K / 5k burning
+        fm <- BGLR2(y=y,ETA=ETA, nIter=40000, burnIn=10000, thin = 50, response_type = "ordinal",
                 saveEnv=TRUE,
+                newChain = TRUE,
+                BGLR_ENV = paste0(output_folder,"chr_", chr, "BGLR_ENV.RData"),
                 saveAt = paste0(output_folder, "chr_", chr))
         
         marker_effects <- tibble(snp_roh = names(fm$ETA$roh$b), b_roh = fm$ETA$roh$b, sd_b_roh = fm$ETA$roh$SD.b,

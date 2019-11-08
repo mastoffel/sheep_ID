@@ -86,13 +86,27 @@ gwas_p <- gwas_roh %>%
 axisdf <- gwas_p %>% group_by(chromosome) %>% 
                 summarize(center = (max(pos_cum) + min(pos_cum)) / 2 )
 
+# roh info
+#devtools::install_github('tavareshugo/windowscanr')
+library(windowscanr)
+hom_sum <- fread("output/ROH/roh_nofilt_ram.hom.summary") %>% 
+                rename(snp.name = SNP, roh_count = UNAFF) %>% 
+                select(snp.name, roh_count) %>% 
+                mutate(roh_count = (roh_count - mean(roh_count)))
+
+gwas_p <- gwas_p %>% 
+                left_join(hom_sum)
+
+proh_dens <- ggplot(gwas_p, aes(pos_cum, roh_count)) + geom_line()
+proh_dens
 
 pgwas <- ggplot(gwas_p, aes(x=pos_cum, y=-log10(p.value))) +
         # Show all points
-        geom_point(aes(color=as.factor(chromosome), fill = chromosome %%2 == 0),  
-                   size = 2,color = "black", alpha = 0.7, shape = 21, stroke = 0.01) +
+        geom_point(aes(fill = chromosome %%2 == 0),  #fill = chromosome %%2 == 0
+                   size = 2, alpha = 0.7, shape = 21, stroke = 0.01) +
         #scale_color_manual(values = rep(cols, 26 )) +
         geom_hline(yintercept = -log10(0.05/28946), linetype="dashed", color = "grey") +
+        #scale_color_viridis() +
         # custom X axis:
         scale_x_continuous(labels = chr_labels, breaks= axisdf$center ) +
         #scale_x_continuous(breaks= axisdf$center ) +
@@ -101,11 +115,11 @@ pgwas <- ggplot(gwas_p, aes(x=pos_cum, y=-log10(p.value))) +
        # geom_label_repel(data=df.tmp[df.tmp$is_annotate=="yes",], aes(label=as.factor(SNP), alpha=0.7), size=5, force=1.3) +
         xlab("Chromosome") + 
         ylab(expression(-log[10](italic(p)))) + ## y label from qqman::qq
-        scale_fill_manual(values = cols) +## instead of colors, go for gray
+        scale_fill_manual(values = cols) +##values = cols
         theme_clean() +
         theme(axis.text.x = element_text(size = 10),
-              axis.ticks = element_line(size = 0.1)) +
-        guides(fill=FALSE) 
+              axis.ticks = element_line(size = 0.1)) #+
+        #guides(fill=FALSE) 
         #facet_wrap(groups~., nrow = 2)
 
 pgwas
