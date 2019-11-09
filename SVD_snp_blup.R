@@ -60,12 +60,69 @@ geno_mat <- annual_survival_sub %>%
                 select(id) %>% 
                 left_join(geno_sub) %>% 
                 select(-id) %>% 
-                map_df(function(x) {
-                        if(length(x) <= 1) return(NULL) 
-                        out <- (x-mean(x, na.rm = TRUE))/ sd(x, na.rm = TRUE)
-                        }) %>% 
                 impute_mean() %>% 
+                # filter snps without variation
+                .[(map_lgl(., function(x) length(table(x)) != 1))] %>% 
+                # standardise genos
+               # mutate_all(function(x) (x-mean(x, na.rm = TRUE))/ sd(x, na.rm = TRUE)) %>% 
                 as.matrix()
 
+rownames(geno_mat) <- annual_survival_sub$id
+
+annual_survival_sub <- annual_survival_sub %>% mutate(survival = as.numeric(as.character(survival)))
+library(bWGR)
+mod <- mixed(y = survival, random = ~birth_year + sheep_year + id, 
+             fixed = ~sex + twin, data = annual_survival_sub,
+             X=list(id = geno_mat), maxit = 100)
+plot(mod$Structure$id)
+
+
 svd_geno <- svd(geno_mat)
-S_mat <- diag(length(svd_geno$d)) * svd_geno$d
+U <- svd_geno$u # dim N * N -> eigenvectors of GRM
+S <- diag(svd_geno$d) # dim N * N singular values matrix
+V <- svd_geno$v # dim k * N -> describes LD structure
+
+effs <- V %*% solve(S) %in% t(U) %*% y
+
+sigma2a <- 0.01
+sigma2e <- 0.6
+lambda <- sigma2e/sigma2a
+
+# blup of marker effects
+sigma2a <- 0.05
+sigma2e <- 0.4
+lambda <- sigma2e/sigma2a
+y <- as.numeric(as.character(annual_survival_sub$survival))
+W <- geno_mat
+Wt <- t(W)
+WWt <- W%*%Wt
+Ivar <- lambda*(diag(nrow(W)))
+WWt2 <- WWt + Ivar
+WWt2_inv <- solve(WWt2)
+blup_a <- (Wt %*% WWt2_inv) %*% y
+plot(blup_a ^ 2)
+
+blup_a <- (Wt %*% solve(W%*%Wt + lambda*(diag(nrow(W))))) %*% y
+
+
+# eq 2
+# inverse
+shat_0 <- solve(S%*%S + (diag(nrow(S)) * lambda))
+shat <- shat_0 * sigma2e
+b_markers <- V %*% shat
+b_markers %>% rowMeans() %>% plot()
+
+V %*% solve(S)
+
+y <- as.numeric(as.character(annual_survival_sub$survival))
+X <- model.matrix(~annual_survival_sub$twin)
+        
+WtW <- geno_mat %*% t(geno_mat)
+varcompSNP <- regress(y ~ X, ~WtW)
+
+sigma2a <- varcompSNP$sigma[1]
+sigma2e <- varcompSNP$sigma[2]  # residual variance -> sigma^2_e
+
+lambda <- sigma2e/sigma2a
+
+
