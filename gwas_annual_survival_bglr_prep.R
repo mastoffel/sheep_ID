@@ -12,7 +12,6 @@ library(BGLR)
 
 # data
 load("data/fitness_roh_df.RData")
-load("data/sheep_ped.RData")
 IDs_lots_missing <- read_delim("data/ids_more_than_5perc_missing.txt", delim = " ")
 
 # roh data
@@ -121,9 +120,6 @@ annual_survival_gwas <- annual_survival %>%
         
 fwrite(annual_survival_gwas, file = "data/annual_survival_gwas_df.txt")
 rm(list=setdiff(ls(), "annual_survival_gwas"))
-
-
-
 
 
 

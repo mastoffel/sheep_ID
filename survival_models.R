@@ -132,11 +132,11 @@ formatC(inv_logit(seq(0, -50, by = -10)), format = "e", digits = 1)
 
 p_fix_eff <- ggplot(surv_mod_df, aes(mean, predictor)) +
         geom_point(size = 2) +
-        geom_errorbarh(aes(xmax = upper_ci, xmin = lower_ci), height = 0.5, size = 0.1) +
+        geom_errorbarh(aes(xmax = upper_ci, xmin = lower_ci), height = 0.5, size = 0.5) +
         geom_vline(xintercept = 0) +
-        xlab("estimate") +
-        theme_clean() +
-        scale_x_continuous(labels = )
+        xlab("posterior mean and credible interval") +
+        theme_clean() 
+p_fix_eff 
 ggsave(filename = "figs/surv_mod_fixeff.jpg", p_fix_eff, width = 4.5, height = 3)        
 
 

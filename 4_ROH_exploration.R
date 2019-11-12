@@ -51,7 +51,8 @@ froh <- roh_lengths %>%
 p_dist <- ggplot(froh, aes(FROH)) +
     geom_histogram(bins = 500) +
     theme_clean() +
-    ylab("individual count") 
+    ylab("sqrt(individual count)") +
+    scale_y_sqrt(expand = c(0, 0))
 p_dist
 
 ggsave("figs/FROH_dist.jpg", p_dist, width = 5, height = 3)
@@ -120,9 +121,9 @@ p_roh <- ggplot(prop_IBD_df_with_0, aes(length_class, prop_IBD)) +
         geom_boxplot(outlier.shape = NA, color = "lightgrey", alpha = 0.7) +
         theme_clean() +
         #theme(axis.ticks.x = element_line(colour = "#cccccc", size = 0.3)) +
-        xlab("ROH class (Mb)") + ylab("Proportion of genome in ROH")
+        xlab("ROH class in Mb (Generations)") + ylab("Proportion of genome in ROH")
 p_roh
-ggsave("figs/roh_classes_boxplots.jpg", p_roh, width = 9, height = 5)
+ggsave("figs/roh_classes_boxplots.jpg", p_roh, width = 9, height = 3.5)
 
 
 
@@ -154,10 +155,11 @@ ROH_classes_pairs <- prop_IBD_df_with_0 %>%
   ggscatmat(alpha = 0.3) +
   geom_smooth(method = "lm") +
   theme_clean() +
+  theme(axis.text = element_blank()) +
   xlab("FROH") +
   ylab("FROH")
 
-ggsave("figs/roh_classes_pairs.jpg", ROH_classes_pairs, width = 13, height = 12)
+ggsave("figs/roh_classes_pairs.jpg", ROH_classes_pairs, width = 8, height = 7)
 
 
 # ind basis
@@ -277,18 +279,17 @@ shade <- df %>%
 
 #png(file="figs/ROH_map.png", units = "in", res = 300, height=4, width=7)
 col <- c("#82687D", "#2C5475" )
-#col <- c("#436DA2", "#1D244B")
+col <- c("#d8b365", "#5ab4ac")
 df %>% 
   filter(MB > 1) %>% 
   filter(CHR %in% 1:26) %>% 
   #mutate(CHR = factor(CHR, levels = as.character(1:26))) %>% 
   ggplot() +
-        geom_hline(data = yax, aes(yintercept = yax), color = "grey", size = 0.2) +
         geom_rect(data=shade, aes(xmin=min, xmax=max, ymin=0, ymax=num_ind*2 + 1), 
-                  alpha=0.2, fill = "lightgrey") +
+                  alpha=0.8, fill = "#f7f7f7") +
+        geom_hline(data = yax, aes(yintercept = yax), color = "grey", size = 0.2) +
         geom_rect(aes(xmin = POS1, xmax = POS2, ymin = yax - 0.5, ymax = yax + 0.5, 
-                     fill = as.factor(CHR)),  col = "black", size = 0.1, alpha = 0.8) +
-        #
+                     fill = as.factor(CHR)),  col = "black", size = 0.1, alpha = 1) +
         scale_fill_manual(values = rep(col, 18)) +
         scale_color_manual(values = rep(col, 18)) +
         #scale_x_discrete(labels = as.character(c(1:20, 22, 24, 26))) + 

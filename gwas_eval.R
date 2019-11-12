@@ -10,7 +10,7 @@ chr_info <- read_delim("../sheep/data/sheep_genome/chromosome_info_ram.txt", "\t
                 mutate(chromosome = as.integer(chromosome)) %>% 
                 filter(!is.na(chromosome))
 
-gwas_files <- list.files("output/gwas_full_roh_pca", pattern = "*.rds", full.names = TRUE)
+gwas_files <- list.files("output/gwas_full_roh_pca_08", pattern = "*.rds", full.names = TRUE)
 # extract results
 all_gwas <- purrr::map(gwas_files, readRDS) %>% 
             purrr::flatten() %>% 
@@ -86,28 +86,40 @@ gwas_p <- gwas_roh %>%
 axisdf <- gwas_p %>% group_by(chromosome) %>% 
                 summarize(center = (max(pos_cum) + min(pos_cum)) / 2 )
 
+
 # roh info
 #devtools::install_github('tavareshugo/windowscanr')
 library(windowscanr)
 hom_sum <- fread("output/ROH/roh_nofilt_ram.hom.summary") %>% 
                 rename(snp.name = SNP, roh_count = UNAFF) %>% 
-                select(snp.name, roh_count) %>% 
-                mutate(roh_count = (roh_count - mean(roh_count)))
+                dplyr::select(snp.name, roh_count) 
 
-gwas_p <- gwas_p %>% 
+quants <- quantile(hom_sum$roh_count, probs = c(0.1, 0.9))
+hom_sum <- hom_sum %>% mutate(roh_prevalence = case_when(
+                                roh_count < quants[1] ~ "<10% of inds",
+                                roh_count > quants[2] ~ ">90% of inds",
+                                TRUE ~ "in between")
+                              )
+
+gwas_plot <- gwas_p %>% 
                 left_join(hom_sum)
 
-proh_dens <- ggplot(gwas_p, aes(pos_cum, roh_count)) + geom_line()
-proh_dens
-
-pgwas <- ggplot(gwas_p, aes(x=pos_cum, y=-log10(p.value))) +
+#proh_dens <- ggplot(gwas_p, aes(pos_cum, roh_count)) + geom_line()
+#proh_dens
+cols <- c("#4393c3", "#2A3132")
+#cols <- c("#f1a340", "#998ec3", "#e0e0e0")
+#cols <- c("#b35806", "#542788", "#d8daeb" )
+pgwas <- ggplot(gwas_plot, aes(x=pos_cum, y=-log10(p.value))) +
         # Show all points
-        geom_point(aes(fill = chromosome %%2 == 0),  #fill = chromosome %%2 == 0
-                   size = 2, alpha = 0.7, shape = 21, stroke = 0.01) +
+ # geom_point(aes(fill = chromosome %%2 == 0, shape = roh_prevalence),  #fill = chromosome %%2 == 0
+ #                   size = 3, alpha = 0.7, shape = 21, stroke = 0.03) +
+        geom_point(aes(fill = chromosome %%2 == 0, shape = roh_prevalence),  #fill = chromosome %%2 == 0
+                   size = 2.5, alpha = 0.5, stroke = 0.2) +
+        #geom_point(size = 2.5, alpha = 1, shape = 21, stroke = 0.1) + 
         #scale_color_manual(values = rep(cols, 26 )) +
         geom_hline(yintercept = -log10(0.05/28946), linetype="dashed", color = "grey") +
-        #scale_color_viridis() +
-        # custom X axis:
+        scale_shape_manual(values = c(25,24,21)) +
+        #scale_color_manual(values = c("red", "yellow", "lightgrey")) +
         scale_x_continuous(labels = chr_labels, breaks= axisdf$center ) +
         #scale_x_continuous(breaks= axisdf$center ) +
         scale_y_continuous(expand = c(0, 0), limits = c(0,8)) +
@@ -118,12 +130,25 @@ pgwas <- ggplot(gwas_p, aes(x=pos_cum, y=-log10(p.value))) +
         scale_fill_manual(values = cols) +##values = cols
         theme_clean() +
         theme(axis.text.x = element_text(size = 10),
-              axis.ticks = element_line(size = 0.1)) #+
-        #guides(fill=FALSE) 
+              axis.ticks = element_line(size = 0.1)) +
+        guides(fill=FALSE) 
         #facet_wrap(groups~., nrow = 2)
 
 pgwas
-ggsave( "figs/survival_gwas_roh_pca_20.jpg",pgwas, height = 3, width = 12)
+
+ggsave( "figs/survival_gwas_roh_pca_new_testset.jpg",pgwas, height = 3, width = 15)
+
+# save top snps
+top_roh_snps <- gwas_full %>% 
+        arrange(p.value) %>% 
+        filter(groups == "roh") %>%  # filter(p.value < 0.05/28946) 
+        .[1:100, ]
+gwas_full %>% 
+        filter(snp.name %in% top_roh_snps$snp.name) %>% 
+        write_delim("output/top_roh_snps_gwas_testset.txt")
+
+
+
 
 gwas_roh %>% arrange(p.value) %>% filter(groups == "roh") %>% filter(p.value < 0.05/28946)
 
@@ -145,7 +170,8 @@ fwrite(sheep_geno_t, file = "data/geno_mat_simpleM_allchr.txt", col.names = FALS
 #         col_means <- colMeans(sheep_geno, na.rm = TRUE)
 # }
 
-gwas_roh %>% arrange(p.value) %>% 
+gwas_full %>% 
+        arrange(p.value) %>% 
         filter(groups == "roh") %>%  # filter(p.value < 0.05/28946) 
         .[1:100, ] %>% 
         write_delim("output/top_snps_gwas_pca.txt")

@@ -3,11 +3,11 @@
 library(tidyverse)
 library(data.table)
 library(snpStats)
+
 top_snps <- read_delim("output/top_snps_gwas.txt", delim = " ")
 snp <- "oar3_OAR11_8762236"
 
 chr <- 15
-
 
 # data
 load("data/fitness_roh_df.RData")

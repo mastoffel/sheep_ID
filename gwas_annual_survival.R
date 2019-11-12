@@ -43,6 +43,7 @@ snps_map_sub <- full_sample$map %>%
         filter(chromosome == chr) 
 
 # survival data
+froh_no_chr <- paste0("FROH_no_chr", chr)
 annual_survival <- fitness_data %>% 
         dplyr::rename(birth_year = BIRTHYEAR,
                       sheep_year = SheepYear,
@@ -146,7 +147,7 @@ rm(roh_mat)
 
 # join additive and roh data to survival for gwas
 annual_survival_gwas <- annual_survival %>% 
-        dplyr::select(id, survival, sex, twin, birth_year, sheep_year, mum_id, age_std, age2_std) %>% 
+        dplyr::select(id, survival, sex, twin, birth_year, sheep_year, mum_id, age_std, age2_std, {{ froh_no_chr }}) %>% 
         left_join(pcs, by = "id") %>% 
         left_join(geno_sub, by = "id") %>% 
         left_join(roh_df, by = "id") %>% 
@@ -176,6 +177,7 @@ nlopt <- function(par, fn, lower, upper, control) {
 
 run_gwas <- function(snp, data) {
         formula_snp <- as.formula(paste0("survival ~ 1 + sex + twin + age_std + age2_std + ", 
+                                         froh_no_chr, " + ",
                                          "pc1 + pc2 + pc3 + pc4 + pc5 + pc6 + pc7 + ",
                                          snp, "+ ", paste0("roh_", snp), "+ (1|birth_year) + (1|sheep_year) + (1|id)"))
         mod <- glmer(formula = formula_snp,

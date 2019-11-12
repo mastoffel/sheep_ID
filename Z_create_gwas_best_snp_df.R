@@ -2,12 +2,12 @@
 library(tidyverse)
 library(data.table)
 library(snpStats)
-top_snps <- read_delim("output/top_snps_gwas_pca_08.txt", delim = " ")
+top_snps <- read_delim("output/top_roh_snps_gwas_testset.txt", delim = " ") %>% 
+                distinct(snp.name, .keep_all = TRUE)
 chrs <- unique(top_snps$chromosome)
 
 # data
 load("data/fitness_roh_df.RData")
-load("data/sheep_ped.RData")
 IDs_lots_missing <- read_delim("data/ids_more_than_5perc_missing.txt", delim = " ")
 
 # roh data
@@ -25,7 +25,7 @@ full_sample <- read.plink(sheep_bed, sheep_bim, sheep_fam)
 snps_map_sub <- full_sample$map #%>% filter(chromosome %in% chrs)
 
 # survival data
-early_survival <- fitness_data %>%
+annual_survival <- fitness_data %>%
         dplyr::rename(birth_year = BIRTHYEAR,
                       sheep_year = SheepYear,
                       age = Age,
@@ -102,13 +102,14 @@ roh_snps_reord <- geno_sub %>%
 
 # prepare roh yes/no matrix
 roh_mat <- matrix(data = 0, nrow = nrow(geno_sub), ncol = ncol(geno_sub))
-colnames(roh_mat) <- c(id, top_snps$snp.name)
+colnames(roh_mat) <- c("id", top_snps$snp.name)
 
 # set 1 where SNP is in an roh
 # make a tibble like for genotypes but with 0/1 for whether a SNP is in ROH or not
 roh_df <- pmap_df(roh_snps_reord[c("id_roh", "all_snps")], function(id_roh, all_snps) {
+        
         df <- as_tibble(t(as.numeric(c(id_roh, rep(0, ncol(geno_sub) - 1)))))
-        names(df) <- c("id_roh", top_snps$snp.name)
+        names(df) <- c("id_roh", unique(top_snps$snp.name))
         if (!is.null(all_snps)){
                 df[, all_snps] <- 1
         } else {
@@ -122,7 +123,7 @@ names(roh_df) <- c("id", paste0("roh_", names(geno_sub)[-1]))
 roh_df <- mutate(roh_df, id = as.character(id))
 
 # join additive and roh data to survival for gwas
-ann_survival_top_snps <- early_survival %>% 
+ann_survival_top_snps <- annual_survival %>% 
         dplyr::select(id, survival, sex, twin, birth_year, sheep_year, mum_id, age, age2, froh_all) %>% 
         left_join(geno_sub, by = "id") %>% 
         left_join(roh_df, by = "id") %>% 
@@ -133,7 +134,14 @@ rm(full_sample)
 rm(roh_list)
 rm(roh_mat)
 
-write_delim(early_survival_top_snps, "output/early_survival_top_snps_pca.txt", delim = " ")
+# pcas 
+pcs <- read_delim("data/ann_surv_pca_testset80.txt", " ", col_names = TRUE) %>% 
+        mutate(id = as.character(id))
+
+out <- ann_survival_top_snps %>% 
+        left_join(pcs)
+
+write_delim(out, "output/annual_survival_top_snps_pca_testset.txt", delim = " ")
 
 
 

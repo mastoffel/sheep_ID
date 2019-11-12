@@ -3,7 +3,7 @@ library(lme4)
 library(performance)
 
 # get df
-surv_df <- read_delim("output/early_survival_top_snps_pca.txt", delim = " ") %>% 
+surv_df <- read_delim("output/annual_survival_top_snps_pca_testset.txt", delim = " ") %>% 
                                 mutate(age_std = as.numeric(scale(age)),
                                        age2_std = as.numeric(scale(age2))) %>% 
                                 mutate(sex = as.factor(sex), twin = as.factor(twin),
@@ -11,6 +11,98 @@ surv_df <- read_delim("output/early_survival_top_snps_pca.txt", delim = " ") %>%
                                        sheep_year = as.factor(sheep_year),
                                        id = as.factor(id)) %>% 
                                 filter(!is.na(sex) & !is.na(twin))
+
+ids_test <- read_delim("data/ids_annual_survival_testset80.txt", " ", col_names = FALSE) %>% 
+                rename(id = X2)
+
+surv_df <- surv_df %>% mutate(trainset = ifelse(id %in% ids_test$id, "yes", "no"))
+
+
+
+# split 
+library(caret)
+library(lme4)
+library(BGLR)
+library(tidyimpute)
+survival_train <- surv_df %>% filter(trainset == "yes")
+survival_test <- surv_df %>% filter(trainset == "no")
+
+roh_snps <- names(surv_df)[grep("roh", names(surv_df))[-1]]
+add_snps <- str_replace(roh_snps, "roh_", "")
+
+# BGLR prediction
+X_roh <- surv_df[roh_snps] %>% 
+        impute_mean() %>% 
+        as.matrix()
+X_add <- surv_df[add_snps] %>% 
+        impute_mean() %>% 
+        as.matrix()
+
+# set y to NA for testset predictions
+surv_df$survival[surv_df$trainset == "no"] <- NA
+
+#2# Setting the linear predictor
+ETA<-list(fixed = list(~factor(sex)+factor(twin)+age_std+age2_std,
+                       data=surv_df,model='FIXED'),
+          id = list(~factor(id), data=surv_df, model='BRR'),
+          sheep_year = list(~factor(sheep_year), data=surv_df, model='BRR'),
+          birth_year = list(~factor(birth_year), data=surv_df, model='BRR'),
+          roh = list(X_roh=X_roh, model='BayesC'),
+          add = list(X_add=X_add, model = 'BayesC') # 
+)
+y <- surv_df$survival
+#3# Fitting the model
+fm <- BGLR(y=y,ETA=ETA, nIter=5000, burnIn=1000, thin = 50, 
+            response_type = "ordinal",
+            # additional iterations with the following two lines
+            #BGLR_ENV = paste0(output_folder, run_name, "BGLR_ENV.RData"), # default NULL
+            #newChain = FALSE, # default TRUE
+            # where to save
+            saveAt = "output/bglr_pred/try") 
+
+plot(fm$ETA$roh$b^2)
+hist(fm$yHat[surv_df$trainset == "no"])
+
+roh_snps <- names((fm$ETA$roh$b^2)[fm$ETA$roh$b^2 > 0.001])
+add_snps <- str_replace(roh_snps, "roh_", "")
+        
+lme_form <- reformulate(c(roh_snps, add_snps, paste0("pc", 1:7), "sex", "twin", "age_std", "age2_std",  "(1|birth_year)", "(1|sheep_year)", "(1|id)"),response="survival")
+mod1 <- glmer(lme_form, data = survival_train, family = "binomial")
+summary(mod1)
+?predict
+
+
+pred_mod <- predict(mod1, newdata = survival_test, allow.new.levels = TRUE, type = "response")
+
+#%>% 
+        #         mutate(surv = ifelse(survival > 0.5, 1, 0)) %>% 
+        # mutate(surv = as.factor(surv),
+        #        survival_org = as.factor(survival_org))
+
+confusionMatrix(data = newdat$surv, reference = newdat$survival_org)
+
+newdat <- survival_test %>% rename(survival_org = survival) %>% 
+        mutate(survival = predict(mod1, newdat, 
+                                  allow.new.levels = TRUE, type = "response")) %>% 
+        mutate(surv = ifelse(survival > 0.5, 1, 0)) %>% 
+        mutate(surv = as.factor(surv),
+               survival_org = as.factor(survival_org))
+
+confusionMatrix(data = newdat$surv, reference = newdat$survival_org)
+
+library(merTools)
+predictInterval(mod1, newdata = survival_test,
+                level = 0.95, n.sims = 5)
+
+mm <- model.matrix(terms(mod1),newdat)
+pvar1 <- diag(mm %*% tcrossprod(vcov(mod1),mm))
+
+
+
+
+
+
+
 
 
 library(BGLR)
@@ -120,40 +212,7 @@ top_snps_gwas %>%
 
 
 
-# split 
-library(caret)
-library(lme4)
-roh_snps <- paste0("roh_", top_snps$snp.name)
-trainIndex <- createDataPartition(early_survival_top_snps$survival, p = .7, 
-                                  list = FALSE, 
-                                  times = 1)
 
-survival_train <- early_survival_top_snps[trainIndex, ]
-survival_test <- early_survival_top_snps[-trainIndex, ]
-survival_test %>% filter((birth_year%in%survival_train$birth_year)) %>% 
-        filter((sheep_year %in% survival_train$sheep_year))
-
-
-lme_form <- reformulate(c(roh_snps, "sex", "twin", "age_std", "age2_std",  "(1|birth_year)", "(1|sheep_year)", "(1|id)"),response="survival")
-mod1 <- glmer(lme_form, data = survival_train, family = "binomial")
-summary(mod1)
-?predict
-
-newdat <- survival_test %>% rename(survival_org = survival) %>% 
-        mutate(survival = predict(mod1, newdat, 
-                                  allow.new.levels = TRUE, type = "response")) %>% 
-        mutate(surv = ifelse(survival > 0.5, 1, 0)) %>% 
-        mutate(surv = as.factor(surv),
-               survival_org = as.factor(survival_org))
-
-confusionMatrix(data = newdat$surv, reference = newdat$survival_org)
-
-library(merTools)
-predictInterval(mod1, newdata = survival_test,
-                level = 0.95, n.sims = 5)
-
-mm <- model.matrix(terms(mod1),newdat)
-pvar1 <- diag(mm %*% tcrossprod(vcov(mod1),mm))
 
 
 

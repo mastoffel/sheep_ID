@@ -1,7 +1,7 @@
 library(tidyverse)
 library(MasterBayes)
 library(data.table)
-
+library(rlang)
 # annual measures of traits and fitness
 annual_fitness <- read_delim("../sheep/data/1_Annual_Fitness_Measures_April_20190501.txt", delim = "\t")
 
@@ -45,6 +45,28 @@ calc_froh_classes <- function(roh_crit, roh_lengths) {
 froh <- purrr::map(c("short", "medium", "long", "all"), calc_froh_classes,  roh_lengths) %>% 
         purrr::reduce(left_join, by = "ID") %>% 
         replace_na(list(FROH_long = 0))
+
+# add FROH minus each of the chromosomes as new variabels for gwas
+calc_froh_minus_chr <- function(chr, roh_lengths) {
+  
+    roh_lengths %>%
+      as_tibble() %>% 
+      dplyr::group_by(IID) %>%
+      #filter({{ roh_filt }}) %>% 
+      dplyr::filter(CHR != !!chr) %>% 
+      dplyr::summarise(KBSUM = sum(KB)) %>%
+      mutate(FROH = KBSUM / 2869898) %>%
+      dplyr::select(IID, FROH) %>%
+      rename(ID = IID, !! paste0("FROH_no_chr", chr) := FROH) 
+  
+}
+
+froh_no_chr <- map(1:26, calc_froh_minus_chr, roh_lengths) %>% 
+              reduce(left_join, by = "ID")
+
+# add to froh
+froh <- froh %>% 
+        left_join(froh_no_chr, by = "ID")
 
 # all FROH are negatively correlated
 library(GGally)

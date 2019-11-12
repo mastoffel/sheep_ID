@@ -1,7 +1,7 @@
 library(tidyverse)
 library(BGLR)
 # check chains
-roh_chain <- read_delim("output/bglr_chr/chr_1ETA_roh_parBayesC.dat", " ", col_names = FALSE)
+roh_chain <- read_delim("output/bglr_chr/chr_20ETA_roh_parBayesC.dat", " ", col_names = FALSE)
 plot(roh_chain$X2, type = "line")
 
 fixed <- BGLR::readBinMat("output/bglr_chr/chr_1ETA_id_b.bin")
@@ -13,7 +13,7 @@ load_effs <- function(chr) {
 
 save_load <- safely(load_effs)
 
-all_effs <- map(1:26, save_load) %>% 
+all_effs <- map(20, save_load) %>% 
                 map("result") %>% 
                 bind_rows() %>% 
                 group_by(chr) %>% 
