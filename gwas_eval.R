@@ -10,7 +10,7 @@ chr_info <- read_delim("../sheep/data/sheep_genome/chromosome_info_ram.txt", "\t
                 mutate(chromosome = as.integer(chromosome)) %>% 
                 filter(!is.na(chromosome))
 
-gwas_files <- list.files("output/gwas_full_roh_pca_08", pattern = "*.rds", full.names = TRUE)
+gwas_files <- list.files("output/gwas_full_pca_with_f/", pattern = "*.rds", full.names = TRUE)
 # extract results
 all_gwas <- purrr::map(gwas_files, readRDS) %>% 
             purrr::flatten() %>% 
@@ -20,7 +20,7 @@ all_gwas <- purrr::map(gwas_files, readRDS) %>%
             purrr::compact()
 
 # get roh/add pval
-gwas_res <- map_df(all_gwas, function(x) x %>% .[c(13,14), ] %>% 
+gwas_res <- map_df(all_gwas, function(x) x %>% .[c(14,15), ] %>% 
                            dplyr::select(term, estimate, p.value))
 
 # check whether snp roh didnt work in some models anywhere
@@ -90,6 +90,7 @@ axisdf <- gwas_p %>% group_by(chromosome) %>%
 # roh info
 #devtools::install_github('tavareshugo/windowscanr')
 library(windowscanr)
+library(data.table)
 hom_sum <- fread("output/ROH/roh_nofilt_ram.hom.summary") %>% 
                 rename(snp.name = SNP, roh_count = UNAFF) %>% 
                 dplyr::select(snp.name, roh_count) 
@@ -120,7 +121,7 @@ pgwas <- ggplot(gwas_plot, aes(x=pos_cum, y=-log10(p.value))) +
         geom_hline(yintercept = -log10(0.05/28946), linetype="dashed", color = "grey") +
         scale_shape_manual(values = c(25,24,21)) +
         #scale_color_manual(values = c("red", "yellow", "lightgrey")) +
-        scale_x_continuous(labels = chr_labels, breaks= axisdf$center ) +
+        #scale_x_continuous(labels = chr_labels, breaks= axisdf$center ) +
         #scale_x_continuous(breaks= axisdf$center ) +
         scale_y_continuous(expand = c(0, 0), limits = c(0,8)) +
         # Add label using ggrepel to avoid overlapping
