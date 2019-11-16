@@ -162,8 +162,10 @@ snp_mat <- do.call(cbind, snp_mat_list)
 fwrite(x = snp_mat, "data/annual_survival_gwas_snps.txt")
 
 #~~~~~~~~~~~~ GWAS non-genetic variables  ~~~~~~~~~~~~~~~~~~~#
-df_names <- names(fread("grep year data/annual_survival_gwas_df.txt",
+df_names <- names(fread("grep year data/annual_survival_gwas_vars.txt",
                         nrows = 0))
-GWAS_non_gen <- fread("data/annual_survival_gwas_df.txt", select = 1:9)
+GWAS_non_gen <- fread("data/annual_survival_gwas_vars.txt", select = 1:9)
 fwrite(GWAS_non_gen, "data/annual_survival_gwas_vars.txt")
+
+
 
