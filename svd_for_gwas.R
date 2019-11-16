@@ -6,7 +6,7 @@ library(data.table)
 output_folder <- "/exports/eddie/scratch/mstoffel/svd/"
 #output_folder <- "output/svd/"
 # name
-out_name <- "snps" # snps roh
+#out_name <- "snps" # snps roh
 out_name <- "roh"
 # non genetic variables
 annual_survival_gwas <- fread("data/annual_survival_gwas_vars.txt")
