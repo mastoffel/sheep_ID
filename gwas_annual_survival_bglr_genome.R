@@ -52,7 +52,7 @@ ETA<-list(fixed = list(~factor(sex)+factor(twin)+age_std+age2_std,
 )
 
 #3# Fitting the model
-fm <- BGLR2(y=y,ETA=ETA, nIter=100, burnIn=20, thin = 10, 
+fm <- BGLR2(y=y,ETA=ETA, nIter=100000, burnIn=20000, thin = 80, 
         response_type = "ordinal",
         saveEnv=TRUE,
         # additional iterations with the following two lines
