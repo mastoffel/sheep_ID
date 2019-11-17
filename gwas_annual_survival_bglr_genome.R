@@ -17,11 +17,11 @@ output_folder <- "/exports/eddie/scratch/mstoffel/bglr/"
 if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
 
 # non genetic variables
-annual_survival_gwas <- fread("data/annual_survival_gwas_vars.txt") %>% as.data.frame()
+annual_survival_gwas <- fread(paste0(input_folder, "annual_survival_gwas_vars.txt")) %>% as.data.frame()
 # response
 y <- as.numeric(annual_survival_gwas$survival)
 # ids belonging to genetic matrices
-ids <- fread("data/roh_ids.txt") %>% as_tibble()
+ids <- fread(paste0(input_folder, "roh_ids.txt")) %>% as_tibble()
 
 # 
 US_roh <- fread(paste0(input_folder, "roh_US.txt")) %>% 

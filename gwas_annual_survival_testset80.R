@@ -1,4 +1,3 @@
-# # run on server
 library(lme4)
 library(tidyverse)
 library(broom.mixed)
@@ -43,6 +42,7 @@ snps_map_sub <- full_sample$map %>%
         filter(chromosome == chr) 
 
 # survival data
+froh_no_chr <- paste0("FROH_no_chr", chr)
 annual_survival <- fitness_data %>% 
         dplyr::rename(birth_year = BIRTHYEAR,
                       sheep_year = SheepYear,
@@ -69,11 +69,11 @@ annual_survival <- fitness_data %>%
                age2_std = as.numeric(scale(age2))) %>% 
         as.data.frame() 
 
-
 #use only training set (80% of individuals)
 annual_survival <- annual_survival %>% filter(id %in% pcs$id)
 
 
+# #use only training set (80% of individuals)
 # sample_frac_groups = function(tbl, size, replace = FALSE, weight = NULL) {
 #         # regroup when done
 #         grps = tbl %>% groups %>% lapply(as.character) %>% unlist
@@ -149,7 +149,7 @@ rm(roh_mat)
 
 # join additive and roh data to survival for gwas
 annual_survival_gwas <- annual_survival %>% 
-        dplyr::select(id, survival, sex, twin, birth_year, sheep_year, mum_id, age_std, age2_std) %>% 
+        dplyr::select(id, survival, sex, twin, birth_year, sheep_year, mum_id, age_std, age2_std, {{ froh_no_chr }}) %>% 
         left_join(pcs, by = "id") %>% 
         left_join(geno_sub, by = "id") %>% 
         left_join(roh_df, by = "id") %>% 
@@ -179,6 +179,7 @@ nlopt <- function(par, fn, lower, upper, control) {
 
 run_gwas <- function(snp, data) {
         formula_snp <- as.formula(paste0("survival ~ 1 + sex + twin + age_std + age2_std + ", 
+                                         froh_no_chr, " + ",
                                          "pc1 + pc2 + pc3 + pc4 + pc5 + pc6 + pc7 + ",
                                          snp, "+ ", paste0("roh_", snp), "+ (1|birth_year) + (1|sheep_year) + (1|id)"))
         mod <- glmer(formula = formula_snp,
