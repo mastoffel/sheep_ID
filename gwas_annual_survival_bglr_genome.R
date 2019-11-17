@@ -2,9 +2,6 @@
 library(tidyverse)
 library(snpStats)
 library(data.table)
-library(furrr)
-library(caret)
-library(tidyimpute)
 library(BGLR)
 
 #~~~~~~~~~~~~~~~~~~~~~ GWAS ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~`#
@@ -13,42 +10,49 @@ input_folder <- "data/"
 # prop_genome
 #prop_geno <- 0.01
 # useful to have _ at the end as some other stuff gets attached
-run_name <- "first_run_"
+run_name <- "first_run_svd_"
 # with / at end
 output_folder <- "/exports/eddie/scratch/mstoffel/bglr/"
+#output_folder <- "output/bglr/"
 if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
 
-# snps
-snp_map <- read_delim(paste0(input_folder, "snp_map.txt"), ' ')
-
 # non genetic variables
-annual_survival_gwas <- fread("data/annual_survival_gwas_vars.txt")
+annual_survival_gwas <- fread("data/annual_survival_gwas_vars.txt") %>% as.data.frame()
 # response
-y <- annual_survival_gwas$survival
+y <- as.numeric(annual_survival_gwas$survival)
+# ids belonging to genetic matrices
+ids <- fread("data/roh_ids.txt") %>% as_tibble()
 
+# 
+US_roh <- fread(paste0(input_folder, "roh_US.txt")) %>% 
+        mutate(id = ids$id) %>% 
+        right_join(data.frame(id = annual_survival_gwas[, "id"])) %>% 
+        dplyr::select(-id) %>% 
+        as.matrix() %>% 
+        unname()
+#US_roh <- cbind(US_roh, matrix(0, nrow = nrow(US_roh), ncol = abs(diff(dim(US_roh)))))
 
-# snps for gwas
-snps_sub <- snp_map %>% 
-        #sample_frac(prop_geno) %>% 
-        .$snp.name
+US_add <- fread(paste0(input_folder, "snps_US.txt")) %>%  
+        mutate(id = ids$id) %>% 
+        right_join(data.frame(id = annual_survival_gwas[, "id"])) %>% 
+        dplyr::select(-id) %>% 
+        as.matrix() %>% 
+        unname()
 
 #2# Setting the linear predictor
 ETA<-list(fixed = list(~factor(sex)+factor(twin)+age_std+age2_std,
-                        data=annual_survival_gwas,model='FIXED', 
+                        data=annual_survival_gwas,model='FIXED',
                         saveEffects=TRUE),
-             id = list(~factor(id), data=annual_survival_gwas, model='BRR', saveEffects=TRUE),
-     sheep_year = list(~factor(sheep_year), data=annual_survival_gwas, model='BRR', saveEffects=TRUE),
-     birth_year = list(~factor(birth_year), data=annual_survival_gwas, model='BRR', saveEffects=TRUE),
-            roh = list(X_roh=fread(paste0(input_folder, "annual_survival_gwas_roh.txt"),  
-                   select = paste0("roh_", snps_sub)) %>% as.matrix(), model='BayesC', 
-                   saveEffects=TRUE),
-            add = list(X_add=fread(paste0(input_folder, "annual_survival_gwas_snps.txt"), 
-                  select = snps_sub) %>% as.matrix(), model = 'BayesC',
-                  saveEffects=TRUE) # 
+               id = list(~factor(id), data=annual_survival_gwas, model='BRR', saveEffects=TRUE),
+       sheep_year = list(~factor(sheep_year), data=annual_survival_gwas, model='BRR', saveEffects=TRUE),
+       birth_year = list(~factor(birth_year), data=annual_survival_gwas, model='BRR', saveEffects=TRUE),
+            # create genetic matrices with duplicated observations
+            roh = list(X_roh=US_roh, model='BayesC', saveEffects=TRUE),
+            add = list(X_add=US_add, model='BayesC', saveEffects=TRUE)
 )
 
 #3# Fitting the model
-fm <- BGLR2(y=y,ETA=ETA, nIter=5000, burnIn=2000, thin = 50, 
+fm <- BGLR2(y=y,ETA=ETA, nIter=100, burnIn=20, thin = 10, 
         response_type = "ordinal",
         saveEnv=TRUE,
         # additional iterations with the following two lines
@@ -61,11 +65,10 @@ fm <- BGLR2(y=y,ETA=ETA, nIter=5000, burnIn=2000, thin = 50,
 # save parts of the output
 model_overview <- fm[-length(fm)]
 eta_non_gen <- fm$ETA[1:4]
-marker_effects <- tibble(snp_roh = names(fm$ETA$roh$b), b_roh = fm$ETA$roh$b, sd_b_roh = fm$ETA$roh$SD.b,
-                 snp_add = names(fm$ETA$add$b), b_add = fm$ETA$add$b, sd_b_add = fm$ETA$add$SD.b)
+estimates <- tibble( b_roh = fm$ETA$roh$b, sd_b_roh = fm$ETA$roh$SD.b, b_add = fm$ETA$add$b, sd_b_add = fm$ETA$add$SD.b)
 
 saveRDS(list(model_overview, eta_non_gen), file=paste0(output_folder, run_name, "mod.rds"))
-write_delim(marker_effects, path = paste0(output_folder,"marker_effects_", run_name, "mod.txt"), delim = " ")
+write_delim(estimates, path = paste0(output_folder,"estimates_", run_name, "mod.txt"), delim = " ")
 
 
 
