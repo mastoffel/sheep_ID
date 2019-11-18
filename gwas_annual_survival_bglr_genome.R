@@ -52,12 +52,12 @@ ETA<-list(fixed = list(~factor(sex)+factor(twin)+age_std+age2_std,
 )
 
 #3# Fitting the model
-fm <- BGLR2(y=y,ETA=ETA, nIter=100000, burnIn=20000, thin = 80, 
+fm <- BGLR2(y=y,ETA=ETA, nIter=50000, burnIn=20000, thin = 30, 
         response_type = "ordinal",
         saveEnv=TRUE,
         # additional iterations with the following two lines
         #BGLR_ENV = paste0(output_folder, run_name, "BGLR_ENV.RData"), # default NULL
-        #newChain = FALSE, # default TRUE
+        newChain = FALSE, # default TRUE
         # where to save
         saveAt = paste0(output_folder, run_name)) 
 

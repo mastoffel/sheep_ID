@@ -5,9 +5,11 @@ library(coda)
 
 first_run_mod[[2]]$birth_year
 
-chain_fix<-read_delim('output/bglr/first_run_ETA_fixed_b.dat', " ") %>% 
-                mutate(iter = 1:nrow(.))
-ggplot(chain_fix, aes(iter, `factor(sex)M`)) + geom_line()
+chain_roh<-read_delim('output/bglr/first_run_svd_ETA_roh_parBayesC.dat', " ", col_names = FALSE)  %>% 
+        mutate(iter = 1:nrow(.))
+ggplot(chain_roh, aes(iter, X1)) + geom_line()
+
+
 
 chain_mu<-read_delim('output/bglr/first_run_mu.dat', " ", col_names = FALSE) %>% 
         mutate(iter = 1:nrow(.))
