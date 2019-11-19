@@ -121,7 +121,7 @@ pgwas <- ggplot(gwas_plot, aes(x=pos_cum, y=-log10(p.value))) +
         geom_hline(yintercept = -log10(0.05/28946), linetype="dashed", color = "grey") +
         scale_shape_manual(values = c(25,24,21)) +
         #scale_color_manual(values = c("red", "yellow", "lightgrey")) +
-        #scale_x_continuous(labels = chr_labels, breaks= axisdf$center ) +
+        scale_x_continuous(labels = chr_labels, breaks= axisdf$center ) +
         #scale_x_continuous(breaks= axisdf$center ) +
         scale_y_continuous(expand = c(0, 0), limits = c(0,8)) +
         # Add label using ggrepel to avoid overlapping
@@ -137,13 +137,13 @@ pgwas <- ggplot(gwas_plot, aes(x=pos_cum, y=-log10(p.value))) +
 
 pgwas
 
-ggsave( "figs/survival_gwas_roh_pca_new_testset.jpg",pgwas, height = 3, width = 15)
+ggsave( "figs/survival_gwas_roh_pca_with_f.jpg",pgwas, height = 3, width = 15)
 
 # save top snps
 top_roh_snps <- gwas_full %>% 
         arrange(p.value) %>% 
         filter(groups == "roh") %>%  # filter(p.value < 0.05/28946) 
-        .[1:100, ]
+        .[1:10, ]
 gwas_full %>% 
         filter(snp.name %in% top_roh_snps$snp.name) %>% 
         write_delim("output/top_roh_snps_gwas_testset.txt")

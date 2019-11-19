@@ -10,4 +10,4 @@ V <- fread("data/gen_mats/roh_V.txt") %>% as.matrix()
 
 effs <- V%*%estimates
 
-write_delim(tibble(effs = effs), path = "data/marker_effects_bglr.txt", delim = " ")
+write_delim(tibble(effs = effs), path = "data/gen_mats/marker_effects_bglr.txt", delim = " ")

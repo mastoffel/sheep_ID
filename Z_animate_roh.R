@@ -74,7 +74,9 @@ calc_froh_classes <- function(roh_crit, roh_lengths) {
                 dplyr::summarise(KBSUM = sum(KB)) %>% 
                 mutate(FROH = KBSUM / 2869914) %>% 
                 dplyr::select(IID, FROH) %>% 
-                rename(ID = IID, !! paste0("FROH_", roh_crit) := FROH)
+                rename(ID = IID, 
+                       !! paste0("FROH_", roh_crit) := FROH)
+                      # !! paste0("ROH_", roh_crit) := ROH)
 }
 
 # proportion of ROH length classes in each genome. Individuals which
@@ -120,9 +122,6 @@ anim_save("figs/roh_dist_across_life.gif", animation = p1)
 
 
 
-
-
-
 # another animated plot
 
 length_dist <- data.frame(g = c(1, 2,2^2, 2^3, 2^4,2^5,2^6,2^7,2^8,2^9,2^10,2^11,2^12,2^13)) %>%
@@ -139,7 +138,7 @@ prop_IBD_df <- roh_lengths %>%
                                  # length_Mb < 4.885464375 & length_Mb >= 3.908371500 ~ 10,
                                  length_Mb < 4.885464375 & length_Mb >= 2.442732188 ~ 16,
                                  length_Mb < 2.442732188 & length_Mb >= 1.221366094 ~ 32,
-                                 length_Mb < 1.221366094 & length_Mb >= 0.610683047 ~ 64 )) %>%
+                                 length_Mb < 1.221366094 & length_Mb >= 0.6 ~ 64 )) %>%
                                 # length_Mb < 0.610683047 & length_Mb >= 0.30 ~ 128)  ) %>% # 0.610683047
         mutate(length_class = case_when(
                 class == 1 ~ "> 39 (1G)",
@@ -156,7 +155,8 @@ prop_IBD_df <- roh_lengths %>%
         mutate(length_class = fct_reorder(length_class, class)) %>% 
         mutate(IID = as.character(IID)) %>% 
         group_by(IID, class, length_class) %>%
-        dplyr::summarise(prop_IBD = sum(length_Mb / 2869)) #%>% 
+        dplyr::summarise(prop_IBD = sum(length_Mb / 2869),
+                         sum_IBD = sum(length_Mb)) 
 # add IBD of non-ROH snps if wanted
 #  bind_rows(homs) 
 
@@ -165,7 +165,8 @@ prop_IBD_df_with_0 <- prop_IBD_df %>%
         ungroup() %>% 
         tidyr::complete(length_class, nesting(IID)) %>% 
         mutate(class = ifelse(is.na(class), length_class, class)) %>% 
-        mutate(prop_IBD = ifelse(is.na(prop_IBD), 0, prop_IBD))
+        mutate(prop_IBD = ifelse(is.na(prop_IBD), 0, prop_IBD),
+               sum_IBD = ifelse(is.na(sum_IBD), 0, sum_IBD))
 
 
 # ROH class distributions as prop. 
@@ -176,6 +177,14 @@ prop_IBD_across_time <- prop_IBD_df_with_0 %>%
         pivot_longer(cols = starts_with("age_class"), names_to = "age_class") %>% 
         filter(value == 1) %>% 
         mutate(age = as.numeric(str_replace(age_class, "age_class_", "")))
+
+# 
+prop_IBD_across_time %>% 
+  filter(length_class == "> 39 (1G)") %>% 
+ggplot(aes(sum_IBD, fill= as.factor(class))) + 
+      geom_histogram(bins = 1000) +
+      scale_y_log10() + 
+      facet_grid(class~age)
 
 library(ggbeeswarm)
 p1 <- prop_IBD_across_time %>% 
@@ -202,4 +211,72 @@ p_rend <- animate(p1, fps = 20, duration = 5, start_pause = 20, height = 560, wi
 anim_save("figs/roh_dist_across_life.gif", animation = p_rend)
 
 
-roh_lengths
+# another plot 
+
+all_roh_per_age <- purrr::map(1:length(ids_per_age), function(x) {
+  out <- roh_lengths %>% 
+    rename(ID = IID) %>% 
+    filter(ID %in% ids_per_age[[x]]) %>% 
+    mutate(age = paste0("age_", x-1))
+  out
+})
+
+roh_plot <- all_roh_per_age %>% 
+  bind_rows() %>% 
+  mutate(age = fct_inorder(age)) %>% 
+  mutate(MB = KB/1000) %>% 
+  mutate(class = dplyr::case_when(
+    KB < 1221 ~ "short",
+    (KB > 1221)&(KB < 4885) ~ "medium",
+    KB > 4885 ~ "long"
+  ))
+
+roh_plot %>% 
+  sample_frac(0.1) %>% 
+  ggplot(aes(MB)) + geom_histogram(bins = 100) +
+  facet_wrap(age~class, scales = "free_y", ncol = 3)
+
+library(ggridges)
+library(viridis)
+
+roh_plot %>% 
+  #filter(MB != 0) %>% 
+  #sample_frac(1) %>% 
+  group_by(ID, class, age) %>% 
+  summarise(MB_mean = mean(MB),
+            MB_sum = sum(MB)) -> roh_plot1
+
+library(ghibli)
+library(wesanderson)
+library(viridis)
+library(ggthemes)
+library(nord)
+?nord
+#cols <- fivethirtyeight_pal()(3)
+cols <- nord("victory_bonds", 3)
+p <- ggplot(roh_plot1, aes(x = MB_sum, y = age, fill =class, point_color = class)) +
+  geom_density_ridges(scale = 0.9,
+                               jittered_points=TRUE,
+                               point_shape = "|", point_size = 3, size = 0.4,
+                               position = position_points_jitter(height = 0),
+                               point_alpha = 1,
+                               alpha = 0.5)+
+ # scale_fill_viridis() +
+  scale_fill_manual(values =cols ) + 
+  scale_discrete_manual("point_colour", values = cols ) + 
+  theme_ridges(font_family = "Avenir") + 
+  facet_wrap(~class, scales = "free_x") +
+  ylab("") +
+  xlab("Sum of ROH per individual in Mb") +
+  theme(strip.background = element_blank(),
+        strip.text = element_text(vjust=2),
+        panel.spacing.x = unit(1, "lines"),
+        strip.text.x = element_text(margin = margin(1,0,0,0, "cm")),
+        legend.position = "none") +
+  labs(title = "ROH across life in Soay sheep",
+       subtitle = "- individuals with lots of long ROHs rarely survive their first year")
+  
+
+ggsave("figs/roh_across_life_ridges_sum.jpg", plot = p, height = 7, width = 8)        
+  
+

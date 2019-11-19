@@ -7,13 +7,15 @@ library(BGLR)
 #~~~~~~~~~~~~~~~~~~~~~ GWAS ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~`#
 # run gwas
 input_folder <- "data/"
+# variable selection prior probIn=2/100,counts=100 (see https://github.com/gdlc/BGLR-R/issues/32)
+var_sel <- TRUE
 # prop_genome
 #prop_geno <- 0.01
 # useful to have _ at the end as some other stuff gets attached
-run_name <- "first_run_svd_"
+run_name <- "var_sel_svd_"
 # with / at end
 output_folder <- "/exports/eddie/scratch/mstoffel/bglr/"
-#output_folder <- "output/bglr/"
+output_folder <- "output/bglr/var_sel/"
 if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
 
 # non genetic variables
@@ -40,24 +42,40 @@ US_add <- fread(paste0(input_folder, "snps_US.txt")) %>%
         unname()
 
 #2# Setting the linear predictor
-ETA<-list(fixed = list(~factor(sex)+factor(twin)+age_std+age2_std,
-                        data=annual_survival_gwas,model='FIXED',
-                        saveEffects=TRUE),
-               id = list(~factor(id), data=annual_survival_gwas, model='BRR', saveEffects=TRUE),
-       sheep_year = list(~factor(sheep_year), data=annual_survival_gwas, model='BRR', saveEffects=TRUE),
-       birth_year = list(~factor(birth_year), data=annual_survival_gwas, model='BRR', saveEffects=TRUE),
-            # create genetic matrices with duplicated observations
-            roh = list(X_roh=US_roh, model='BayesC', saveEffects=TRUE),
-            add = list(X_add=US_add, model='BayesC', saveEffects=TRUE)
-)
+if (!var_sel) {
+        ETA<-list(fixed = list(~factor(sex)+factor(twin)+age_std+age2_std,
+                               data=annual_survival_gwas,model='FIXED',
+                               saveEffects=TRUE),
+                  id = list(~factor(id), data=annual_survival_gwas, model='BRR', saveEffects=TRUE),
+                  sheep_year = list(~factor(sheep_year), data=annual_survival_gwas, model='BRR', saveEffects=TRUE),
+                  birth_year = list(~factor(birth_year), data=annual_survival_gwas, model='BRR', saveEffects=TRUE),
+                  # create genetic matrices with duplicated observations
+                  roh = list(X_roh=US_roh, model='BayesC', saveEffects=TRUE),
+                  add = list(X_add=US_add, model='BayesC', saveEffects=TRUE)
+        )
+}
+
+if (var_sel) {
+        ETA<-list(fixed = list(~factor(sex)+factor(twin)+age_std+age2_std,
+                               data=annual_survival_gwas,model='FIXED',
+                               saveEffects=TRUE),
+                  id = list(~factor(id), data=annual_survival_gwas, model='BRR', saveEffects=TRUE),
+                  sheep_year = list(~factor(sheep_year), data=annual_survival_gwas, model='BRR', saveEffects=TRUE),
+                  birth_year = list(~factor(birth_year), data=annual_survival_gwas, model='BRR', saveEffects=TRUE),
+                  # create genetic matrices with duplicated observations
+                  roh = list(X_roh=US_roh, model='BayesC', saveEffects=TRUE, probIn=2/100,counts=100),
+                  add = list(X_add=US_add, model='BayesC', saveEffects=TRUE, probIn=2/100,counts=100)
+        )
+}
+
 
 #3# Fitting the model
-fm <- BGLR2(y=y,ETA=ETA, nIter=50000, burnIn=20000, thin = 30, 
+fm <- BGLR2(y=y,ETA=ETA, nIter=50000, burnIn=10000, thin = 10, 
         response_type = "ordinal",
         saveEnv=TRUE,
         # additional iterations with the following two lines
         #BGLR_ENV = paste0(output_folder, run_name, "BGLR_ENV.RData"), # default NULL
-        newChain = FALSE, # default TRUE
+        #newChain = FALSE, # default TRUE
         # where to save
         saveAt = paste0(output_folder, run_name)) 
 
