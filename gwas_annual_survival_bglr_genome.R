@@ -81,10 +81,9 @@ if (var_sel) {
 fm <- BGLR2(y=y,ETA=ETA, nIter=100, burnIn=10, thin = 5, 
         response_type = "ordinal",
         #saveEnv=TRUE,
-        
         # additional iterations with the following two lines
-        BGLR_ENV = "data/var_sel_svd_BGLR_ENV.RData", # default NULL
-        #newChain = FALSE, # default TRUE
+        BGLR_ENV = "output/bglr/var_sel/var_sel_svd_BGLR_ENV.RData", # default NULL
+        newChain = FALSE, # default TRUE
         # where to save
         saveAt = paste0(output_folder, "/", run_name)) 
 

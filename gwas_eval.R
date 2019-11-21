@@ -11,7 +11,7 @@ chr_info <- read_delim("../sheep/data/sheep_genome/chromosome_info_ram.txt", "\t
                 filter(!is.na(chromosome))
 
 gwas_files <- list.files("output/gwas_full_pca_with_f", pattern = "*.rds", full.names = TRUE)
-gwas_files <- list.files("output/gwas_survival_gaussian/", pattern = "*.rds", full.names = TRUE)
+#gwas_files <- list.files("output/gwas_survival_gaussian/", pattern = "*.rds", full.names = TRUE)
 
 # extract results
 all_gwas <- purrr::map(gwas_files, readRDS) %>% 
@@ -60,7 +60,7 @@ GWASTools::qqPlot(gwas_full[gwas_full$groups == "roh", ]$p.value)
 # manhattan
 ## computing new x axis
 gwas_roh <- gwas_full %>% 
-                        filter(groups == "roh") #%>% 
+                        filter(groups == "add") #%>% 
                        # filter(chromosome == 20)
                         #group_by(groups) %>% 
                         #arrange(chromosome, position) %>% 
@@ -103,7 +103,7 @@ hom_sum <- fread("output/ROH/roh_nofilt_ram.hom.summary") %>%
                 rename(snp.name = SNP, roh_count = UNAFF) %>% 
                 dplyr::select(snp.name, roh_count) 
 
-quants <- quantile(hom_sum$roh_count, probs = c(0.1, 0.9))
+quants <- quantile(hom_sum$roh_count, probs = c(0.2, 0.8))
 hom_sum <- hom_sum %>% mutate(roh_prevalence = case_when(
                                 roh_count < quants[1] ~ "<10% of inds",
                                 roh_count > quants[2] ~ ">90% of inds",
@@ -157,7 +157,7 @@ gwas_roh %>% arrange(p.value) %>% filter(groups == "roh") %>% filter(p.value < 0
 
 
 # effect size
-pgwas <- ggplot(gwas_plot, aes(x=pos_cum, y=abs(estimate))) +
+pgwas <- ggplot(gwas_plot, aes(x=pos_cum, y=estimate)) + # inv.logit(estimate)
         geom_point(aes(fill = chromosome %%2 == 0, shape = roh_prevalence),  #fill = chromosome %%2 == 0
                    size = 2.5, alpha = 0.5, stroke = 0.2) +
         #geom_hline(yintercept = -log10(0.05/28946), linetype="dashed", color = "grey") +

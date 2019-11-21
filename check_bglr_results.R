@@ -6,6 +6,11 @@ library(coda)
 chain_roh<-read_delim('output/bglr/first_run_svd_ETA_roh_parBayesC.dat', " ", col_names = FALSE)  %>% 
         mutate(iter = 1:nrow(.))
 ggplot(chain_roh, aes(iter, X2)) + geom_line()
+
+chain_roh<-read_delim('output/bglr/var_sel/var_sel_svd_ETA_add_parBayesC.dat', " ", col_names = FALSE)  %>% 
+        mutate(iter = 1:nrow(.))
+ggplot(chain_roh, aes(iter, X2)) + geom_line()
+
 hist(chain_roh$X2)
 chain_birth_year<-read_delim('output/bglr/first_run_svd_ETA_birth_year_varB.dat', " ", col_names = FALSE)  %>% 
         mutate(iter = 1:nrow(.))
