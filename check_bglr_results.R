@@ -3,16 +3,32 @@ library(tidyverse)
 library(lobstr)
 library(coda)
 
-first_run_mod[[2]]$birth_year
-
 chain_roh<-read_delim('output/bglr/first_run_svd_ETA_roh_parBayesC.dat', " ", col_names = FALSE)  %>% 
         mutate(iter = 1:nrow(.))
 ggplot(chain_roh, aes(iter, X2)) + geom_line()
-chain_roh_old <- read_delim('output/bglr/first/first_run_svd_ETA_roh_parBayesC.dat', " ", col_names = FALSE)  %>% 
+hist(chain_roh$X2)
+chain_birth_year<-read_delim('output/bglr/first_run_svd_ETA_birth_year_varB.dat', " ", col_names = FALSE)  %>% 
         mutate(iter = 1:nrow(.))
-ggplot(chain_roh_old, aes(iter, X2)) + geom_line()
+ggplot(chain_birth_year, aes(iter, X1)) + geom_line()
+hist(chain_birth_year$X1)
+# get beta
+beta <- readBinMat("output/bglr/first_run_svd_ETA_roh_b.bin") %>% 
+        colMeans()
+b <- read_delim('output/bglr/estimates_third_run_svd_mod.txt', " ") %>% .$b_roh 
 
-markers <-read_delim('output/bglr/var_sel/marker_effects_bglr_2nd.txt', " ", col_names = TRUE)  %>% 
+plot(beta, b)
+
+markers <- read_delim('output/bglr/marker_effects_bglr.txt', " ")  %>% 
+        mutate(iter = 1:nrow(.))
+ggplot(markers, aes(iter, effs^2)) + geom_point()
+
+
+markers <- read_delim('output/bglr/marker_effects_bglr_third.txt', " ")  %>% 
+        mutate(iter = 1:nrow(.))
+ggplot(markers, aes(iter, effs^2)) + geom_point()
+
+
+markers <-read_delim('output/bglr/var_sel/marker_effects_var_sel.txt', " ", col_names = TRUE)  %>% 
         mutate(iter = 1:nrow(.))
 ggplot(markers, aes(iter, effs^2)) + geom_point()
 

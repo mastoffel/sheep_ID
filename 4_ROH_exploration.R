@@ -17,6 +17,7 @@ library(GGally)
 library("naniar")
 options(scipen=999)
 
+library(ggchicklet)
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #          Full data           #   
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -313,3 +314,8 @@ ROH_per_ind
 #dev.off()
 ggsave("figs/roh_per_ind_1Mb.jpg", ROH_per_ind, width = 11, height = 5)
 
+
+# test with ggchicklets
+ggplot(df, aes(IID, KB, group = POS1)) +
+  geom_chicklet() + 
+  coord_flip()

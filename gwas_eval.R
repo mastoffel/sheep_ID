@@ -11,6 +11,8 @@ chr_info <- read_delim("../sheep/data/sheep_genome/chromosome_info_ram.txt", "\t
                 filter(!is.na(chromosome))
 
 gwas_files <- list.files("output/gwas_full_pca_with_f", pattern = "*.rds", full.names = TRUE)
+gwas_files <- list.files("output/gwas_survival_gaussian/", pattern = "*.rds", full.names = TRUE)
+
 # extract results
 all_gwas <- purrr::map(gwas_files, readRDS) %>% 
             purrr::flatten() %>% 
@@ -49,6 +51,7 @@ gwas_full <- gwas_res %>%
         mutate(snp.name = str_replace(snp.name, "roh_", "")) %>%
         left_join(snps_map) 
 # 
+
 qqman::qq(gwas_full[gwas_full$groups == "add", ]$p.value)
 qqman::qq(gwas_full[gwas_full$groups == "roh", ]$p.value)
 
@@ -65,6 +68,11 @@ gwas_roh <- gwas_full %>%
 ## calculating x axis location for chromosome label
 # med.dat <- gwas_roh %>% dplyr::group_by(groups, chromosome) %>% 
 #                 dplyr::summarise(median.x = median(cumsum.tmp))
+library(QQperm) # lambda roh = 1.602886, lambda add = 1.570673
+exp_p <- runif(nrow(gwas_roh), min = 0, max = 1)
+lambda <- estlambda2(gwas_roh$p.value, exp_p)$estimate
+gwas_roh <- gwas_roh %>% mutate(p_cor = p.value/lambda)
+
 
 chr_labels <- c(c(1:18),"","20","",  "22","", "24","", "26")
 #chr_labels <- unique(gwas_roh$chromosome)
@@ -105,11 +113,7 @@ hom_sum <- hom_sum %>% mutate(roh_prevalence = case_when(
 gwas_plot <- gwas_p %>% 
                 left_join(hom_sum)
 
-#proh_dens <- ggplot(gwas_p, aes(pos_cum, roh_count)) + geom_line()
-#proh_dens
 cols <- c("#4393c3", "#2A3132")
-#cols <- c("#f1a340", "#998ec3", "#e0e0e0")
-#cols <- c("#b35806", "#542788", "#d8daeb" )
 pgwas <- ggplot(gwas_plot, aes(x=pos_cum, y=-log10(p.value))) +
         # Show all points
  # geom_point(aes(fill = chromosome %%2 == 0, shape = roh_prevalence),  #fill = chromosome %%2 == 0
@@ -120,9 +124,9 @@ pgwas <- ggplot(gwas_plot, aes(x=pos_cum, y=-log10(p.value))) +
         #scale_color_manual(values = rep(cols, 26 )) +
         geom_hline(yintercept = -log10(0.05/28946), linetype="dashed", color = "grey") +
         scale_shape_manual(values = c(25,24,21)) +
-        #scale_color_manual(values = c("red", "yellow", "lightgrey")) +
-        scale_x_continuous(labels = chr_labels, breaks= axisdf$center ) +
-        #scale_x_continuous(breaks= axisdf$center ) +
+   
+        #scale_x_continuous(labels = chr_labels, breaks= axisdf$center ) +
+
         scale_y_continuous(expand = c(0, 0), limits = c(0,8)) +
         # Add label using ggrepel to avoid overlapping
        # geom_label_repel(data=df.tmp[df.tmp$is_annotate=="yes",], aes(label=as.factor(SNP), alpha=0.7), size=5, force=1.3) +
@@ -148,10 +152,51 @@ gwas_full %>%
         filter(snp.name %in% top_roh_snps$snp.name) %>% 
         write_delim("output/top_roh_snps_gwas_testset.txt")
 
-
-
-
 gwas_roh %>% arrange(p.value) %>% filter(groups == "roh") %>% filter(p.value < 0.05/28946)
+
+
+
+# effect size
+pgwas <- ggplot(gwas_plot, aes(x=pos_cum, y=abs(estimate))) +
+        geom_point(aes(fill = chromosome %%2 == 0, shape = roh_prevalence),  #fill = chromosome %%2 == 0
+                   size = 2.5, alpha = 0.5, stroke = 0.2) +
+        #geom_hline(yintercept = -log10(0.05/28946), linetype="dashed", color = "grey") +
+        scale_shape_manual(values = c(25,24,21)) +
+        scale_x_continuous(labels = chr_labels, breaks= axisdf$center ) +
+        #scale_x_continuous(breaks= axisdf$center ) +
+        #scale_y_continuous(expand = c(0, 0), limits = c(0,8)) +
+        xlab("Chromosome") + 
+        ylab("estimate") + ## y label from qqman::qq
+        scale_fill_manual(values = cols) +##values = cols
+        theme_clean() +
+        theme(axis.text.x = element_text(size = 10),
+              axis.ticks = element_line(size = 0.1)) +
+        guides(fill=FALSE) 
+pgwas
+
+
+# additive plot
+pgwas <- ggplot(gwas_plot, aes(x=pos_cum, y=-log10(p.value))) +
+        geom_point(aes(fill = chromosome %%2 == 0),  #fill = chromosome %%2 == 0
+                   size = 2.5, alpha = 0.5, stroke = 0.2) +
+        geom_hline(yintercept = -log10(0.05/28946), linetype="dashed", color = "grey") +
+        scale_shape_manual(values = c(25,24,21)) +
+        scale_x_continuous(labels = chr_labels, breaks= axisdf$center ) +
+        scale_y_continuous(expand = c(0, 0), limits = c(0,8)) +
+        xlab("Chromosome") + 
+        ylab(expression(-log[10](italic(p)))) + ## y label from qqman::qq
+        scale_fill_manual(values = cols) +##values = cols
+        theme_clean() +
+        theme(axis.text.x = element_text(size = 10),
+              axis.ticks = element_line(size = 0.1)) +
+        guides(fill=FALSE) 
+
+pgwas
+
+
+
+
+
 
 
 # prepare genotypes for simpleM
