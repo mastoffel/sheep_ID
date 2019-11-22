@@ -94,6 +94,7 @@ roh_lengths[which.max(roh_lengths$KB), ]
 plink_geno_path <- "data/"
 # plink name
 sheep_plink_name <- "sheep_geno_imputed_ram_27092019_pruned"
+sheep_plink_name <- "sheep_geno_imputed_ram_27092019"
 # read merged plink data
 sheep_bed <- paste0(plink_geno_path, sheep_plink_name, ".bed")
 sheep_bim <- paste0(plink_geno_path, sheep_plink_name, ".bim")

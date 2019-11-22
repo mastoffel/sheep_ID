@@ -26,8 +26,8 @@ y <- annual_survival_gwas$survival
 
 # with / at end
 output_folder <- paste0("/exports/eddie/scratch/mstoffel/bglr_chr/chr_", chr, "/")
+# output_folder <- ("output/bglr_chr/testruns/")
 if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
-
 
 run_gwas_per_chr <- function(chr) {
         snps_sub <- snp_map %>% filter(chromosome == chr) %>% .$snp.name
@@ -38,15 +38,15 @@ run_gwas_per_chr <- function(chr) {
                 id = list(~factor(id), data=annual_survival_gwas, model='BRR', saveEffects=TRUE),
                 sheep_year = list(~factor(sheep_year), data=annual_survival_gwas, model='BRR', saveEffects=TRUE),
                 birth_year = list(~factor(birth_year), data=annual_survival_gwas, model='BRR', saveEffects=TRUE),
-                roh = list(X_roh=fread("data/annual_survival_gwas_roh.txt",  select = paste0("roh_", snps_sub)) %>% as.matrix(), model='BayesC'), # , saveEffects=TRUE
-                add = list(X_add=fread("data/annual_survival_gwas_snps.txt", select = snps_sub) %>% as.matrix(), model = 'BayesC') # , saveEffects=TRUE / BayesC
+                roh = list(X=fread("data/annual_survival_gwas_roh.txt",  select = paste0("roh_", snps_sub)) %>% as.matrix(), model='BayesC', probIn=1/100,counts=100), # , saveEffects=TRUE
+                add = list(X=fread("data/annual_survival_gwas_snps.txt", select = snps_sub) %>% as.matrix(), model = 'BayesC', probIn=1/100,counts=100) # , saveEffects=TRUE / BayesC
         )
         
         #3# Fitting the model / previous 10K / 5k burning
-        fm <- BGLR2(y=y,ETA=ETA, nIter=40000, burnIn=10000, thin = 50, response_type = "ordinal",
-                saveEnv=TRUE,
-                newChain = TRUE,
-                BGLR_ENV = paste0(output_folder,"chr_", chr, "BGLR_ENV.RData"),
+        fm <- BGLR2(y=y,ETA=ETA, nIter=10000, burnIn=1000, thin = 10, response_type = "ordinal",
+                #saveEnv=TRUE,
+                #newChain = TRUE,
+                #BGLR_ENV = paste0(output_folder,"chr_", chr, "BGLR_ENV.RData"),
                 saveAt = paste0(output_folder, "chr_", chr))
         
         marker_effects <- tibble(snp_roh = names(fm$ETA$roh$b), b_roh = fm$ETA$roh$b, sd_b_roh = fm$ETA$roh$SD.b,

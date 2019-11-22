@@ -60,7 +60,7 @@ GWASTools::qqPlot(gwas_full[gwas_full$groups == "roh", ]$p.value)
 # manhattan
 ## computing new x axis
 gwas_roh <- gwas_full %>% 
-                        filter(groups == "add") #%>% 
+                        filter(groups == "roh") #%>% 
                        # filter(chromosome == 20)
                         #group_by(groups) %>% 
                         #arrange(chromosome, position) %>% 
@@ -103,7 +103,7 @@ hom_sum <- fread("output/ROH/roh_nofilt_ram.hom.summary") %>%
                 rename(snp.name = SNP, roh_count = UNAFF) %>% 
                 dplyr::select(snp.name, roh_count) 
 
-quants <- quantile(hom_sum$roh_count, probs = c(0.2, 0.8))
+quants <- quantile(hom_sum$roh_count, probs = c(0.1, 0.9))
 hom_sum <- hom_sum %>% mutate(roh_prevalence = case_when(
                                 roh_count < quants[1] ~ "<10% of inds",
                                 roh_count > quants[2] ~ ">90% of inds",
@@ -157,14 +157,18 @@ gwas_roh %>% arrange(p.value) %>% filter(groups == "roh") %>% filter(p.value < 0
 
 
 # effect size
-pgwas <- ggplot(gwas_plot, aes(x=pos_cum, y=estimate)) + # inv.logit(estimate)
+gwas_plot %>% 
+        #filter(chromosome == 20) %>% 
+       # filter(p.value < 0.05/90000) %>% 
+ggplot(aes(x=pos_cum, y=estimate)) + # inv.logit(estimate)
         geom_point(aes(fill = chromosome %%2 == 0, shape = roh_prevalence),  #fill = chromosome %%2 == 0
                    size = 2.5, alpha = 0.5, stroke = 0.2) +
         #geom_hline(yintercept = -log10(0.05/28946), linetype="dashed", color = "grey") +
         scale_shape_manual(values = c(25,24,21)) +
         scale_x_continuous(labels = chr_labels, breaks= axisdf$center ) +
         #scale_x_continuous(breaks= axisdf$center ) +
-        #scale_y_continuous(expand = c(0, 0), limits = c(0,8)) +
+        #scale_y_continuous(limits = c(-1,1)) +
+        #scale_y_sqrt() + 
         xlab("Chromosome") + 
         ylab("estimate") + ## y label from qqman::qq
         scale_fill_manual(values = cols) +##values = cols
@@ -172,7 +176,7 @@ pgwas <- ggplot(gwas_plot, aes(x=pos_cum, y=estimate)) + # inv.logit(estimate)
         theme(axis.text.x = element_text(size = 10),
               axis.ticks = element_line(size = 0.1)) +
         guides(fill=FALSE) 
-pgwas
+
 
 
 # additive plot

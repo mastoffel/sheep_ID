@@ -155,10 +155,10 @@ quantile(sampicc, c(0.025, 0.5, 0.975))
 # ~~~~~~~~~~~~~~~~~~~~~ Survival across different life-stages ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 
-annual_survival %>% 
-        filter(age %in% c(5,6)) %>% 
-        group_by(survival) %>% 
-        tally()
+# annual_survival %>% 
+#         filter(age %in% c(5,6)) %>% 
+#         group_by(survival) %>% 
+#         tally()
 
 
 survival_inla <- function(ageclass) {
@@ -166,11 +166,12 @@ survival_inla <- function(ageclass) {
                         add_index_inla() %>% 
                         mutate(IndexA2 = IndexA)
         prec_prior <- list(prior = "loggamma", param = c(0.5, 0.5))
-        formula_surv <- as.formula(paste('survival ~ froh_long + froh_medium + froh_short + sex + twin + 1', 
+        formula_surv <- as.formula(paste(#'survival ~ froh_long + froh_medium + froh_short + sex + twin + 1', 
+                                         'survival ~ froh_all + sex + twin + 1', 
                                          'f(birth_year, model = "iid", hyper = list(prec = prec_prior))',
                                          'f(sheep_year, model = "iid", hyper = list(prec = prec_prior))',
                                          'f(IndexA2, model = "iid", hyper = list(prec = prec_prior))',
-                                         'f(mum_id, model="iid",  hyper = list(prec = prec_prior))', 
+                                         #'f(mum_id, model="iid",  hyper = list(prec = prec_prior))', 
                                          'f(IndexA, model="generic0", hyper = list(theta = list(param = c(0.5, 0.5))),Cmatrix=Cmatrix)', sep = " + "))
         mod_inla <- inla(formula=formula_surv, family="binomial",
                          data= dat_survival, 
@@ -178,25 +179,37 @@ survival_inla <- function(ageclass) {
 }
 
 all_inla_mods <- map(1:9, survival_inla)
-saveRDS(all_inla_mods, file = "output/inla_survival_models_diff_ages_with_mum.rds")
+saveRDS(all_inla_mods, file = "output/inla_survival_models_diff_ages_froh_all.rds")
 all_inla_mods <- readRDS("output/inla_survival_models_diff_ages.rds")
+all_inla_mods_froh <- readRDS("output/inla_survival_models_diff_ages_froh_all.rds")
+inla_mods <- list(all_inla_mods, all_inla_mods_froh)
 # extract all fixed effects
-fix_effs <- all_inla_mods %>% 
+fix_effs <- inla_mods %>% 
+        flatten() %>% 
         map("summary.fixed") %>% 
         compact() %>% 
         map(rownames_to_column, var = "var") %>% 
         bind_rows(.id = "age") %>% 
-        mutate(age = as.numeric(age) - 1)# %>% 
+        mutate(age = as.numeric(age) - 1) %>% 
+        mutate(age = ifelse(age > 8, age - 8, age)) %>% 
+        filter(age != 9) %>% 
+        filter(var %in% c("froh_all", "froh_long", "froh_medium", "froh_short"))
         #filter(str_detect(var, "froh"))
 names(fix_effs) <- c("age", "var", "mean", "sd", "lower", "median", "upper", "mode", "kld")
 
 library(boot)
+library(wesanderson)
 ggplot(fix_effs, aes(age, mean, color = var)) + 
         geom_point() +
-        #geom_smooth(method="lm", se = FALSE) +
-        geom_errorbar(aes(ymin = lower, ymax = upper)) +
-        facet_wrap(~var, scales = "free_y")
-        
+        geom_smooth(method="lm", se = FALSE) +
+        geom_errorbar(aes(ymin = lower, ymax = upper), width = 0) +
+        facet_wrap(~var, scales = "free_y", nrow = 1) +
+        theme_clean() +
+        scale_color_manual(values = wes_palette("Darjeeling2")) +
+        geom_hline(aes(yintercept = 0), color = "lightgrey")
+
+
+
 
 
 # # extract all fixed effects
