@@ -22,6 +22,20 @@ beta <- readBinMat("output/bglr/first_run_svd_ETA_roh_b.bin") %>%
         colMeans()
 b <- read_delim('output/bglr/estimates_third_run_svd_mod.txt', " ") %>% .$b_roh 
 
+# bglr chr wise
+effs <- list.files("output/bglr_chr",pattern = "*.txt", full.names = TRUE)
+all_effs <- map_dfr(effs, read_delim, " ", .id = "chr") %>% 
+                mutate(chr = as.numeric(chr)) %>% 
+                mutate(chr2 = case_when(
+                        chr == 1 ~ 10,
+                        chr == 2 ~ 11,
+                        TRUE ~ chr + 1
+                )) %>% 
+                select(-chr) %>% 
+                arrange(chr2) %>% 
+                filter(chr2 == 10)
+ggplot(all_effs, aes(1:nrow(all_effs), b_roh^2)) + geom_point()
+
 plot(beta, b)
 
 markers <- read_delim('output/bglr/var_sel/marker_effects.txt', " ")  %>% 

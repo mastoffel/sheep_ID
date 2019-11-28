@@ -9,17 +9,17 @@ library(BGLR)
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 # variable selection prior probIn=2/100,counts=100 (see https://github.com/gdlc/BGLR-R/issues/32)
 # BGLR with variable selection?
-var_sel <- TRUE
+var_sel <- FALSE
 # run name
-run_name <- "first_run"
+run_name <- "test_run"
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 # attach to run_name when var_sel selected
 if(var_sel) run_name <- paste0(run_name, "_var_sel")
 
 # different output folder depending on whether script runs on mac or server
-if (Sys.info()["sysname"] == "Darwin") output_folder <- paste0("output/bglr/", run_name)
-if (Sys.info()["sysname"] == "Linux") output_folder <- paste0("/exports/eddie/scratch/mstoffel/bglr/", run_name)
+if (Sys.info()["sysname"] == "Darwin") output_folder <- paste0("output/bglr/", run_name, "/")
+if (Sys.info()["sysname"] == "Linux") output_folder <- paste0("/exports/eddie/scratch/mstoffel/bglr/", run_name, "/")
 
 # create output folder if its not there
 if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
@@ -58,8 +58,8 @@ if (!var_sel) {
                   sheep_year = list(~factor(sheep_year), data=annual_survival_gwas, model='BRR', saveEffects=TRUE),
                   birth_year = list(~factor(birth_year), data=annual_survival_gwas, model='BRR', saveEffects=TRUE),
                   # create genetic matrices with duplicated observations
-                  roh = list(X_roh=US_roh, model='BayesC', saveEffects=TRUE),
-                  add = list(X_add=US_add, model='BayesC', saveEffects=TRUE)
+                  roh = list(X_roh=US_roh, model='BRR', saveEffects=TRUE),
+                  add = list(X_add=US_add, model='BRR', saveEffects=TRUE)
         )
 }
 
@@ -80,12 +80,13 @@ if (var_sel) {
 #3# Fitting the model
 fm <- BGLR2(y=y,ETA=ETA, nIter=100, burnIn=10, thin = 5, 
         response_type = "ordinal",
-        #saveEnv=TRUE,
+        saveEnv=TRUE,
         # additional iterations with the following two lines
-        BGLR_ENV = "output/bglr/var_sel/var_sel_svd_BGLR_ENV.RData", # default NULL
+        BGLR_ENV = paste0(output_folder, "/", "BGLR_ENV.RData"), # default NULL
         newChain = FALSE, # default TRUE
         # where to save
-        saveAt = paste0(output_folder, "/", run_name)) 
+        #saveAt = output_folder, "run2"
+        )
 
 
 # save parts of the output

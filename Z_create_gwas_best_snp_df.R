@@ -135,6 +135,7 @@ rm(roh_list)
 rm(roh_mat)
 
 # pcas 
+
 pcs <- read_delim("data/ann_surv_pca_testset80.txt", " ", col_names = TRUE) %>% 
         mutate(id = as.character(id))
 

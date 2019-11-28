@@ -123,6 +123,8 @@ pgwas <- ggplot(gwas_plot, aes(x=pos_cum, y=-log10(p.value))) +
         #geom_point(size = 2.5, alpha = 1, shape = 21, stroke = 0.1) + 
         #scale_color_manual(values = rep(cols, 26 )) +
         geom_hline(yintercept = -log10(0.05/28946), linetype="dashed", color = "grey") +
+        # for top snps
+        #geom_hline(yintercept = -log10(0.05/1000), linetype="dashed", color = "grey") +
         scale_shape_manual(values = c(25,24,21)) +
    
         #scale_x_continuous(labels = chr_labels, breaks= axisdf$center ) +
@@ -141,13 +143,19 @@ pgwas <- ggplot(gwas_plot, aes(x=pos_cum, y=-log10(p.value))) +
 
 pgwas
 
-ggsave( "figs/survival_gwas_roh_pca_with_f.jpg",pgwas, height = 3, width = 15)
+ggsave( "figs/survival_gwas_roh_pca_with_f_testset.jpg",pgwas, height = 3, width = 15)
 
 # save top snps
 top_roh_snps <- gwas_full %>% 
         arrange(p.value) %>% 
         filter(groups == "roh") %>%  # filter(p.value < 0.05/28946) 
-        .[1:10, ]
+        filter(p.value < 0.00005) %>% 
+        # only take top snp per peak
+        mutate(pos_round = round(position/1000000)) %>% 
+        arrange(chromosome, pos_round, p.value) %>% 
+        group_by(chromosome, pos_round) %>% 
+        top_n(-1, p.value)
+      
 gwas_full %>% 
         filter(snp.name %in% top_roh_snps$snp.name) %>% 
         write_delim("output/top_roh_snps_gwas_testset.txt")

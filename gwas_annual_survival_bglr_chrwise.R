@@ -25,8 +25,8 @@ annual_survival_gwas <- fread("data/annual_survival_gwas_vars.txt")
 y <- annual_survival_gwas$survival
 
 # with / at end
-output_folder <- paste0("/exports/eddie/scratch/mstoffel/bglr_chr/chr_", chr, "/")
-# output_folder <- ("output/bglr_chr/testruns/")
+#output_folder <- paste0("/exports/eddie/scratch/mstoffel/bglr_chr/chr_", chr, "/")
+output_folder <- paste0("output/bglr_chr/chr_", chr, "/")
 if (!dir.exists(output_folder)) dir.create(output_folder, recursive = TRUE)
 
 run_gwas_per_chr <- function(chr) {
@@ -38,13 +38,13 @@ run_gwas_per_chr <- function(chr) {
                 id = list(~factor(id), data=annual_survival_gwas, model='BRR', saveEffects=TRUE),
                 sheep_year = list(~factor(sheep_year), data=annual_survival_gwas, model='BRR', saveEffects=TRUE),
                 birth_year = list(~factor(birth_year), data=annual_survival_gwas, model='BRR', saveEffects=TRUE),
-                roh = list(X=fread("data/annual_survival_gwas_roh.txt",  select = paste0("roh_", snps_sub)) %>% as.matrix(), model='BayesC', probIn=1/100,counts=100), # , saveEffects=TRUE
-                add = list(X=fread("data/annual_survival_gwas_snps.txt", select = snps_sub) %>% as.matrix(), model = 'BayesC', probIn=1/100,counts=100) # , saveEffects=TRUE / BayesC
+                roh = list(X=fread("data/annual_survival_gwas_roh.txt",  select = paste0("roh_", snps_sub)) %>% as.matrix(), model='BRR'), # , saveEffects=TRUE
+                add = list(X=fread("data/annual_survival_gwas_snps.txt", select = snps_sub) %>% as.matrix(), model = 'BRR') # , saveEffects=TRUE / BayesC
         )
         
         #3# Fitting the model / previous 10K / 5k burning
-        fm <- BGLR2(y=y,ETA=ETA, nIter=10000, burnIn=1000, thin = 10, response_type = "ordinal",
-                #saveEnv=TRUE,
+        fm <- BGLR2(y=y,ETA=ETA, nIter=50000, burnIn=10000, thin = 10, response_type = "ordinal",
+                saveEnv=TRUE,
                 #newChain = TRUE,
                 #BGLR_ENV = paste0(output_folder,"chr_", chr, "BGLR_ENV.RData"),
                 saveAt = paste0(output_folder, "chr_", chr))

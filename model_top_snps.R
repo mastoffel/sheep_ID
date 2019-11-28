@@ -30,6 +30,68 @@ survival_test <- surv_df %>% filter(trainset == "no")
 roh_snps <- names(surv_df)[grep("roh", names(surv_df))[-1]]
 add_snps <- str_replace(roh_snps, "roh_", "")
 
+
+# how much variation do all ROH snps explain?
+# time saver function for modeling
+nlopt <- function(par, fn, lower, upper, control) {
+        .nloptr <<- res <- nloptr(par, fn, lb = lower, ub = upper, 
+                                  opts = list(algorithm = "NLOPT_LN_BOBYQA", print_level = 1,
+                                              maxeval = 1000, xtol_abs = 1e-6, ftol_abs = 1e-6))
+        list(par = res$solution,
+             fval = res$objective,
+             conv = if (res$status > 0) 0 else res$status,
+             message = res$message
+        )
+}
+
+pcs <- paste0("pc",1:7)
+# with roh_snps / pc to add roh_snps, add_snps,
+glme_form <- reformulate(c("sex", "twin", "age_std", "age2_std", roh_snps, add_snps, "(1|birth_year)", "(1|sheep_year)", "(1|id)"),response="survival")
+mod1 <- glmer(glme_form, data = survival_test, family = "binomial",
+              control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+
+summary(mod1)
+r2_nakagawa(mod1)
+
+# testset no genes
+#   Conditional R2: 0.777
+# Marginal R2: 0.127
+# froh 
+#  Conditional R2: 0.790
+#Marginal R2: 0.137
+# with specific 
+#   Conditional R2: 0.745
+# Marginal R2: 0.172
+
+
+?predict.merMod
+
+pred_surv <- predict(mod1, newdata = survival_test, type = "response") # allow.new.levels = TRUE, re.form = NA
+pred_surv_round <- as.factor(ifelse(pred_surv > 0.5, 1, 0))
+
+confusionMatrix(pred_surv_round, as.factor(survival_test$survival))
+
+# froh all
+#  Accuracy : 0.7042          
+# 95% CI : (0.6872, 0.7207)
+# Conditional R2: 0.883
+# Marginal R2: 0.138
+
+# no genetic
+# Conditional R2: 0.871
+# Marginal R2: 0.108
+
+glme_form2 <- reformulate(c("sex", "twin", "age_std", "age2_std",  "(1|birth_year)", "(1|sheep_year)", "(1|id)"),response="survival")
+mod2 <- glmer(glme_form2, data = survival_top_snps, family = "binomial",
+              control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+summary(mod2)
+library(performance)
+r2_nakagawa(mod2)
+
+
+
+
+
 # BGLR prediction
 X_roh <- surv_df[roh_snps] %>% 
         impute_mean() %>% 
@@ -151,41 +213,6 @@ abline(v=fm$burnIn/fm$thin,col=4)
 
 
 
-
-# how much variation do all ROH snps explain?
-# time saver function for modeling
-nlopt <- function(par, fn, lower, upper, control) {
-        .nloptr <<- res <- nloptr(par, fn, lb = lower, ub = upper, 
-                                  opts = list(algorithm = "NLOPT_LN_BOBYQA", print_level = 1,
-                                              maxeval = 1000, xtol_abs = 1e-6, ftol_abs = 1e-6))
-        list(par = res$solution,
-             fval = res$objective,
-             conv = if (res$status > 0) 0 else res$status,
-             message = res$message
-        )
-}
-
-# get roh snps
-roh_snps <- names(early_survival_top_snps)[str_detect(names(early_survival_top_snps), "roh")][-1]
-
-# check
-test <- survival_top_snps %>% 
-        filter(!is.na(survival_top_snps$survival)) %>% 
-        summarise_at(vars(contains("roh")), function(x) length(table(x)))
-
-# with roh_snps
-glme_form <- reformulate(c("sex", "twin", "age_std", "age2_std", roh_snps, "(1|birth_year)", "(1|sheep_year)", "(1|id)"),response="survival")
-mod1 <- glmer(glme_form, data = survival_top_snps, family = "binomial",
-              control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
-summary(mod1)
-r2_nakagawa(mod1)
-
-glme_form2 <- reformulate(c("sex", "twin", "age_std", "age2_std",  "(1|birth_year)", "(1|sheep_year)", "(1|id)"),response="survival")
-mod2 <- glmer(glme_form2, data = survival_top_snps, family = "binomial",
-              control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
-summary(mod2)
-library(performance)
-r2_nakagawa(mod2)
 
 
 # get all inla mods

@@ -211,7 +211,9 @@ p_rend <- animate(p1, fps = 20, duration = 5, start_pause = 20, height = 560, wi
 anim_save("figs/roh_dist_across_life.gif", animation = p_rend)
 
 
-# another plot 
+
+
+# FROH across age cohorts 
 
 all_roh_per_age <- purrr::map(1:length(ids_per_age), function(x) {
   out <- roh_lengths %>% 
@@ -231,10 +233,10 @@ roh_plot <- all_roh_per_age %>%
     KB > 4885 ~ "long"
   ))
 
-roh_plot %>% 
-  sample_frac(0.1) %>% 
-  ggplot(aes(MB)) + geom_histogram(bins = 100) +
-  facet_wrap(age~class, scales = "free_y", ncol = 3)
+# roh_plot %>% 
+#   sample_frac(0.1) %>% 
+#   ggplot(aes(MB)) + geom_histogram(bins = 100) +
+#   facet_wrap(age~class, scales = "free_y", ncol = 3)
 
 library(ggridges)
 library(viridis)
@@ -280,3 +282,39 @@ p <- ggplot(roh_plot1, aes(x = MB_sum, y = age, fill =class, point_color = class
 ggsave("figs/roh_across_life_ridges_sum.jpg", plot = p, height = 7, width = 8)        
   
 
+
+# FROH across life
+roh_plot %>% 
+  #filter(MB != 0) %>% 
+  #sample_frac(1) %>% 
+  group_by(ID, age) %>% 
+  summarise(MB_mean = mean(MB),
+            MB_sum = sum(MB)) %>% 
+  mutate(FROH = MB_sum/2869.898) %>% 
+  mutate(age = str_replace(age, "_", " ")) -> roh_plot2
+
+roh_plot2 %>% 
+  #ungroup() %>% 
+  #sample_frac(0.1) %>% 
+  ggplot(aes(x = FROH, y = fct_inorder(age))) +
+  geom_density_ridges(scale = 0.85,
+                      jittered_points=TRUE, color = "#465881", 
+                      fill = "#c9d1d3",
+                      point_shape = "|", point_size = 2.5, size = 0.4,
+                      position = position_points_jitter(height = 0),
+                      point_alpha = 1, point_color = "#1b2a49", 
+                      alpha = 0.9, bandwidth = 0.006) +
+  # scale_fill_viridis() +
+  theme_ridges(font_family = "Avenir") + 
+  ylab("") +
+  xlab("FROH across age cohorts") +
+  theme(strip.background = element_blank(),
+        strip.text = element_text(vjust=2),
+        panel.spacing.x = unit(1, "lines"),
+        strip.text.x = element_text(margin = margin(1,0,0,0, "cm")),
+        legend.position = "none") -> p2 #+
+  #labs(title = "Inbreeding across life in Soay sheep",
+   #    subtitle = "- individuals with lots of long ROHs rarely survive their first year")
+p2
+
+ggsave("figs/FROH_across_ages_col.jpg", plot = p2, width = 5, height = 6.5)

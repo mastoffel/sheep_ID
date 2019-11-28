@@ -1046,7 +1046,7 @@ head(annfit)
 
 #~~ save to file
 
-write.table(annfit, "../sheep/data//1_Annual_Fitness_Measures_April_20190501.txt", sep = "\t", quote = F, row.names = F)
+write.table(annfit, "../sheep/data/1_Annual_Fitness_Measures_April_20190501.txt", sep = "\t", quote = F, row.names = F)
 
 
 # #~~ LIfetime fitness

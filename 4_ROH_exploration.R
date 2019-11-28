@@ -43,6 +43,7 @@ chr_data <- read_delim("../sheep/data/sheep_genome/chromosome_info_ram.txt", del
 file_path <- "output/ROH/roh_nofilt_ram_pruned.hom"
 roh_lengths <- fread(file_path)
 
+# GENOME SIZE NEEDS fixing (only autosomes)
 froh <- roh_lengths %>%
         dplyr::group_by(IID) %>%
         dplyr::summarise(KBAVG = mean(KB), KBSUM = sum(KB)) %>%
@@ -117,12 +118,16 @@ prop_IBD_df_with_0 <- prop_IBD_df %>%
 # ROH class distributions as prop. 
 
 prop_IBD_df
-p_roh <- ggplot(prop_IBD_df_with_0, aes(length_class, prop_IBD)) +
-        geom_jitter(alpha = 0.3, width = 0.2) +
-        geom_boxplot(outlier.shape = NA, color = "lightgrey", alpha = 0.7) +
+p_roh <- ggplot(prop_IBD_df_with_0, aes(length_class, prop_IBD, fill = length_class)) +
+        geom_jitter(alpha = 0.6, width = 0.2, shape = 21, color = "black", stroke = 0.1) +
+        geom_boxplot(outlier.shape = NA, color = "#393e46", alpha = 0.7, width = 0.6,
+                     lwd = 0.4) +
         theme_clean() +
+        scale_fill_brewer(palette = "GnBu", direction = -1) +
+        #scale_fill_brewer(palette = "YlGnBu", direction = -1) + 
+        theme(legend.position = "none") + 
         #theme(axis.ticks.x = element_line(colour = "#cccccc", size = 0.3)) +
-        xlab("ROH class in Mb (Generations)") + ylab("Proportion of genome in ROH")
+        xlab("ROH class in Mb (Generations)") + ylab("Proportion of genome")
 p_roh
 ggsave("figs/roh_classes_boxplots.jpg", p_roh, width = 9, height = 3.5)
 
