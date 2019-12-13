@@ -82,7 +82,7 @@ fm <- BGLR2(y=y,ETA=ETA, nIter=100, burnIn=10, thin = 5,
         response_type = "ordinal",
         saveEnv=TRUE,
         # additional iterations with the following two lines
-        BGLR_ENV = paste0(output_folder, "/", "BGLR_ENV.RData"), # default NULL
+        BGLR_ENV = paste0(output_folder, "BGLR_ENV.RData"), # default NULL
         newChain = FALSE, # default TRUE
         # where to save
         #saveAt = output_folder, "run2"

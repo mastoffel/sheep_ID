@@ -113,6 +113,7 @@ summary(mod_inla2)
 
 saveRDS(list(mod_inla, mod_inla2), file = "output/inla_survival_models_std.rds")
 
+# results
 out <- readRDS("output/inla_survival_models.rds")
 inla_mod1 <- out[[1]]
 inla_mod2 <- out[[2]]
@@ -137,19 +138,25 @@ surv_mod_df <- inla_mod2$summary.fixed %>%
                 filter(predictor != "(Intercept)") %>% 
                 mutate(predictor = factor(predictor, 
                                           levels = rev(c("froh_all", "froh_long", "froh_medium", "froh_short",
-                                                     "sexM", "twin", "age_std", "age2_std")))) %>% 
-                mutate(predictor = fct_recode(predictor, !!!pred_names))
+                                                     "sexM", "twin", "age_std", "age2_std")))) #%>% 
+                #mutate(predictor = fct_recode(predictor, !!!pred_names))
 
 formatC(inv_logit(seq(0, -50, by = -10)), format = "e", digits = 1)
 
 # mean FROH_all
 annual_survival %>% group_by(id) %>% summarise(froh = mean(froh_all)) %>% summarise(mean(froh))
-        
+
+# calculate FROH as odds of surviving when offspring of first cousins vs average
+surv_mod_cousin <- surv_mod_df %>% 
+        filter(str_detect(predictor, "froh")) %>% 
+        mutate_at(c("mean", "lower_ci", "upper_ci"), function(x) exp((0.226+0.0625) * x) / exp(0.226 * x)) 
+surv_mod_df
+
 p_fix_eff <- ggplot(surv_mod_df, aes(mean, predictor)) +
         geom_point(size = 2) +
         geom_errorbarh(aes(xmax = upper_ci, xmin = lower_ci), height = 0.5, size = 0.5) +
         geom_vline(xintercept = 0) +
-        scale_y_discrete(labels = rev(pred_names)) +
+       # scale_y_discrete(labels = rev(pred_names)) +
         xlab("posterior mean (logit) and credible interval") +
         theme_clean() +
         ylab("")
