@@ -277,7 +277,7 @@ p <- ggplot(roh_plot1, aes(x = MB_sum, y = age, fill =class, point_color = class
         legend.position = "none") +
   labs(title = "ROH across life in Soay sheep",
        subtitle = "- individuals with lots of long ROHs rarely survive their first year")
-  
+p
 
 ggsave("figs/roh_across_life_ridges_sum.jpg", plot = p, height = 7, width = 8)        
   
@@ -307,7 +307,7 @@ roh_plot2 %>%
   # scale_fill_viridis() +
   theme_ridges(font_family = "Avenir") + 
   ylab("") +
-  xlab("FROH across age cohorts") +
+  xlab(expression(F[ROH]~across~age~cohorts)) +
   theme(strip.background = element_blank(),
         strip.text = element_text(vjust=2),
         panel.spacing.x = unit(1, "lines"),
@@ -317,4 +317,4 @@ roh_plot2 %>%
    #    subtitle = "- individuals with lots of long ROHs rarely survive their first year")
 p2
 
-ggsave("figs/FROH_across_ages_col.jpg", plot = p2, width = 5, height = 6.5)
+ggsave("figs/FROH_across_ages_col.jpg", plot = p2, width = 4.5, height = 5.5)

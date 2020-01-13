@@ -116,18 +116,18 @@ gwas_plot <- gwas_p %>%
 cols <- c("#4393c3", "#2A3132")
 pgwas <- ggplot(gwas_plot, aes(x=pos_cum, y=-log10(p.value))) +
         # Show all points
- # geom_point(aes(fill = chromosome %%2 == 0, shape = roh_prevalence),  #fill = chromosome %%2 == 0
- #                   size = 3, alpha = 0.7, shape = 21, stroke = 0.03) +
-        geom_point(aes(fill = chromosome %%2 == 0, shape = roh_prevalence),  #fill = chromosome %%2 == 0
-                   size = 2.5, alpha = 0.5, stroke = 0.2) +
+ geom_point(aes(fill = chromosome %%2 == 0),#shape = roh_prevalence  #fill = chromosome %%2 == 0
+                   size = 3, alpha = 0.5, shape = 21, stroke = 0.1) +
+        # geom_point(aes(fill = chromosome %%2 == 0,  shape = roh_prevalence), #  shape = roh_prevalence  #fill = chromosome %%2 == 0
+        #            size = 2.5, alpha = 0.5, stroke = 0.2) +
         #geom_point(size = 2.5, alpha = 1, shape = 21, stroke = 0.1) + 
         #scale_color_manual(values = rep(cols, 26 )) +
         geom_hline(yintercept = -log10(0.05/28946), linetype="dashed", color = "grey") +
         # for top snps
         #geom_hline(yintercept = -log10(0.05/1000), linetype="dashed", color = "grey") +
-        scale_shape_manual(values = c(25,24,21)) +
+        #scale_shape_manual(values = c(25,24,21)) +
    
-        #scale_x_continuous(labels = chr_labels, breaks= axisdf$center ) +
+        scale_x_continuous(labels = chr_labels, breaks= axisdf$center ) +
 
         scale_y_continuous(expand = c(0, 0), limits = c(0,8)) +
         # Add label using ggrepel to avoid overlapping
@@ -143,7 +143,7 @@ pgwas <- ggplot(gwas_plot, aes(x=pos_cum, y=-log10(p.value))) +
 
 pgwas
 
-ggsave( "figs/survival_gwas_roh_pca_with_f_testset.jpg",pgwas, height = 3, width = 15)
+ggsave( "figs/survival_gwas_roh_pca_with_f_no_shape.jpg",pgwas, height = 3, width = 15)
 
 # save top snps
 top_roh_snps <- gwas_full %>% 

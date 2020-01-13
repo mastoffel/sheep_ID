@@ -16,29 +16,23 @@ library(viridis)
 library(GGally)
 library("naniar")
 options(scipen=999)
-
 library(ggchicklet)
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #          Full data           #   
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-#~~ Chr lengths
+# Chr lengths
 chr_data <- read_delim("../sheep/data/sheep_genome/chromosome_info_ram.txt", delim = "\t") %>% 
-                        rename(size_BP = Length,
-                               CHR = Part) %>% 
-                        mutate(size_KB = size_BP * 1000)
-                
+  rename(size_BP = Length,
+         CHR = Part) %>% 
+  mutate(size_KB = size_BP / 1000)
 
-# add homozygosity not in roh
-# homs <- read_delim("output/ROH/roh_nofilt_hom_not_in_roh.txt", delim = " ") %>% 
-#             rename(prop_IBD = hom, 
-#                    IID = ID) %>% 
-#             mutate(IID = as.character(IID)) %>% 
-#             mutate(length_class = as.factor(rep("not_in_ROH", nrow(.))))
-                
+autosomal_genome_size <- chr_data %>% 
+  .[2:27, ] %>% 
+  summarise(sum_KB = sum(size_KB)) %>% 
+  as.numeric()
 
-#2439314
-# sheep gen    me size 2869490 KB 
 #~~ Length distribution
 file_path <- "output/ROH/roh_nofilt_ram_pruned.hom"
 roh_lengths <- fread(file_path)
@@ -47,15 +41,19 @@ roh_lengths <- fread(file_path)
 froh <- roh_lengths %>%
         dplyr::group_by(IID) %>%
         dplyr::summarise(KBAVG = mean(KB), KBSUM = sum(KB)) %>%
-        mutate(FROH = KBSUM/2869898)
+        mutate(FROH = KBSUM/autosomal_genome_size) %>% 
+        mutate(FROH_cent = FROH - mean(FROH))
 
 # FROH across individuals
 p_dist <- ggplot(froh, aes(FROH)) +
-    geom_histogram(bins = 500) +
-    theme_clean() +
-    ylab("sqrt(individual count)") +
-    scale_y_sqrt(expand = c(0, 0))
+    geom_histogram(bins = 100, fill = "#E5E9F0", color = "black", size = 0.2) +
+    ylab("individuals") +
+    xlab(expression(inbreeding~coefficient~F[ROH])) +
+    scale_y_continuous(expand = c(0, 0)) +
+    theme_clean(grid = FALSE, axis = TRUE, base_size = 12, 
+                highlight_family = "Lato", base_family = "Lato")
 p_dist
+
 
 ggsave("figs/FROH_dist.jpg", p_dist, width = 5, height = 3)
 

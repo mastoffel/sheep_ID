@@ -71,7 +71,7 @@ annual_survival %<>%
 nlopt <- function(par, fn, lower, upper, control) {
         .nloptr <<- res <- nloptr(par, fn, lb = lower, ub = upper, 
                                   opts = list(algorithm = "NLOPT_LN_BOBYQA", print_level = 1,
-                                              maxeval = 1000, xtol_abs = 1e-6, ftol_abs = 1e-6))
+                                              maxeval = 10000, xtol_abs = 1e-6, ftol_abs = 1e-6))
         list(par = res$solution,
              fval = res$objective,
              conv = if (res$status > 0) 0 else res$status,
@@ -87,7 +87,9 @@ chrom_part <- function(chr, annual_survival) {
                                       "(1|birth_year)", "(1|sheep_year)", "(1|id)"),
                                     response = "survival")
         mod <- glmer(formula_surv, data = annual_survival, family = "binomial",
-                     control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+                     control=glmerControl(optimizer="bobyqa",
+                                          optCtrl=list(maxfun=2e5)))
+                     #control = glmerControl(optimizer = "nloptwrap")) #  calc.derivs = FALSE
        
 }
 
@@ -118,11 +120,13 @@ roh_lengths %>%
         mutate(chr_length = Length / 1000000,
                roh_length_ratio = mean_roh_MB/chr_length) -> chrom_part_df
 
-ggplot(chrom_part_df, aes(roh_length_ratio, estimate, color = as.factor(chr))) + 
-        geom_point() 
+
+ggplot(chrom_part_df[-c(1,2,3), ], aes( mean_roh_MB, estimate)) +  #color = as.factor(chr)
+        geom_point() +
+        geom_smooth(se = FALSE, method = "lm")
         #geom_errorbar(aes(ymin = conf.low, ymax = conf.high)) 
        
-
+summary(lm(mean_roh_MB ~ estimate, data = chrom_part_df[-c(1,2,3), ]))
 
 
 

@@ -2,8 +2,11 @@ library(tidyverse)
 library(MasterBayes)
 library(data.table)
 library(rlang)
+
 # annual measures of traits and fitness
-annual_fitness <- read_delim("../sheep/data/1_Annual_Fitness_Measures_April_20190501.txt", delim = "\t")
+fitness_path <- "../sheep/data/1_Annual_Fitness_Measures_April_20190501.txt"
+annual_fitness <- read_delim(fitness_path, delim = "\t")
+names(annual_fitness)
 
 # get LRS
 sheep_ped <- read_delim("../sheep/data/SNP_chip/20190711_Soay_Pedigree.txt", 
@@ -19,7 +22,18 @@ file <- "roh_nofilt_pruned"
 roh_lengths <- fread(file_path)
 hist(roh_lengths$KB, breaks = 1000, xlim = c(0,10000))
 
-# roh_crit = c("short", "medium", "long", "all")
+# Chr lengths
+chr_data <- read_delim("../sheep/data/sheep_genome/chromosome_info_ram.txt", delim = "\t") %>% 
+  rename(size_BP = Length,
+         CHR = Part) %>% 
+  mutate(size_KB = size_BP / 1000)
+
+autosomal_genome_size <- chr_data %>% 
+                          .[2:27, ] %>% 
+                          summarise(sum_KB = sum(size_KB)) %>% 
+                          as.numeric()
+
+# define ROH length classes
 calc_froh_classes <- function(roh_crit, roh_lengths) {
         
         roh_filt <- dplyr::case_when(
@@ -34,7 +48,7 @@ calc_froh_classes <- function(roh_crit, roh_lengths) {
                 #filter({{ roh_filt }}) %>% 
                 filter(!!roh_filt) %>% 
                 dplyr::summarise(KBSUM = sum(KB)) %>% 
-                mutate(FROH = KBSUM / 2869898) %>% 
+                mutate(FROH = KBSUM / autosomal_genome_size) %>% 
                 dplyr::select(IID, FROH) %>% 
                 rename(ID = IID, !! paste0("FROH_", roh_crit) := FROH)
         
@@ -42,110 +56,50 @@ calc_froh_classes <- function(roh_crit, roh_lengths) {
 
 # proportion of ROH length classes in each genome. Individuals which
 # do not have long ROH have 0 for this class.
-froh <- purrr::map(c("short", "medium", "long", "all"), calc_froh_classes,  roh_lengths) %>% 
+ROH_classes <- c("short", "medium", "long", "all")
+froh <- purrr::map(ROH_classes, calc_froh_classes, roh_lengths) %>% 
         purrr::reduce(left_join, by = "ID") %>% 
         replace_na(list(FROH_long = 0))
 
 # add FROH minus each of the chromosomes as new variabels for gwas
 calc_froh_minus_chr <- function(chr, roh_lengths) {
-  
+    
+    # get chromosome length and substract from autosomal genome length
+    chr_size <- chr_data %>% 
+                filter(CHR == paste0("Chromosome ", chr)) %>% 
+                .[["size_KB"]]
+    genome_size_minus_chr <- autosomal_genome_size - chr_size
+    
     roh_lengths %>%
       as_tibble() %>% 
       dplyr::group_by(IID) %>%
       #filter({{ roh_filt }}) %>% 
       dplyr::filter(CHR != !!chr) %>% 
       dplyr::summarise(KBSUM = sum(KB)) %>%
-      mutate(FROH = KBSUM / 2869898) %>%
+      mutate(FROH = KBSUM / genome_size_minus_chr ) %>%
       dplyr::select(IID, FROH) %>%
       rename(ID = IID, !! paste0("FROH_no_chr", chr) := FROH) 
   
 }
 
 froh_no_chr <- map(1:26, calc_froh_minus_chr, roh_lengths) %>% 
-              reduce(left_join, by = "ID")
+               reduce(left_join, by = "ID")
 
 # add to froh
 froh <- froh %>% 
         left_join(froh_no_chr, by = "ID")
 
-# all FROH are negatively correlated
-library(GGally)
-ggpairs(froh[-1])
-
-# add death year
-# load("model_in/lrt_roh_df.RData")
-# lrt_roh_df <- lrt_roh_df %>% rename(ID = animal) %>% 
-#         dplyr::select(ID, DeathYear) %>% 
-#         mutate(ID = as.numeric(as.character(ID)))
-
 # dataset for modeling
 fitness_data <- annual_fitness %>% 
-       # dplyr::select(ID, OffspringBorn, OffspringSurvived, SheepYear, Age, Survival,
-      #                   BIRTHYEAR, SEX, MOTHER, BIRTHWT, CapMonth, Weight, Hindleg, ID.CapYear) %>% 
-       # rename() %>% 
-        left_join(froh, by = "ID")# %>% 
-     #   left_join(lrt_roh_df, by = "ID")
+        left_join(froh, by = "ID")
 
 # add homozygosity not in roh
 homs <- read_delim("output/ROH/roh_nofilt_hom_not_in_roh.txt", delim = " ")
-
 fitness_data <- fitness_data %>% 
         left_join(homs, by = "ID")
 
+# save data
 save(fitness_data, file = "data/fitness_roh_df.RData")
-save(sheep_ped, file = "data/sheep_ped.RData")
+save(sheep_ped, file = "data/sheep_ped.RData") # ordered ped
 
 
-
-# # females: offspring
-# sheep_ped %>% 
-#         group_by(Mother) %>% 
-#         tally() %>% 
-#         filter(!is.na(Mother)) %>% 
-#         rename(ID = Mother) -> female_LRT
-# 
-# # males: offspring
-# sheep_ped %>% 
-#         group_by(Father) %>% 
-#         tally() %>% 
-#         filter(!is.na(Father)) %>% 
-#         rename(ID = Father) -> male_LRT
-# # Inds with no offspring
-# no_offspring <- sheep_ped %>% 
-#       #  rename(ID = Code) %>% 
-#         mutate(n = ifelse( !((ID %in% .$Mother) | (ID %in% .$Father)), 0, NA)) %>% 
-#         filter(n == 0) %>% 
-#         dplyr::select(ID, n)
-# 
-# # put together
-# LRT_df <- rbind(female_LRT, male_LRT) %>% 
-#                 rbind(no_offspring) %>% 
-#                 rename(n_offspring = n)
-# 
-# Sheep$ID <- as.numeric(Sheep$ID) # for joining
-# 
-# # add other variables and filter out living individuals
-# LRT <- LRT_df %>% 
-#         left_join(Sheep, by="ID") %>% 
-#         left_join(tblPreg, by = "BirthRef") %>% 
-#         dplyr::select(ID, n_offspring, BirthRef, Status, Sex, DeathYear, BirthWt,
-#                       BirthYear, MumID) %>% 
-#         filter(Status %in% c("Dead", "EstDead")) %>% 
-#         mutate_at(c("ID", "MumID", "BirthYear", "DeathYear", "Sex"), as.character)
-# individuals with both lrt and roh info
-# lrt_roh_df <- LRT %>% 
-#   # mutate(ID = as.character(ID)) %>% 
-#   inner_join(froh, by = "ID") %>% 
-#   filter(!is.na(Sex))
-# 
-# # check distribution
-# lrt_roh_df %>% 
-#   filter(!is.na(Sex)) %>% 
-#   mutate(Sex = as.factor(Sex)) %>% 
-#   ggplot(aes(n_offspring)) + 
-#   geom_histogram(bins = 100) +
-#   scale_y_sqrt() + 
-#   facet_wrap(Sex~., scales = "free_x")
-# 
-# save(lrt_roh_df, "model_in/lrt_roh_df.RData")
-# save(sheep_ped, "model_in/sheep_ped.RData")

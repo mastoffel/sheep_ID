@@ -10,86 +10,51 @@ library(snpStats)
 # # test ROH on subset
 # system("~/programs/plink --bfile data/sheep_imp --keep data/subset_inds.txt --make-bed --out data/geno_sub --sheep")
 
-# # LD pruned data ===========================
+# LD pruning ===================================================================
 system(paste0("~/programs/plink --bfile ../sheep/data/SNP_chip/ramb_mapping/sheep_geno_imputed_ram_27092019 --sheep --out output/ROH/sheep_geno_imputed_ram_27092019_pruned ",
               "--indep-pairwise 500 50 0.95"))
 
 system(paste0("~/programs/plink --bfile ../sheep/data/SNP_chip/ramb_mapping/sheep_geno_imputed_ram_27092019 --sheep ",
               "--extract output/ROH/sheep_geno_imputed_ram_27092019_pruned.prune.in --make-bed --out output/ROH/sheep_geno_imputed_ram_27092019_pruned"))
 
-# PCA for GWAS
+# PCA for GWAS =================================================================
 system(paste0("~/programs/plink --bfile output/ROH/sheep_geno_imputed_ram_27092019_pruned --sheep ",
               "--pca --out output/sheep_pca")) # sheep_pca
 
-# calculate ROH 
-
-# system(paste0("~/programs/plink --bfile ../sheep/data/SNP_chip/ramb_mapping/sheep_geno_imputed_ram_27092019 --sheep --out output/ROH/roh_nofilt_ram ",
-#               "--homozyg --homozyg-window-snp 30 --homozyg-snp 30 --homozyg-kb 500 ",
-#               "--homozyg-gap 500 --homozyg-density 50 --homozyg-window-missing 5 ",
-#               "--homozyg-het 3 ",
-#               "--homozyg-window-het 1"))
-
+# calculate ROH ================================================================
 system(paste0("~/programs/plink --bfile ../sheep/data/SNP_chip/ramb_mapping/sheep_geno_imputed_ram_27092019_pruned --sheep --out output/ROH/roh_nofilt_ram_pruned ",
               "--homozyg --homozyg-window-snp 30 --homozyg-snp 25 --homozyg-kb 600 ",
               "--homozyg-gap 500 --homozyg-density 50 --homozyg-window-missing 2 ",
               "--homozyg-het 1 ",
               "--homozyg-window-het 1"))
 
+# inferred ROH output ==========================================================
+# without pruning
+# file_path <- "output/ROH/roh_nofilt_ram.hom"
+# with pruning
 file_path <- "output/ROH/roh_nofilt_ram_pruned.hom"
-#file <- "roh_nofilt"
 roh_lengths <- fread(file_path)
+
+# distribution
 hist(roh_lengths$KB, breaks = 1000, xlim = c(500,5000))
+
+# some transformation
 froh <- roh_lengths %>%
         dplyr::group_by(IID) %>%
         dplyr::summarise(KBAVG = mean(KB), KBSUM = sum(KB)) %>%
         mutate(FROH = KBSUM/2869914)
 
-# roh per ind
+# roh stats
 roh_lengths %>% 
         group_by(IID) %>% 
         tally() -> roh_nums
 range(roh_nums$n)
 roh_lengths[which.max(roh_lengths$KB), ]
-# # without pruning
-# file_path <- "output/ROH/roh_nofilt_ram.hom"
-# #file <- "roh_nofilt"
-# roh_lengths_old <- fread(file_path)
-# 
-# hist(roh_lengths$KB, breaks = 1000, xlim = c(500,5000))
-# # longest ROH
-# roh_lengths[which.max(roh_lengths$KB), ]
-# 
-# # total sequence length: 2,869,914,396
-# froh_old <- roh_lengths_old %>%
-#         dplyr::group_by(IID) %>%
-#         dplyr::summarise(KBAVG = mean(KB), KBSUM = sum(KB)) %>%
-#         mutate(FROH = KBSUM/2869914)
-# 
-# hist(froh$FROH, breaks = 100)
-# 
-# plot(froh$FROH, froh_old$FROH)
-# system(paste0("~/programs/plink --bfile ../sheep/data/SNP_chip/sheep_geno_imputed_04092019 --sheep --out output/ROH/roh_nofilt_pruned ",
-#               "--extract output/ROH/sheep_geno_imputed_LDpruned.prune.in ",
-#               "--homozyg --homozyg-window-snp 50 --homozyg-snp 50 --homozyg-kb 500 ",
-#               "--homozyg-gap 500 --homozyg-density 250 --homozyg-window-missing 5 ",
-#               "--homozyg-window-het 1"))
-# 
-# file_path <- "output/ROH/roh_nofilt_pruned.hom"
-# file <- "roh_nofilt_pruned"
-# roh_lengths_pruned <- fread(file_path)
-# 
-# froh_pruned <- roh_lengths_pruned %>%
-#         dplyr::group_by(FID) %>%
-#         dplyr::summarise(KBAVG = mean(KB), KBSUM = sum(KB)) %>%
-#         mutate(FROH = KBSUM/2619054)
-# 
-# hist(froh_pruned$FROH, breaks = 100)
-# 
-# plot(froh$FROH, froh_pruned$FROH)
-# cor(froh$FROH, froh_pruned$FROH)
 
 
-#~~~~~~~~~~~~~~ calculate homozygosity in the rest of the genome ~~~~~~~~~~~~~~# =======
+
+#~~~~~~~~~~~~~~ calculate homozygosity in the rest of the genome ~~~~~~~~~~~~~~# 
+#~~~~~~~~~~~~~~ not used at the moment ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 plink_geno_path <- "data/"
 # plink name

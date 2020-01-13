@@ -20,7 +20,6 @@ file_path <- "data/roh_nofilt_ram_pruned.hom"
 roh_lengths <- fread(file_path) 
 
 
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~Annual survival~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 # survival data
@@ -43,9 +42,10 @@ annual_survival <- fitness_data %>%
         filter(!(is.na(survival) | is.na(froh_all) | is.na(birth_year))) %>% 
         filter(!(is.na(sheep_year))) %>% 
         mutate_at(c("id", "birth_year", "sex", "sheep_year"), as.factor) %>% 
-        mutate(age2 = age^2) %>% 
+        mutate(age2 = age^2, age3 = age^3) %>% 
         mutate(age_std = as.numeric(scale(age)),
-               age2_std = as.numeric(scale(age2))) %>% 
+               age2_std = as.numeric(scale(age2)),
+               age3_std = as.numeric(scale(age3))) %>% 
         as.data.frame() 
 
 # inla prep
@@ -76,30 +76,40 @@ add_index_inla <- function(dat) {
 
 
 # ~~~~~~~~~~~~~~~~~~
+# add index for inla animal model
 annual_survival <- add_index_inla(annual_survival)
+# add standardised and centered variables
 annual_survival <- annual_survival %>% 
                         mutate(IndexA2 = IndexA) %>% 
                         mutate(froh_all_std = scale(froh_all),
                                froh_short_std = scale(froh_short),
                                froh_medium_std = scale(froh_medium),
-                               froh_long_std = scale(froh_long))
+                               froh_long_std = scale(froh_long),
+                               froh_all_cent = froh_all - mean(froh_all),
+                               froh_short_cent = froh_short - mean(froh_short),
+                               froh_medium_cent = froh_medium - mean(froh_medium),
+                               froh_long_cent = froh_long - mean(froh_long),
+                               age_cent = age - mean(age),
+                               age2_cent = age_cent ^ 2)
 
+# model 1, FROH 
 prec_prior <- list(prior = "loggamma", param = c(0.5, 0.5))
-formula_surv <- as.formula(paste('survival ~ froh_all_std + sex + age_std + age2_std + twin + 1', 
+formula_surv <- as.formula(paste('survival ~ froh_all + sex + age_cent + age2_cent + twin + 1', 
                                  'f(birth_year, model = "iid", hyper = list(prec = prec_prior))',
                                  'f(sheep_year, model = "iid", hyper = list(prec = prec_prior))',
                                  'f(IndexA2, model = "iid", hyper = list(prec = prec_prior))',
-                                 # 'f(mum_id, model="iid",  hyper = list(prec = prec_prior))', 
+                                 #'f(mum_id, model="iid",  hyper = list(prec = prec_prior))', 
                                  'f(IndexA, model="generic0", hyper = list(theta = list(param = c(0.5, 0.5))),Cmatrix=Cmatrix)', sep = " + "))
 mod_inla <- inla(formula=formula_surv, family="binomial",
                  data=annual_survival , 
                  control.compute = list(dic = TRUE))
-summary(mod_inla)
-bri.hyperpar.summary(mod_inla)
-hrtbl <- bri.hyperpar.summary(mod_inla)[4, 1] / sum(sum(bri.hyperpar.summary(mod_inla)[,1], pi^2/3))
 
-# mod2
-formula_surv2 <- as.formula(paste('survival ~ froh_long_std + froh_medium_std + froh_short_std + sex + age_std + age2_std + twin + 1', 
+# summary(mod_inla)
+# bri.hyperpar.summary(mod_inla)
+# hrtbl <- bri.hyperpar.summary(mod_inla)[4, 1] / sum(sum(bri.hyperpar.summary(mod_inla)[,1], pi^2/3))
+
+# model 2, FROH long, medium and short
+formula_surv2 <- as.formula(paste('survival ~ froh_long + froh_medium + froh_short + sex + age_cent + age2_cent + twin + 1', 
                                  'f(birth_year, model = "iid", hyper = list(prec = prec_prior))',
                                  'f(sheep_year, model = "iid", hyper = list(prec = prec_prior))',
                                  'f(IndexA2, model = "iid", hyper = list(prec = prec_prior))',
@@ -110,86 +120,22 @@ mod_inla2 <- inla(formula=formula_surv2, family="binomial",
                  control.compute = list(dic = TRUE))
 
 summary(mod_inla2)
-
-saveRDS(list(mod_inla, mod_inla2), file = "output/inla_survival_models_std.rds")
-
-# results
-out <- readRDS("output/inla_survival_models.rds")
-inla_mod1 <- out[[1]]
-inla_mod2 <- out[[2]]
-
-summary(inla_mod1)
-summary(inla_mod2)
-
-sampvars <- 1/inla.hyperpar.sample(1000, inla_mod1)
-sampicc <- sampvars[, 3]/ (rowSums(sampvars))
-quantile(sampicc, c(0.025, 0.5, 0.975))
-
-# inv logit exp(x)/(1+exp(x))
-inv_logit <- function(x) exp(x)/(1+exp(x))
-
-# plot
-pred_names <- c("FROH", "FROH long", "FROH medium", "FROH short", "sex (male)", "twin", "age (std)", "age2 (std)")
-surv_mod_df <- inla_mod2$summary.fixed %>% 
-                rbind(inla_mod1$summary.fixed[2, ]) %>% 
-                as_tibble(rownames = "predictor") %>% 
-                rename(lower_ci = `0.025quant`,
-                       upper_ci = `0.975quant`) %>% 
-                filter(predictor != "(Intercept)") %>% 
-                mutate(predictor = factor(predictor, 
-                                          levels = rev(c("froh_all", "froh_long", "froh_medium", "froh_short",
-                                                     "sexM", "twin", "age_std", "age2_std")))) #%>% 
-                #mutate(predictor = fct_recode(predictor, !!!pred_names))
-
-formatC(inv_logit(seq(0, -50, by = -10)), format = "e", digits = 1)
-
-# mean FROH_all
-annual_survival %>% group_by(id) %>% summarise(froh = mean(froh_all)) %>% summarise(mean(froh))
-
-# calculate FROH as odds of surviving when offspring of first cousins vs average
-surv_mod_cousin <- surv_mod_df %>% 
-        filter(str_detect(predictor, "froh")) %>% 
-        mutate_at(c("mean", "lower_ci", "upper_ci"), function(x) exp((0.226+0.0625) * x) / exp(0.226 * x)) 
-surv_mod_df
-
-p_fix_eff <- ggplot(surv_mod_df, aes(mean, predictor)) +
-        geom_point(size = 2) +
-        geom_errorbarh(aes(xmax = upper_ci, xmin = lower_ci), height = 0.5, size = 0.5) +
-        geom_vline(xintercept = 0) +
-       # scale_y_discrete(labels = rev(pred_names)) +
-        xlab("posterior mean (logit) and credible interval") +
-        theme_clean() +
-        ylab("")
-p_fix_eff 
-ggsave(filename = "figs/surv_mod_fixeff.jpg", p_fix_eff, width = 4.5, height = 3)        
-
-
-# rpt and herit
-sampvars <- 1/inla.hyperpar.sample(1000, inla_mod1)
-sampicc <- sampvars[, 4]/ (rowSums(sampvars) + (pi^2)/3)
-quantile(sampicc, c(0.025, 0.5, 0.975))
+saveRDS(list(mod_inla, mod_inla2), file = "output/inla_survival_models.rds")
 
 
 
 # ~~~~~~~~~~~~~~~~~~~~~ Survival across different life-stages ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-
-
-# annual_survival %>% 
-#         filter(age %in% c(5,6)) %>% 
-#         group_by(survival) %>% 
-#         tally()
-
 
 survival_inla <- function(ageclass) {
         dat_survival <- annual_survival %>% filter(age %in% c(ageclass)) %>% 
                         add_index_inla() %>% 
                         mutate(IndexA2 = IndexA)
         prec_prior <- list(prior = "loggamma", param = c(0.5, 0.5))
-        formula_surv <- as.formula(paste('survival ~ froh_long_std + froh_medium_std + froh_short_std + sex + twin + 1', 
-                                         #'survival ~ froh_all_std + sex + twin + 1', 
+        formula_surv <- as.formula(paste(#'survival ~ froh_long + froh_medium + froh_short + sex + twin + 1', 
+                                         'survival ~ froh_all + sex + twin + 1', 
                                          'f(birth_year, model = "iid", hyper = list(prec = prec_prior))',
                                          'f(sheep_year, model = "iid", hyper = list(prec = prec_prior))',
-                                         'f(IndexA2, model = "iid", hyper = list(prec = prec_prior))',
+                                         #'f(IndexA2, model = "iid", hyper = list(prec = prec_prior))',
                                          #'f(mum_id, model="iid",  hyper = list(prec = prec_prior))', 
                                          'f(IndexA, model="generic0", hyper = list(theta = list(param = c(0.5, 0.5))),Cmatrix=Cmatrix)', sep = " + "))
         mod_inla <- inla(formula=formula_surv, family="binomial",
@@ -198,57 +144,8 @@ survival_inla <- function(ageclass) {
 }
 
 all_inla_mods <- map(1:9, survival_inla)
-saveRDS(all_inla_mods, file = "output/inla_survival_models_diff_ages_std.rds")
+saveRDS(all_inla_mods, file = "output/inla_survival_models_diff_ages_froh_all_new.rds")
 
-all_inla_mods <- readRDS("output/inla_survival_models_diff_ages.rds")
-all_inla_mods_froh <- readRDS("output/inla_survival_models_diff_ages_froh_all.rds")
-inla_mods <- list(all_inla_mods, all_inla_mods_froh)
-# extract all fixed effects
-fix_effs <- inla_mods %>% 
-        flatten() %>% 
-        map("summary.fixed") %>% 
-        #compact() %>% 
-        map(rownames_to_column, var = "var") %>% 
-        bind_rows(.id = "age") %>% 
-        mutate(age = as.numeric(age) - 1) %>% 
-        mutate(age = ifelse(age > 8, age - 9, age)) %>% 
-        #filter(age != 9) %>% 
-        #filter(var %in% c("froh_all_std", "froh_long_std", "froh_medium_std", "froh_short_std"))
-        filter(var %in% c("froh_all", "froh_long", "froh_medium", "froh_short")) %>% 
-        mutate(var = case_when(
-                var =="froh_all" ~ "FROH",
-                var == "froh_long" ~ "FROH long",
-                var == "froh_medium" ~ "FROH medium",
-                var == "froh_short" ~ "FROH short"
-        ))
-        
-        #filter(str_detect(var, "froh"))
-names(fix_effs) <- c("age", "var", "mean", "sd", "lower", "median", "upper", "mode", "kld")
-
-library(boot)
-library(wesanderson)
-ggplot(fix_effs, aes(age, mean, color = var)) + 
-        geom_hline(aes(yintercept = 0), color = "lightgrey") +
-        geom_point() +
-        geom_smooth(method="lm", se = FALSE) +
-        geom_errorbar(aes(ymin = lower, ymax = upper), width = 0) +
-        facet_wrap(~var, scales = "free_y", ncol = 2) +
-        theme_clean() +
-        ylab("inbreeding depression estimate") + 
-        scale_color_manual(values = wes_palette("Darjeeling2")) +
-   
-        theme(legend.position = "none") -> p_roh
-p_roh
-ggsave("figs/ID_across_life.jpg", p_roh, width = 4, height = 3)
-
-annual_survival %>% group_by(age, sex) %>% tally() %>% 
-        mutate(sex = as.character(sex)) %>% 
-        filter(!is.na(sex)) %>% 
-        filter(age %in% c(1:8)) %>% 
-        ggplot(aes(age, n, color = sex)) + 
-        geom_point() +
-        geom_line() +
-        theme_clean()
 
 
 # # extract all fixed effects
@@ -265,3 +162,156 @@ annual_survival %>% group_by(age, sex) %>% tally() %>%
 #         geom_smooth(method="lm", se = FALSE) +
 #         geom_errorbar(aes(ymin = lower, ymax = upper)) +
 #         facet_wrap(~var, scales = "free_y")
+
+
+
+
+
+# inbreeding depression changes across life?? ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# lme4 models
+nlopt <- function(par, fn, lower, upper, control) {
+        .nloptr <<- res <- nloptr(par, fn, lb = lower, ub = upper, 
+                                  opts = list(algorithm = "NLOPT_LN_BOBYQA", print_level = 1,
+                                              maxeval = 1000, xtol_abs = 1e-6, ftol_abs = 1e-6))
+        list(par = res$solution,
+             fval = res$objective,
+             conv = if (res$status > 0) 0 else res$status,
+             message = res$message
+        )
+}
+
+# run model for each chromosome
+annual_survival %>% filter(age > 0) -> annual_survival_1_and_over
+mod <- glmer(survival ~ froh_long * age_std + froh_medium * age_std + froh_short * age_std + sex + twin + (1|mum_id) + (1|birth_year) + (1|sheep_year) + (1|id), 
+             data = dat, family = "binomial",
+             control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+summary(mod)
+
+
+####### inla ##############
+annual_survival %>% filter(age > 0) -> annual_survival_1_and_over
+
+prec_prior <- list(prior = "loggamma", param = c(0.5, 0.5))
+formula_surv <- as.formula(paste('survival ~ froh_all_cent * age_cent + age2_cent + sex + twin + 1', 
+                                 'f(birth_year, model = "iid", hyper = list(prec = prec_prior))',
+                                 'f(sheep_year, model = "iid", hyper = list(prec = prec_prior))',
+                                 'f(IndexA2, model = "iid", hyper = list(prec = prec_prior))',
+                                 #'f(mum_id, model="iid",  hyper = list(prec = prec_prior))', 
+                                 'f(IndexA, model="generic0", hyper = list(theta = list(param = c(0.5, 0.5))),Cmatrix=Cmatrix)', sep = " + "))
+
+mod_inla_std_inc_age0 <- inla(formula=formula_surv, family="binomial",
+                 data=annual_survival, 
+                 control.compute = list(dic = TRUE))
+
+summary(mod_inla_std)
+bri.hyperpar.summary(mod_inla)
+hrtbl <- bri.hyperpar.summary(mod_inla)[4, 1] / sum(sum(bri.hyperpar.summary(mod_inla)[,1], pi^2/3))
+
+# mod2
+formula_surv2 <- as.formula(paste('survival ~ froh_long_cent * age_cent + froh_medium_cent * age_cent + froh_short_cent * age_cent + age2_cent + sex + twin + 1', 
+                                  'f(birth_year, model = "iid", hyper = list(prec = prec_prior))',
+                                  'f(sheep_year, model = "iid", hyper = list(prec = prec_prior))',
+                                  'f(IndexA2, model = "iid", hyper = list(prec = prec_prior))',
+                                 # 'f(mum_id, model="iid",  hyper = list(prec = prec_prior))', 
+                                  'f(IndexA, model="generic0", hyper = list(theta = list(param = c(0.5, 0.5))),Cmatrix=Cmatrix)', sep = " + "))
+mod_inla2_std_inc_age0 <- inla(formula=formula_surv2, family="binomial",
+                  data=annual_survival, 
+                  control.compute = list(dic = TRUE))
+
+summary(mod_inla2_std)
+
+saveRDS(list(mod_inla_std_inc_age0, mod_inla2_std_inc_age0), file = "output/inla_survival_models_interaction_inc_age0.rds")
+
+
+# repeat and exclude age = 0
+annual_survival %>% filter(age > 0) -> annual_survival_1_and_over
+prec_prior <- list(prior = "loggamma", param = c(0.5, 0.5))
+formula_surv <- as.formula(paste('survival ~ froh_all_cent * age_cent + age2_cent + sex + twin + 1', 
+                                 'f(birth_year, model = "iid", hyper = list(prec = prec_prior))',
+                                 'f(sheep_year, model = "iid", hyper = list(prec = prec_prior))',
+                                 'f(IndexA2, model = "iid", hyper = list(prec = prec_prior))',
+                                 #'f(mum_id, model="iid",  hyper = list(prec = prec_prior))', 
+                                 'f(IndexA, model="generic0", hyper = list(theta = list(param = c(0.5, 0.5))),Cmatrix=Cmatrix)', sep = " + "))
+mod_inla_std_excl_age0 <- inla(formula=formula_surv, family="binomial",
+                              data=annual_survival_1_and_over, 
+                              control.compute = list(dic = TRUE))
+
+# mod2
+formula_surv2 <- as.formula(paste('survival ~ froh_long_cent * age_cent + froh_medium_cent * age_cent + froh_short_cent * age_cent + age2_cent + sex + twin + 1', 
+                                  'f(birth_year, model = "iid", hyper = list(prec = prec_prior))',
+                                  'f(sheep_year, model = "iid", hyper = list(prec = prec_prior))',
+                                  'f(IndexA2, model = "iid", hyper = list(prec = prec_prior))',
+                                  # 'f(mum_id, model="iid",  hyper = list(prec = prec_prior))', 
+                                  'f(IndexA, model="generic0", hyper = list(theta = list(param = c(0.5, 0.5))),Cmatrix=Cmatrix)', sep = " + "))
+mod_inla2_std_excl_age0 <- inla(formula=formula_surv2, family="binomial",
+                               data=annual_survival_1_and_over, 
+                               control.compute = list(dic = TRUE))
+
+summary(mod_inla2_std)
+
+saveRDS(list(mod_inla_std_excl_age0, mod_inla2_std_excl_age0), file = "output/inla_survival_models_interaction_excl_age0.rds")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# plot inla models
+inla_mods_std <- list(mod_inla_std, mod_inla2_std)
+# extract all fixed effects
+fix_effs <- inla_mods_std %>% 
+        map("summary.fixed") %>% 
+        map(rownames_to_column, var = "var") %>% 
+        bind_rows() %>% 
+        filter(str_detect(var, c("froh"))) 
+
+#filter(str_detect(var, "froh"))
+names(fix_effs) <- c("var", "mean", "sd", "lower", "median", "upper", "mode", "kld")
+
+library(boot)
+library(wesanderson)
+
+# only FROH
+ggplot(fix_effs[c(1,2), ], aes(mean, as.factor(var))) + 
+        geom_vline(aes(xintercept = 0), color = "lightgrey") +
+        geom_errorbarh(aes(xmin = lower, xmax = upper), height = 0, color = "#3B4252") +
+        geom_point(size = 2.5, shape = 21, fill = "darkgrey") +
+        theme_clean() +
+        scale_y_discrete(labels = c('FROH', "FROH * age")) +
+        ylab("standardized predictors\n") + 
+        xlab("\nFROH model estimate\n(logit scale)")
+        # scale_color_manual(values = wes_palette("Darjeeling2")) +
+        theme() -> p_roh_froh
+
+
+
+# repeat the exercise with lme4
+
+calc_id_est <- function(ageclass) {
+        dat <- annual_survival %>% filter(age %in% c(ageclass)) 
+        mod <- glmer(survival ~ froh_long + froh_medium + froh_short + sex + twin + (1|birth_year) + (1|sheep_year), 
+                     data = dat, family = binomial(link = "probit"))
+       # control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+}
+
+all_mods <- map(0:7, calc_id_est)
+
+all_mods %>% 
+        map(tidy, conf.int = TRUE) %>% 
+        bind_rows(.id = "age") %>% 
+        filter(str_detect(term, "froh")) %>% 
+        ggplot(aes(age, estimate)) +
+        geom_point() +
+        geom_errorbar(aes(ymin = conf.low, ymax = conf.high)) +
+        facet_wrap(~term, scales = "free_y")
+
+
