@@ -1,16 +1,12 @@
 # Exploring ROH through plots
 
 library(data.table)
-library(dplyr)
-library(tidyr)
-library(ggplot2)
 library(RColorBrewer)
 library(wesanderson)
-library(forcats)
 library(readxl)
 library(tidyverse)
 library(zoo)
-source("theme_clean.R")
+source("theme_simple.R")
 library(ggridges)
 library(viridis)
 library(GGally)
@@ -50,17 +46,15 @@ p_dist <- ggplot(froh, aes(FROH)) +
     ylab("individuals") +
     xlab(expression(inbreeding~coefficient~F[ROH])) +
     scale_y_continuous(expand = c(0, 0)) +
-    theme_clean(grid = FALSE, axis = TRUE, base_size = 12, 
-                highlight_family = "Lato", base_family = "Lato")
+    theme_simple(grid_lines = FALSE, axis_lines = TRUE, base_size = 12, 
+                base_family = "Lato")
 p_dist
-
 
 ggsave("figs/FROH_dist.jpg", p_dist, width = 5, height = 3)
 
 # Specifiy length distributon:
 # a separation of m meisies (2m generations) results in segment lengths that are
 # exponentially distributied with mean 100/m cM
-
 
 # 1.451221 cM/Mb for Males
 # 1.037693 cM/Mb for Females
@@ -101,7 +95,7 @@ prop_IBD_df <- roh_lengths %>%
         mutate(length_class = fct_reorder(length_class, class)) %>% 
         mutate(IID = as.character(IID)) %>% 
         group_by(IID, class, length_class) %>%
-        dplyr::summarise(prop_IBD = sum(length_Mb / 2869)) #%>% 
+        dplyr::summarise(prop_IBD = sum(length_Mb / (autosomal_genome_size/1000))) #%>% 
         # add IBD of non-ROH snps if wanted
       #  bind_rows(homs) 
 
@@ -112,21 +106,21 @@ prop_IBD_df_with_0 <- prop_IBD_df %>%
         mutate(class = ifelse(is.na(class), length_class, class)) %>% 
         mutate(prop_IBD = ifelse(is.na(prop_IBD), 0, prop_IBD))
  
-
 # ROH class distributions as prop. 
-
 prop_IBD_df
 p_roh <- ggplot(prop_IBD_df_with_0, aes(length_class, prop_IBD, fill = length_class)) +
         geom_jitter(alpha = 0.6, width = 0.2, shape = 21, color = "black", stroke = 0.1) +
         geom_boxplot(outlier.shape = NA, color = "#393e46", alpha = 0.7, width = 0.6,
                      lwd = 0.4) +
-        theme_clean() +
+        #theme_classic() + 
+        theme_simple() +
         scale_fill_brewer(palette = "GnBu", direction = -1) +
         #scale_fill_brewer(palette = "YlGnBu", direction = -1) + 
         theme(legend.position = "none") + 
         #theme(axis.ticks.x = element_line(colour = "#cccccc", size = 0.3)) +
         xlab("ROH class in Mb (Generations)") + ylab("Proportion of genome")
 p_roh
+
 ggsave("figs/roh_classes_boxplots.jpg", p_roh, width = 9, height = 3.5)
 
 
@@ -141,7 +135,7 @@ IBD_across_classes <- prop_IBD_df %>%
   ylab("ROH length class in Mb (generations)") +
   xlab("Proportion of the genome") + 
   #scale_fill_viridis(name = "Temp. [F]", option = "C")  +
-  theme_clean()
+  theme_simple()
 IBD_across_classes
 ggsave("figs/roh_classes_ridgeplot.jpg", IBD_across_classes, width = 8, height = 8)
 
@@ -158,7 +152,7 @@ ROH_classes_pairs <- prop_IBD_df_with_0 %>%
   replace_with_na_all(condition = ~.x == 0) %>% 
   ggscatmat(alpha = 0.3) +
   geom_smooth(method = "lm") +
-  theme_clean() +
+  theme_simple() +
   theme(axis.text = element_blank()) +
   xlab("FROH") +
   ylab("FROH")
@@ -184,7 +178,7 @@ prop_IBD_df %>%
          # scale_fill_brewer(palette = "YlGnBu", name = "ROH class (Mb)", direction = -1) +
           scale_fill_manual(values = col_pal, name = "ROH class (Mb)") +
           #facet_grid(.~ pop, space = 'free_x', scales = 'free_x', switch = 'x') +
-          theme_clean() +
+          theme_simple() +
           theme(axis.text.x = element_blank()) +
           ylab("Proportion of genome in ROH") + 
           xlab("Individuals") + 
@@ -196,7 +190,6 @@ ggsave("figs/roh_classes_subset_inds.jpg", p_roh2, width = 15, height = 5)
 
 
 #~~~ ROH density
-
 hom_sum <- fread("output/ROH/roh_nofilt_ram.hom.summary")
 
 hom_sum <- hom_sum %>%

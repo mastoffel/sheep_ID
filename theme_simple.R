@@ -1,5 +1,5 @@
-theme_simple <- function(grid_lines = TRUE, axis_lines = FALSE, base_size = 12,
-                        base_family='Lato', line_size = 0.2) {
+theme_simple <- function(axis_lines = TRUE, grid_lines = FALSE, base_size = 12,
+                        base_family='Lato', line_size = 0.2, start0 = TRUE) {
         
         # base 
         th <- ggplot2::theme_minimal(base_family = base_family, 
@@ -30,7 +30,7 @@ theme_simple <- function(grid_lines = TRUE, axis_lines = FALSE, base_size = 12,
         # legend
         th <- th + theme(legend.background = element_blank())
         th <- th + theme(legend.key = element_blank())
-        
+
        # th <- th + theme(axis.line = element_line(color = '#333333',  size = 0.5))
         #th <- th + theme(axis.text = element_text(family=highlight_family))
         # if (!is.na(legend.position)) th <- th + theme(legend.position = legend.position)

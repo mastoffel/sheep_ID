@@ -8,13 +8,16 @@ fitness_path <- "../sheep/data/1_Annual_Fitness_Measures_April_20190501.txt"
 annual_fitness <- read_delim(fitness_path, delim = "\t")
 names(annual_fitness)
 
-# get LRS
+# prepare, order pedigree
 sheep_ped <- read_delim("../sheep/data/SNP_chip/20190711_Soay_Pedigree.txt", 
                         delim = "\t",
                         col_types = "ccc") %>%
         as.data.frame() %>%
         MasterBayes::orderPed() 
 #save(sheep_ped,  file = "model_in/sheep_ped.RData")
+
+# IDs which weren't well imputed and should be removed
+IDs_lots_missing <- read_delim("data/ids_more_than_5perc_missing.txt", delim = " ")
 
 ##### ROH data #####
 file_path <- "output/ROH/roh_nofilt_ram_pruned.hom"
@@ -78,7 +81,7 @@ calc_froh_minus_chr <- function(chr, roh_lengths) {
       dplyr::summarise(KBSUM = sum(KB)) %>%
       mutate(FROH = KBSUM / genome_size_minus_chr ) %>%
       dplyr::select(IID, FROH) %>%
-      rename(ID = IID, !! paste0("FROH_no_chr", chr) := FROH) 
+      rename(ID = IID, !! paste0("froh_no_chr", chr) := FROH) 
   
 }
 
@@ -89,7 +92,7 @@ froh_no_chr <- map(1:26, calc_froh_minus_chr, roh_lengths) %>%
 froh <- froh %>% 
         left_join(froh_no_chr, by = "ID")
 
-# dataset for modeling
+# add froh to fitness
 fitness_data <- annual_fitness %>% 
         left_join(froh, by = "ID")
 
@@ -98,8 +101,52 @@ homs <- read_delim("output/ROH/roh_nofilt_hom_not_in_roh.txt", delim = " ")
 fitness_data <- fitness_data %>% 
         left_join(homs, by = "ID")
 
+# prepare for analysis
+fitness_data_mod <- fitness_data %>% 
+        dplyr::rename(birth_year = BIRTHYEAR,
+                sheep_year = SheepYear,
+                age = Age,
+                id = ID,
+                twin = TWIN,
+                sex = SEX,
+                mum_id = MOTHER,
+                froh_short = FROH_short,
+                froh_medium = FROH_medium,
+                froh_long = FROH_long,
+                froh_all = FROH_all,
+                froh_not_roh = hom,
+                survival = Survival,
+                comment = Comment,
+                seen_in_rut = SeenInRut,
+                dad_id = FATHER,
+                weight = Weight, 
+                birth_weight = BIRTHWT,
+                cap_month = CapMonth,
+                hindleg = Hindleg,
+                foreleg = Foreleg,
+                rut_measure = RutMeasure,
+                horn_len = HornLen,
+                horn_circ = HornCirc,
+                bol_circ = BolCirc,
+                bol_len = BolLen,
+                horn = Horn,
+                freq = Freq,
+                offspr_born = OffspringBorn,
+                offspr_surv = OffspringSurvived,
+                offspr_surv_aug = AugSurvOffspring,
+                offspr_surv_oct = OctSurvOffspring,
+                offspr_surv_wint = OverWinterOffspring) %>% 
+        dplyr::select(id, survival, comment, sheep_year, age, birth_year,
+                      sex, mum_id, twin, froh_all, froh_long, froh_medium, 
+                      froh_all, everything()) %>% 
+        # some individuals arent imputed well and should be discarded 
+        filter(!(id %in% IDs_lots_missing$id)) %>% 
+        # na rows should be discarded
+        mutate_at(c("id", "survival", "sheep_year", "birth_year", "sex",
+                    "mum_id", "twin"), as.factor)
+
 # save data
-save(fitness_data, file = "data/fitness_roh_df.RData")
+save(fitness_data, file = "data/survival_mods_data.RData") # formerly fitness_roh_df
 save(sheep_ped, file = "data/sheep_ped.RData") # ordered ped
 
 
