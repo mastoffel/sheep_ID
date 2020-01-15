@@ -12,9 +12,9 @@ library(furrr)
 library(brinla)
 
 # data
-load("data/fitness_roh_df.RData")
+#load("data/fitness_roh_df.RData") # formerly
+load("data/survival_mods_data.RData") 
 load("data/sheep_ped.RData")
-IDs_lots_missing <- read_delim("data/ids_more_than_5perc_missing.txt", delim = " ")
 
 # roh data
 file_path <- "data/roh_nofilt_ram_pruned.hom"
@@ -23,62 +23,41 @@ roh_lengths <- fread(file_path)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~Annual survival~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-# survival data
+# survival data preprocessing
 annual_survival <- fitness_data %>% 
-        dplyr::rename(birth_year = BIRTHYEAR,
-                      sheep_year = SheepYear,
-                      age = Age,
-                      id = ID,
-                      twin = TWIN,
-                      sex = SEX,
-                      mum_id = MOTHER,
-                      froh_short = FROH_short,
-                      froh_medium = FROH_medium,
-                      froh_long = FROH_long,
-                      froh_all = FROH_all,
-                      froh_not_roh = hom,
-                      survival = Survival) %>% 
-        # some individuals arent imputed well and should be discarded 
-        filter(!(id %in% IDs_lots_missing$id)) %>% 
-        filter(!(is.na(survival) | is.na(froh_all) | is.na(birth_year))) %>% 
-        filter(!(is.na(sheep_year))) %>% 
-        mutate_at(c("id", "birth_year", "sex", "sheep_year"), as.factor) %>% 
-        mutate(age2 = age^2, age3 = age^3) %>% 
-        mutate(age_std = as.numeric(scale(age)),
-               age2_std = as.numeric(scale(age2)),
-               age3_std = as.numeric(scale(age3))) %>% 
+        # filter na rows
+        filter_at(vars(survival, froh_all, birth_year, sheep_year), ~ !is.na(.)) %>% 
+        mutate(age2 = age^2,
+               age_std = as.numeric(scale(age)),
+               age2_std = as.numeric(scale(age2))) %>% 
         as.data.frame() 
 
-# inla prep
+# prepare pedigree for animal inla
 sheep_ped_inla <- sheep_ped %>% 
         as_tibble() %>% 
-        rename(id = ID,
+        dplyr::rename(id = ID,
                mother = MOTHER,
                father = FATHER) %>% 
         mutate_at(c("id", "mother", "father"), function(x) str_replace(x, "F", "888")) %>% 
         mutate_at(c("id", "mother", "father"), function(x) str_replace(x, "M", "999")) %>% 
-        #filter(!is.na(id)) %>% 
-        mutate(father = ifelse(is.na(father), 0, father)) %>% 
-        mutate(mother = ifelse(is.na(mother), 0, mother)) %>% 
+        mutate(father = ifelse(is.na(father), 0, father),
+               mother = ifelse(is.na(mother), 0, mother)) %>% 
         mutate_if(is.character, list(as.numeric)) %>% 
         as.data.frame() 
 
+# compute Ainverse and map
 comp_inv <- AnimalINLA::compute.Ainverse(sheep_ped_inla)
+
+# make Cmatrix and map
 ainv <- comp_inv$Ainverse
 ainv_map <- comp_inv$map
 Cmatrix <- sparseMatrix(i=ainv[,1],j=ainv[,2],x=ainv[,3])
 
-add_index_inla <- function(dat) {
-        Ndata <- dim(dat)[1]
-        dat$IndexA <- rep(0, times = Ndata)
-        for(i in 1:Ndata) dat$IndexA[i] <- which(ainv_map[,1]==dat$id[i])
-        dat
-}
+# link id to cmatrix
+annual_survival$IndexA <- match(annual_survival$id, ainv_map[, 1])
 
 
 # ~~~~~~~~~~~~~~~~~~
-# add index for inla animal model
-annual_survival <- add_index_inla(annual_survival)
 # add standardised and centered variables
 annual_survival <- annual_survival %>% 
                         mutate(IndexA2 = IndexA) %>% 
@@ -102,10 +81,11 @@ formula_surv <- as.formula(paste('survival ~ froh_all + sex + age_cent + age2_ce
                                  #'f(mum_id, model="iid",  hyper = list(prec = prec_prior))', 
                                  'f(IndexA, model="generic0", hyper = list(theta = list(param = c(0.5, 0.5))),Cmatrix=Cmatrix)', sep = " + "))
 mod_inla <- inla(formula=formula_surv, family="binomial",
-                 data=annual_survival , 
-                 control.compute = list(dic = TRUE))
+                 data=annual_survival, 
+                 control.compute = list(dic = TRUE),
+                 control.inla = list(correct = TRUE))
 
-# summary(mod_inla)
+summary(mod_inla)
 # bri.hyperpar.summary(mod_inla)
 # hrtbl <- bri.hyperpar.summary(mod_inla)[4, 1] / sum(sum(bri.hyperpar.summary(mod_inla)[,1], pi^2/3))
 

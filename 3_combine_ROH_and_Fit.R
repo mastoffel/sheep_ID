@@ -102,7 +102,7 @@ fitness_data <- fitness_data %>%
         left_join(homs, by = "ID")
 
 # prepare for analysis
-fitness_data_mod <- fitness_data %>% 
+fitness_data <- fitness_data %>% 
         dplyr::rename(birth_year = BIRTHYEAR,
                 sheep_year = SheepYear,
                 age = Age,
@@ -139,10 +139,12 @@ fitness_data_mod <- fitness_data %>%
         dplyr::select(id, survival, comment, sheep_year, age, birth_year,
                       sex, mum_id, twin, froh_all, froh_long, froh_medium, 
                       froh_all, everything()) %>% 
+        # for sex, check what Cas is
+        filter(sex %in% c("F", "M")) %>% 
         # some individuals arent imputed well and should be discarded 
         filter(!(id %in% IDs_lots_missing$id)) %>% 
         # na rows should be discarded
-        mutate_at(c("id", "survival", "sheep_year", "birth_year", "sex",
+        mutate_at(c("id", "sheep_year", "birth_year", "sex",
                     "mum_id", "twin"), as.factor)
 
 # save data
