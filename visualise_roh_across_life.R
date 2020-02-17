@@ -5,7 +5,7 @@ library(tidyverse)
 library(data.table)
 library(magrittr)
 library(rlang)
-source("theme_clean.R")
+source("theme_simple.R")
 # annual measures of traits and fitness
 load("data/fitness_roh_df.RData")
 library(windowscanr)
@@ -103,7 +103,7 @@ p1 <- ggplot(roh_plot, aes(prop, fill = roh_class)) +
         geom_histogram(bins = 100, color = "grey", lwd = 0.2) +
         scale_y_sqrt() + 
         scale_fill_brewer(palette = "YlGnBu", direction = -1) + 
-        theme_clean() +
+        theme_simple() +
         theme(axis.text.y = element_blank(),
               axis.line.y = element_blank()) +
         transition_states(age,
@@ -197,7 +197,7 @@ ggplot(aes(length_class, prop_IBD)) +
         geom_quasirandom(alpha = 0.2, width = 0.3, size = 4) +
         #geom_beeswarm(alpha = 0.3, cex = 0.7, size = 2) +
         geom_boxplot(outlier.shape = NA, color = "lightgrey", alpha = 0.7) +
-        theme_clean() +
+        theme_simple() +
         theme(axis.text = element_text(size = 15),
               axis.title = element_text(size = 18),
               plot.title=element_text(size=20,face="bold")) +
