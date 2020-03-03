@@ -1,7 +1,9 @@
 library(tidyverse)
-source("theme_clean.R")
+source("theme_simple.R")
 library(boot)
 library(wesanderson)
+library(INLA)
+library(brinla)
 # Part 1: overall ==============================================================
 # results
 out <- readRDS("output/inla_survival_models.rds")
@@ -53,7 +55,7 @@ surv_mod_plot %>%
         #scale_y_discrete(labels = rev(c(expression(atop(F[ROH],(Offspring~of~cousins))), "Sex\n(Male)", "Twin"))) +
         scale_x_continuous(limits=c(0,1)) +
         xlab("odds of survival\n(mean & credible interval)") +
-        theme_clean() +
+        theme_simple() +
         theme(axis.line.y = element_blank(),
               axis.ticks.x = element_line()) +
         ylab("") -> p_froh
@@ -77,10 +79,11 @@ ggplot(surv_mod_plot2, aes(mean, predictor)) +
                                         "FROH short\n(< 1MB)"))) +
         #scale_x_continuous(limits=c(0,1)) +
         xlab("odds of survival\n(mean & credible interval)") +
-        theme_clean() +
+        theme_simple() +
         theme(axis.line.y = element_blank(),
               axis.ticks.x = element_line()) +
         ylab("") -> p_froh2
+
 ggsave(filename = "figs/surv_mod_froh_by_length.jpg", p_froh2, width = 4, height = 2.6)     
 
 # rpt and herit
@@ -133,6 +136,7 @@ ggplot(fix_effs_trans %>% filter(var == "FROH"), aes(age, mean)) +
         ylab("FROH estimate\n(log odds)") + 
         # scale_color_manual(values = wes_palette("Darjeeling2")) +
         theme(legend.position = "none") -> p_roh_froh
+p_roh_froh
 ggsave("figs/FROH_across_ages_full.jpg", width = 3.3, height = 2.4)
 
 ggplot(fix_effs, aes(age, mean, color = var)) + 

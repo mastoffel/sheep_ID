@@ -22,15 +22,69 @@ roh_lengths <- fread(file_path)
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~Annual survival~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-
 # survival data preprocessing
 annual_survival <- fitness_data %>% 
         # filter na rows
         filter_at(vars(survival, froh_all, birth_year, sheep_year), ~ !is.na(.)) %>% 
-        mutate(age2 = age^2,
+        mutate(age_cent = age - mean(age, na.rm = TRUE),
+               age_cent2 = age_cent^2,
                age_std = as.numeric(scale(age)),
-               age2_std = as.numeric(scale(age2))) %>% 
+               age_std2 = age_std^2,
+               # times 10 to estimate a 10% percent increase
+               froh_all10 = froh_all * 10,
+               froh_all10_cent = froh_all10 - mean(froh_all10, na.rm = TRUE),
+               lamb = ifelse(age == 0, 1, 0),
+               lamb_cent = lamb - mean(lamb, na.rm = TRUE),
+               lamb = as.factor(lamb)) %>% 
         as.data.frame() 
+
+
+# a few lme4 trials
+# time saver function for modeling
+nlopt <- function(par, fn, lower, upper, control) {
+        .nloptr <<- res <- nloptr(par, fn, lb = lower, ub = upper, 
+                                  opts = list(algorithm = "NLOPT_LN_BOBYQA", print_level = 1,
+                                              maxeval = 1000, xtol_abs = 1e-6, ftol_abs = 1e-6))
+        list(par = res$solution,
+             fval = res$objective,
+             conv = if (res$status > 0) 0 else res$status,
+             message = res$message
+        )
+}
+
+mod5 <- glmer(survival ~ froh_all10_cent + lamb_cent + age_cent + sex + twin + (1|birth_year) + (1|sheep_year) + (1|mum_id) + (1|id),
+              family = binomial, data = annual_survival,
+              control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+tidy(mod5, conf.int = TRUE)
+glance(mod5)
+
+mod6 <- glmer(survival ~ froh_all10_cent * (lamb_cent + age_cent) + sex + twin + (1|birth_year) + (1|sheep_year) + (1|id),
+              family = binomial, data = annual_survival,
+              control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+tidy(mod6, conf.int = TRUE)
+glance(mod6)
+
+
+# depression across life
+
+run_across_life <- function(age, data) {
+        dat <- data %>% filter(age == {{ age }})
+        formula_age <- as.formula(paste0("survival ~ 1 + froh_all10 + sex + twin ", 
+                                   "+ (1|birth_year) + (1|sheep_year) + (1|id)"))
+        mod <- glmer(formula = formula_age,
+                     data = dat, family = "binomial",
+                     control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+        out <- broom.mixed::tidy(mod, conf.int = TRUE)
+        out
+}
+
+all_mods <- purrr::map(0:8, run_across_life, annual_survival)
+all_mods %>% bind_rows(.id = "age") %>% filter(term == "froh_all10") %>% 
+        ggplot(aes(age, estimate)) +
+        geom_point() +
+        geom_errorbar(aes(ymin = conf.low, ymax = conf.high))
+
+
 
 # prepare pedigree for animal inla
 sheep_ped_inla <- sheep_ped %>% 
@@ -55,6 +109,116 @@ Cmatrix <- sparseMatrix(i=ainv[,1],j=ainv[,2],x=ainv[,3])
 
 # link id to cmatrix
 annual_survival$IndexA <- match(annual_survival$id, ainv_map[, 1])
+
+# ~~~~~~~~~~~~~~~~~~
+annual_survival <- annual_survival %>% 
+        mutate(IndexA2 = IndexA) 
+
+#annual_survival_test <- annual_survival %>% sample_frac(0.2)
+
+# model 2, with lamb 
+formula_surv <- as.formula(paste('survival ~ froh_all10_cent * (lamb + age_cent) + sex + twin + 1', 
+                                 'f(birth_year, model = "iid", hyper = list(prec = prec_prior))',
+                                 'f(sheep_year, model = "iid", hyper = list(prec = prec_prior))',
+                                 'f(IndexA2, model = "iid", hyper = list(prec = prec_prior))',
+                                 #'f(mum_id, model="iid",  hyper = list(prec = prec_prior))', 
+                                 'f(IndexA, model="generic0", hyper = list(theta = list(param = c(0.5, 0.5))),Cmatrix=Cmatrix)', sep = " + "))
+mod_inla <- inla(formula=formula_surv, family="binomial",
+                 data=annual_survival, 
+                 control.compute = list(dic = TRUE),
+                 control.inla = list(correct = TRUE))
+summary(mod_inla)
+str(mod_inla, max.level = 1)
+saveRDS(mod_inla, file = "output/inla_survival_model_full.rds")
+
+mod_inla$summary.fixed
+
+
+trans_link_to_dat <- function(pred, mod_inla) {
+        inla.rmarginal(n = 10000, marginal = mod_inla$marginals.fixed[[pred]]) %>% 
+                exp() %>% 
+                quantile(probs = c(0.025,0.5, 0.975))  %>% 
+                t() %>% 
+                as.data.frame() %>% 
+                bind_cols() %>% 
+                add_column(pred = pred, .before = 1)
+}
+
+fix_eff <- map_df(names(mod_inla$marginals.fixed), trans_link_to_dat, mod_inla) %>% 
+           .[c(2,4,5,6,8), ] %>% 
+           filter(!(pred == "(Intercept)")) %>% 
+           mutate(pred = fct_inorder(as.factor(pred)))
+names(fix_eff) <- c("Predictor", "lower_CI", "median", "upper_CI")
+
+p_surv_mod <- ggplot(fix_eff, aes(median, Predictor, xmax = upper_CI, xmin = lower_CI)) +
+        geom_vline(xintercept = 1, linetype='dashed', colour =  "#4c566a", size = 0.7) +
+        geom_errorbarh(alpha = 1, height = 0.5,
+                       size = 0.5) +
+        geom_point(size = 3, shape = 21, col = "#4c566a", fill = "#eceff4", # "grey69"
+                   alpha = 1, stroke = 0.7) + 
+        scale_y_discrete(limits = rev(levels(fix_eff$Predictor)),
+                         #labels = rev(c("FROH", "Age", "Sex(Male)", "Twin", "FROH:Age"))) +
+                         labels = rev(c(expression(F[ROH]), "Age", expression(Sex[Male]), "Twin", expression(F[ROH]:Age)))) + 
+                         #labels = rev(c("Froh", "Lamb", "Age", "Sex(Male)", "Twin", "Froh:lamb", "Froh:age"))) +
+        scale_x_continuous(breaks = c(0.25, 0.5, 0.75, 1, 1.25)) +
+        theme_simple(axis_lines = TRUE) +
+        theme(
+                panel.grid.major = element_blank(),
+                panel.grid.minor = element_blank(),
+                axis.line.y = element_blank(),
+                axis.ticks.y = element_blank(),
+                axis.title.y = element_blank(),
+                axis.line.x = element_line(colour = "black",size = 0.8),
+                axis.ticks.x = element_line(size = 0.8),
+                axis.text = element_text(),
+                axis.title.x = element_text(margin=margin(t=8))
+        ) +
+        xlab(expression(beta~and~95*"%"*~CI~(odds~of~survival)))
+p_surv_mod
+ggsave("figs/surv_mod_fixs.jpg", p_surv_mod, width = 3.5, height = 3)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# model 3, with age * roh interaction 
+formula_surv <- as.formula(paste('survival ~ froh_all10_cent * age_cent + sex + lamb + age_cent2 + twin + 1', 
+                                 'f(birth_year, model = "iid", hyper = list(prec = prec_prior))',
+                                 'f(sheep_year, model = "iid", hyper = list(prec = prec_prior))',
+                                 'f(IndexA2, model = "iid", hyper = list(prec = prec_prior))',
+                                 #'f(mum_id, model="iid",  hyper = list(prec = prec_prior))', 
+                                 'f(IndexA, model="generic0", hyper = list(theta = list(param = c(0.5, 0.5))),Cmatrix=Cmatrix)', sep = " + "))
+mod_inla3 <- inla(formula=formula_surv, family="binomial",
+                 data=annual_survival, 
+                 control.compute = list(dic = TRUE),
+                 control.inla = list(correct = TRUE))
+
+summary(mod_inla3)
+
+# model 4, without age_cent2
+formula_surv <- as.formula(paste('survival ~ froh_all10_cent * age_cent + sex + twin + 1', 
+                                 'f(birth_year, model = "iid", hyper = list(prec = prec_prior))',
+                                 'f(sheep_year, model = "iid", hyper = list(prec = prec_prior))',
+                                 'f(IndexA2, model = "iid", hyper = list(prec = prec_prior))',
+                                 #'f(mum_id, model="iid",  hyper = list(prec = prec_prior))', 
+                                 'f(IndexA, model="generic0", hyper = list(theta = list(param = c(0.5, 0.5))),Cmatrix=Cmatrix)', sep = " + "))
+mod_inla4 <- inla(formula=formula_surv, family="binomial",
+                  data=annual_survival, 
+                  control.compute = list(dic = TRUE),
+                  control.inla = list(correct = TRUE))
+
+summary(mod_inla4)
+
 
 
 # ~~~~~~~~~~~~~~~~~~

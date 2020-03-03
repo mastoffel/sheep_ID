@@ -2,7 +2,7 @@ library(tidyverse)
 library(data.table)
 library(magrittr)
 library(rlang)
-source("theme_clean.R")
+source("theme_simple.R")
 # annual measures of traits and fitness
 load("model_in/fitness_roh_df.RData")
 library(windowscanr)
