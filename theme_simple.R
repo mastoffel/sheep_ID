@@ -13,8 +13,8 @@ theme_simple <- function(axis_lines = TRUE,   # do we want axis lines or not
         # if we want axis lines
         if (axis_lines) {
                 # We add axis lines and give them our preferred thickness
-                th <- th + theme(axis.line = element_line(size =  line_size))
-                th <- th + theme(axis.ticks = element_line(size = line_size))
+                th <- th + theme(axis.line = element_line(size =  line_size, color = "black"))
+                th <- th + theme(axis.ticks = element_line(size = line_size, color = "black"))
         }
         
         # Let's give the axis text a bit more space

@@ -10,7 +10,11 @@ library(snpStats)
 library(data.table)
 library(furrr)
 library(brinla)
-
+library(performance)
+library(sjPlot)
+library(ggeffects)
+library(patchwork)
+library(effects)
 # data
 #load("data/fitness_roh_df.RData") # formerly
 load("data/survival_mods_data.RData") 
@@ -52,18 +56,137 @@ nlopt <- function(par, fn, lower, upper, control) {
         )
 }
 
-mod5 <- glmer(survival ~ froh_all10_cent + lamb_cent + age_cent + sex + twin + (1|birth_year) + (1|sheep_year) + (1|mum_id) + (1|id),
+# random_slopes
+mod1 <- glmer(survival ~ froh_all10_cent + sex + twin + (1 + froh_all10_cent|age) + (1|birth_year) + (1|sheep_year) + (1|id),
               family = binomial, data = annual_survival,
               control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
-tidy(mod5, conf.int = TRUE)
-glance(mod5)
+# plot 
+ggpredict(mod1, type = "re", terms = c("froh_all10_cent", "age [0,1,2,3]")) %>% plot()
+performance(mod1)
+plot(-0.9 - ranef(mod6)$age[,2])
 
-mod6 <- glmer(survival ~ froh_all10_cent * (lamb_cent + age_cent) + sex + twin + (1|birth_year) + (1|sheep_year) + (1|id),
+library(boot)
+# age interaction and lamb
+mod2 <- glmer(survival ~ froh_all10_cent * age_cent + froh_all10_cent * lamb + sex + twin + (1|birth_year) + (1|sheep_year) + (1|id),
               family = binomial, data = annual_survival,
               control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
-tidy(mod6, conf.int = TRUE)
-glance(mod6)
+saveRDS(mod2, file = "output/survival_mod_full_lme4")
+plot_model(mod2)
+summary(mod2)
+inv.logit(-1.197)
+odds_to_prob <- function(x) exp(x) / (1+exp(x))
+get_model_data(mod2, type = "est")
+summary(mod2)
+check_model(mod2)
+performance(mod2)
+plot_model(mod2, type = "eff", terms = c("froh_all10_cent [all]", "age_cent[-1.4, 1.6, 2.6, 3.6, 7.6]"))
+plot_model(mod2, type = "eff", terms = c("froh_all10_cent [all]",  "age_cent[-2.4, -1.4]", "lamb"))
+df1 <- get_model_data(mod2, type = "eff", 
+                      terms = c("froh_all10_cent [all]", "age_cent[-1.4, 2.6, 5.6]", "lamb")) %>% 
+       as_tibble() %>% 
+       filter(facet == 0)
+df2 <- get_model_data(mod2, type = "eff", 
+                      terms = c("froh_all10_cent [all]",  "age_cent[-2.4, -1.4]", "lamb")) %>% 
+       as_tibble() %>% 
+       filter(facet == 1) %>% 
+       filter(group == -2.4)
+df_full <- bind_rows(df1, df2) %>% 
+           mutate(group = as.character(as.numeric(group) + 2.4))
 
+ggplot() +
+  #geom_jitter(data = annual_survival, aes(froh_all10_cent, y = -0.1), height = 0.05,
+  #            alpha = 0.2, size = 3) +
+  #geom_point(data = df_full, aes(x = froh_all10_cent, fit, color = age_cent)) +
+  geom_line(data = df_full, aes(x = x, predicted, color = group), size = 1) +
+  geom_ribbon(data= df_full, aes(x=x, ymin=conf.low, ymax=conf.high, fill = group, color = group), alpha= 0.2,
+              linetype = 2, size = 0.1) +
+  scale_color_viridis_d("Age", labels = c(0, 1, 4, 7)) +
+  scale_fill_viridis_d("Age", labels = c(0, 1, 4, 7)) +
+  theme_simple(grid_lines = FALSE, axis_lines = TRUE) 
+
+
+mod8 <- glmer(survival ~ froh_all10_cent * age_cent + lamb + sex + twin + (1|birth_year) + (1|sheep_year) + (1|id),
+              family = binomial, data = annual_survival,
+              control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+performance(mod8)
+check_collinearity(mod8)
+tidy(mod8, conf.int = TRUE)
+
+plot_model(mod8, type = "eff", terms = c("froh_all10_cent [all]", "lamb"))
+
+roh_eff_lamb <- ggeffect(mod8, type = "eff", terms = c("froh_all10_cent [all]", "lamb [1]")) %>% 
+          as_tibble() #%>% 
+         #filter(group == 1)
+summary(roh_eff_lamb)
+roh_eff_adult <- ggeffect(mod8, type = "eff", 
+                          terms = c("froh_all10_cent [all]", "age_cent[-1.4, 3.6, 7.6]")) %>%  # -1.4, 1.6, 3.6, 5.6, 7.6
+                as_tibble() 
+summary(roh_eff_adult)
+p_lamb <- ggplot(roh_eff_lamb, aes(x, predicted)) +
+          geom_line(size = 1) +
+          #geom_point(data = annual_survival %>% filter(age == 0), 
+          #           aes(x = froh_all10_cent, y = survival),
+          #           size = 4, alpha = 0.1) +
+          geom_ribbon(aes(ymin = conf.low, ymax = conf.high),
+                      alpha = 0.1, linetype = 2, color = "grey") +
+          theme_simple() +
+          scale_y_continuous(labels = paste0(seq(from = 0, to = 100, by = 25), "%"), limits = c(0,1)) +
+          scale_x_continuous(labels = c("0.24", "0.34", "0.44"), breaks = c(0, 1, 2)) +
+          ylab("Survival probability") +
+          #ggtitle("Lambs") +
+          xlab(expression(F[ROH])) 
+p_lamb
+p_adult <-  ggplot(roh_eff_adult, aes(x, predicted)) +
+                geom_line(aes(color = group), size = 1) +
+                geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = group, color = group),
+                            alpha = 0.05, size = 0.2, linetype = 2) +
+                theme_simple() +
+                scale_color_viridis_d("age", labels = c(1, 4, 8)) +
+                scale_fill_viridis_d("age", labels = c(1, 4, 8)) +
+                scale_y_continuous(labels = paste0(seq(from = 0, to = 100, by = 25), "%"), limits = c(0,1)) +
+                scale_x_continuous(labels = c("0.24", "0.34", "0.44"), breaks = c(0, 1, 2)) +
+                ylab("Survival probability") +
+        xlab(expression(F[ROH])) 
+p_adult  
+
+p_lamb + p_adult + plot_annotation(tag_levels = "A") 
+
+p <- plot_model(mod6)
+p +
+  theme_simple() +
+  scale_x_continuous(limits = c(0.05, 5), breaks = c(0.05, 1, 5))
+plot_model(mod7, type = "eff",  terms = c("age_cent [-1.4, 1.6, 3.6, 5.6]", "froh_all10_cent [-1, 0, 1, 2]"))
+plot_model(mod8, type = "eff",  terms = c("froh_all10_cent [-1, 0, 1, 2]", "age_cent [-1.4, 2.6, 5.6]"))
+
+plot_model(mod8, type = "eff", terms = c("age_cent [-2.4, -0.4, 1.6, 3.6]", "froh_all10_cent [-0.5, 0, 0.5, 1]"))
+plot_model(mod8)
+out <- ggeffect(mod8, type = "eff", terms = c("age_cent [-2.4, -0.4, 1.6, 3.6]", "froh_all10_cent [-0.5, 0, 0.5, 1]"))
+
+plot_model(mod8, type = "eff", terms = c("froh_all10_cent", "age_cent", "lamb"))
+plot_model(mod8, type = "pred", terms = c("froh_all10_cent", "lamb"))
+plot_model
+
+p2 <- plot_model(mod6, type = "eff", terms = c("age_cent [-2.4, -0.4, 1.6, 3.6, 5.6]", "froh_all10_cent  [-1, 0, 1, 2]"))
+plot_model(mod6, type = "pred")
+
+library(patchwork)
+p1+p2
+plot_model(mod6, type = "pred", terms = c( "froh_all10_cent [all]", "age_cent [-2.4, -1.4, -0.4, 1.4, 2.4]", "lamb_cent"))
+
+library(effects)
+effects_roh <- Effect(focal.predictors = c("froh_all10_cent", "age_cent"), mod = mod6)
+summary(effects_roh)
+x_roh <- as.data.frame(effects_roh) %>%
+         mutate(age_cent = as.factor(age_cent))
+         #mutate(froh = froh_all10_cent + mean(annual_survival$froh_all),
+         #       age = age_cent + mean(annual_survival$age))
+ggplot() +
+        geom_point(data = annual_survival, aes(froh_all10_cent, survival)) +
+        geom_point(data = x_roh, aes(x = froh_all10_cent, fit, color = age_cent)) +
+        geom_line(data = x_roh, aes(x = froh_all10_cent, fit, color = age_cent)) +
+        geom_ribbon(data= x_roh, aes(x=froh_all10_cent, ymin=lower, ymax=upper, fill = age_cent), alpha= 0.3) +
+        theme_simple() 
+        
 
 # depression across life
 
@@ -131,8 +254,14 @@ summary(mod_inla)
 str(mod_inla, max.level = 1)
 saveRDS(mod_inla, file = "output/inla_survival_model_full.rds")
 
-mod_inla$summary.fixed
+mod_inla <- readRDS("output/inla_survival_model_full.rds")
+plot(mod_inla, plot.fixed.effects=FALSE, plot.lincomb=FALSE, plot.random.effects=FALSE,
+     plot.hyperparameters=FALSE, plot.predictor=TRUE, plot.q=FALSE, plot.cpo=FALSE,
+     single=FALSE)
 
+mod_inla$summary.fixed
+library(INLAutils)
+autoplot(mod_inla)
 
 trans_link_to_dat <- function(pred, mod_inla) {
         inla.rmarginal(n = 10000, marginal = mod_inla$marginals.fixed[[pred]]) %>% 
