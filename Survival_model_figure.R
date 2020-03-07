@@ -85,24 +85,30 @@ roh_plot %>%
         summarise(MB_mean = mean(MB),
                   MB_sum = sum(MB)) %>% 
         mutate(FROH = MB_sum/2655) %>% 
-        mutate(age = str_replace(age, "_", " ")) -> roh_plot2
+        mutate(age = str_replace(age, "_", " ")) %>% 
+        mutate(age_num = as.numeric(str_replace(age, "age ", ""))) %>% 
+        as.data.frame() %>% 
+        mutate(age = factor(age)) %>% 
+        mutate(age = fct_reorder(age, age_num))-> roh_plot2
 
 roh_plot2 %>% 
         #ungroup() %>% 
         #sample_frac(0.1) %>% 
-        ggplot(aes(x = FROH, y = fct_inorder(age))) +
+        ggplot(aes(x = FROH, y = age)) +
         geom_density_ridges(scale = 0.85,
-                            jittered_points=TRUE, color = "#465881", 
-                            fill = "#c9d1d3",
+                            jittered_points=TRUE, color = "#4c566a",  # # "#4c566a"  "#eceff4"
+                            fill = "#eceff4",
                             point_shape = "|", point_size = 2.5, size = 0.4,
                             position = position_points_jitter(height = 0),
-                            point_alpha = 1, point_color = "#1b2a49", 
+                            point_alpha = 1, point_color = "#4c566a", 
                             alpha = 0.9, bandwidth = 0.006) +
         # scale_fill_viridis() +
-        theme_ridges(font_family = "Avenir") + 
-        ylab("") +
+        #theme_ridges(font_family = "Avenir") + 
+        theme_simple(axis_lines = FALSE, base_size = 14) +
+        ylab("") + 
         xlab(expression(F[ROH]~across~age~cohorts)) +
         theme(strip.background = element_blank(),
+              panel.grid.major = element_line(colour = "#d8dee9", size = 0.5),
               strip.text = element_text(vjust=2),
               panel.spacing.x = unit(1, "lines"),
               strip.text.x = element_text(margin = margin(1,0,0,0, "cm")),
@@ -113,18 +119,63 @@ p_froh_across_ages
 # ggsave("figs/FROH_across_ages_col.jpg", plot = p_froh_across_ages, width = 4.5, height = 5.5)
 
 
+
+
+
+
+#load("data/fitness_roh_df.RData") # formerly
+load("data/survival_mods_data.RData") 
+load("data/sheep_ped.RData")
+annual_survival <- fitness_data %>% 
+        # filter na rows
+        filter_at(vars(survival, froh_all, birth_year, sheep_year), ~ !is.na(.)) %>% 
+        mutate(age_cent = age - mean(age, na.rm = TRUE),
+               age_cent2 = age_cent^2,
+               age_std = as.numeric(scale(age)),
+               age_std2 = age_std^2,
+               # times 10 to estimate a 10% percent increase
+               froh_all10 = froh_all * 10,
+               froh_all10_cent = froh_all10 - mean(froh_all10, na.rm = TRUE),
+               lamb = ifelse(age == 0, 1, 0),
+               lamb_cent = lamb - mean(lamb, na.rm = TRUE),
+               lamb = as.factor(lamb)) %>% 
+        as.data.frame() 
+
 # age interaction and lamb
 mod <- readRDS("output/survival_mod_full_lme4")
 
+# make two marginal effects plots, one overall, one split by age
+plot_model(mod, type = "eff", terms = c("froh_all10_cent"))
+
+p_marginal_effs <- ggplot() +
+        #geom_jitter(data = annual_survival, aes(froh_all10_cent, y = -0.1), height = 0.05,
+        #            alpha = 0.2, size = 3) +
+        #geom_point(data = df_full, aes(x = froh_all10_cent, fit, color = age_cent)) +
+        geom_line(data = df_full, aes(x = x, predicted, color = group), size = 1.5) +
+        geom_ribbon(data= df_full, aes(x=x, ymin=conf.low, ymax=conf.high, fill = group, color = group), alpha= 0.2,
+                    linetype = 2, size = 0.1) +
+        scale_color_viridis_d("Age", labels = c(0, 1, 4, 7)) +
+        scale_fill_viridis_d("Age", labels = c(0, 1, 4, 7)) +
+        scale_y_continuous(expand = c(0, 0), breaks = seq(from = 0, to = 100, by = 25),
+                           limits = c(0,100)) +
+        theme_simple(axis_lines = TRUE, base_size = 14) +
+        theme(axis.line.y = element_blank()) +
+        xlab(expression(F[ROH])) +
+        ylab("Predicted survival probability %")
+p_marginal_effs 
+
+
 df1 <- get_model_data(mod, type = "eff", 
-                      terms = c("froh_all10_cent [all]", "age_cent[-1.4, 2.6, 5.6]", "lamb")) %>% 
+                      terms = c("froh_all10_cent [all]", "age_cent [-1.4, 2.6, 5.6]", "lamb")) %>% 
         as_tibble() %>% 
         filter(facet == 0)
+
 df2 <- get_model_data(mod, type = "eff", 
                       terms = c("froh_all10_cent [all]",  "age_cent[-2.4, -1.4]", "lamb")) %>% 
         as_tibble() %>% 
         filter(facet == 1) %>% 
         filter(group == -2.4)
+
 df_full <- bind_rows(df1, df2) %>% 
         mutate(group = as.character(as.numeric(group) + 2.4),
                x = ((x + mean(annual_survival$froh_all10))/10),
@@ -143,23 +194,29 @@ p_marginal_effs <- ggplot() +
         scale_fill_viridis_d("Age", labels = c(0, 1, 4, 7)) +
         scale_y_continuous(expand = c(0, 0), breaks = seq(from = 0, to = 100, by = 25),
                            limits = c(0,100)) +
-        theme_simple(axis_lines = TRUE, line_size = 0.3) +
-        theme(axis.line.y = element_blank()) +
+        theme_simple(axis_lines = TRUE, base_size = 14) +
+        theme(axis.line.y = element_blank(),
+              legend.position = "top") +
         xlab(expression(F[ROH])) +
-        ylab("Predicted survival probability %")
+        ylab("Predicted\nsurvival probability %")
 p_marginal_effs  
 
 get_model_data(mod, type = "est") %>% 
         as_tibble() %>% 
+        .[c(1,6,7), ] %>% 
         ggplot(aes(estimate, term, xmax = conf.high, xmin = conf.low)) +
-        geom_vline(xintercept = 1, linetype='dashed', colour =  "#4c566a", size = 0.3) +
+        geom_vline(xintercept = 1, linetype='dashed', colour =  "#4c566a", size = 0.3) +     # "#4c566a"  "#eceff4"
         geom_errorbarh(alpha = 1, height = 0.5,
                        size = 0.5) +
         geom_point(size = 3, shape = 21, col = "#4c566a", fill = "#eceff4", # "grey69"
                    alpha = 1, stroke = 0.7) + 
-        scale_x_log10(breaks = c(0.1, 0.3, 0.5, 1, 2), limits = c(0.028, 4), labels = c( "0.1", "0.3", "0.5", "1", "2")) +
-        scale_y_discrete(labels = rev(c(expression(F[ROH]), "Age", "Lamb", expression(Sex[Male]), "Twin", expression(F[ROH]:Age), expression(F[ROH]:Lamb)))) +
-        theme_simple(axis_lines = TRUE) +
+        # when only showing roh related effs
+        scale_x_log10(breaks = c(0.1, 0.3, 1, 2, 5), limits = c(0.1, 5), labels = c( "0.1", "0.3", "1", "2", "5")) +
+        scale_y_discrete(labels = rev(c(expression(F[ROH]), expression(F[ROH]:Age), expression(F[ROH]:Lamb)))) +
+        # when using all fixed effects
+        #scale_x_log10(breaks = c(0.1, 0.3, 0.5, 1, 2), limits = c(0.028, 4), labels = c( "0.1", "0.3", "0.5", "1", "2")) +
+        #scale_y_discrete(labels = rev(c(expression(F[ROH]), "Age", "Lamb", expression(Sex[Male]), "Twin", expression(F[ROH]:Age), expression(F[ROH]:Lamb)))) +
+        theme_simple(axis_lines = TRUE, base_size = 14) +
         theme(
                 panel.grid.major = element_blank(),
                 panel.grid.minor = element_blank(),
@@ -175,8 +232,11 @@ get_model_data(mod, type = "est") %>%
 
 p_froh_across_ages + (p_forest / p_marginal_effs)
 
-
-
+library(cowplot)
+p_final <- cowplot::plot_grid(p_froh_across_ages, plot_grid(p_forest, p_marginal_effs, nrow = 2, rel_heights = c(1,1.5),
+                                                            labels = c('B', 'C')),
+                              labels = c('A', ''))
+ggsave("figs/Figure2.jpg", height = 6, width = 9)
 
 
 

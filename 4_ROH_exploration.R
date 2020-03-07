@@ -35,6 +35,9 @@ autosomal_genome_size <- chr_data %>%
 file_path <- "output/ROH/roh_nofilt_ram_pruned.hom"
 roh_lengths <- fread(file_path)
 
+# max ROH length
+roh_lengths[which.max(roh_lengths$KB), ]
+
 # survival data 
 load("data/survival_mods_data.RData")
 annual_survival <- fitness_data %>% 
@@ -58,6 +61,26 @@ froh <- roh_lengths %>%
         mutate(FROH_cent = FROH - mean(FROH))
 mean(froh$FROH)
 range(froh$FROH)
+
+# longest ROH proportional to chr size
+chr_sizes <- chr_data %>% .[-1, ] %>% 
+  mutate(CHR = str_replace(CHR, "Chromosome ", "")) %>% 
+  mutate(CHR = as.integer(CHR))
+
+roh_lengths %>% 
+  arrange(desc(KB)) %>% 
+  left_join(chr_sizes, by = "CHR") %>% 
+  mutate(prop_chr = KB / size_KB) %>% 
+  arrange(desc(prop_chr))
+
+plot(froh$KBSUM, num_roh_per_ind$n)
+
+num_roh_per_ind %>% 
+  left_join(froh) %>% 
+  top_frac(0.005, FROH) %>% 
+  #top_frac(0.005, desc(FROH)) %>% 
+  arrange(desc(FROH)) %>% 
+  summarise(mean(n), mean(KBAVG))
 
 # FROH / ROH across individuals
 p_froh <- ggplot(froh, aes(FROH)) +
@@ -143,6 +166,12 @@ col_pal <- viridis(7)
 prop_IBD_df
 set.seed(17)
 library(gghalves)
+
+# ROH classes summary
+prop_IBD_df_with_0 %>% group_by(length_class) %>% summarise(mean(prop_IBD), sd(prop_IBD))
+prop_IBD_df_with_0 %>% group_by(length_class) %>% summarise(prop = sum(prop_IBD > 0) / n() )
+
+# plot
 prop_IBD_df_with_0 %>% 
   mutate(prop_IBD = prop_IBD * 100) %>% 
   ggplot(aes(length_class, prop_IBD, fill = length_class)) +
@@ -290,6 +319,10 @@ running_roh %>%
   mutate(UNAFF_mean = UNAFF_mean/7691) %>% 
   filter(!is.na(UNAFF_mean))-> running_roh_p
   #filter(CHR == 1) %>% 
+
+# max and min
+running_roh_p %>% arrange(desc(UNAFF_mean))
+
 library(scales)
 fill_cols <- viridis(20, option = "D")
 qn <- scales::rescale(quantile(running_roh_p$UNAFF_mean,
