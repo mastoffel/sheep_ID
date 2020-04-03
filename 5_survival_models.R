@@ -15,6 +15,7 @@ library(sjPlot)
 library(ggeffects)
 library(patchwork)
 library(effects)
+library(MCMCglmm)
 # data
 #load("data/fitness_roh_df.RData") # formerly
 load("data/survival_mods_data.RData") 
@@ -103,6 +104,39 @@ ggplot() +
   scale_color_viridis_d("Age", labels = c(0, 1, 4, 7)) +
   scale_fill_viridis_d("Age", labels = c(0, 1, 4, 7)) +
   theme_simple(grid_lines = FALSE, axis_lines = TRUE) 
+
+
+
+# calc ID per ageclass
+#  sex +
+est_id_per_age <- function(ageclass) {
+  annual_survival_sub <- annual_survival[(annual_survival$age == ageclass), ]
+  mod_sub <- glmer(survival ~ froh_all10_cent + sex + twin + (1|birth_year) + (1|sheep_year),
+                family = binomial, data = annual_survival_sub,
+                control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+}
+
+id_per_age <- map(0:9, est_id_per_age)
+id_per_age %>% 
+  map(tidy, conf.int = TRUE) %>% 
+  bind_rows(.id = "age") %>% 
+  filter(term == "froh_all10_cent") %>% 
+  mutate(age = as.factor(as.numeric(age) - 1)) %>% 
+        # sex = rep(rep(c("M", "F") ,each =9))) %>% 
+  ggplot(aes(age, estimate)) +
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.5) +
+  geom_point(size = 3, shape = 21, col = "#4c566a", fill = "#eceff4", # "grey69"
+             alpha = 1, stroke = 0.7) +
+  xlab("Age class") + 
+  ylab(expression(beta[F[ROH]])) +
+  geom_hline(yintercept = 0, linetype='dashed', colour =  "#4c566a", size = 0.3) +
+  theme_simple(grid_lines = FALSE, axis_lines = TRUE) -> p_froh_across_life
+
+ggsave("figs/sup_froh_across_life.jpg", width = 5, height = 3)
+
+
+
+
 
 
 mod8 <- glmer(survival ~ froh_all10_cent * age_cent + lamb + sex + twin + (1|birth_year) + (1|sheep_year) + (1|id),

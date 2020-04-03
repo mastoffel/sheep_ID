@@ -67,7 +67,7 @@ annual_survival <- fitness_data %>%
         mutate_at(c("id", "birth_year", "sex", "sheep_year", "survival"), as.factor) %>% 
         mutate(age2 = age^2) %>% 
         mutate(age_std = as.numeric(scale(age)),
-               age2_std = as.numeric(scale(age2))) %>% 
+               age2_std = as.numeric(scale(age2))) %>%  # check whether scaling is correct here
         as.data.frame() 
 
 
