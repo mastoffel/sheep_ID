@@ -142,7 +142,9 @@ saveRDS(mod_AS2, file = "output/AS_mod_MCMCglmm_cat")
 
 
 # load mcmc
-mod_AS <- readRDS("output/AS_mod_MCMCglmm")
+mod_AS <- readRDS("output/AS_mod_MCMCglmm_logit_08m_nosclice")
+
+
 plot(mod_AS)
 tidy(mod_AS, conf.int = TRUE)
 tidy(mod2, conf.int = TRUE)
@@ -156,7 +158,29 @@ predict(mod_AS, type = "response")[1:5, ]
 out <- predict(mod_AS2, type = "response", newdata = annual_survival,
                interval = "prediction")[1:100, ]
 
-ggemmeans(mod_AS, terms= "froh_all10_cent")
+ggemmeans(mod_AS, terms = "froh_all10_cent")
+
+df1 <- ggemmeans(mod_AS, terms = c("froh_all10_cent [all]", "age_cent[-1.4, 2.6, 5.6]", "lamb")) %>% 
+        as_tibble() %>% 
+        filter(facet == 0)
+df2 <- ggemmeans(mod_AS, terms = c("froh_all10_cent [all]",  "age_cent[-2.4, -1.4]", "lamb")) %>% 
+        as_tibble() %>% 
+        filter(facet == 1) %>% 
+        filter(group == -2.4)
+df_full <- bind_rows(df1, df2) %>% 
+        mutate(group = as.character(as.numeric(group) + 2.4))
+
+ggplot() +
+        #geom_jitter(data = annual_survival, aes(froh_all10_cent, y = -0.1), height = 0.05,
+        #            alpha = 0.2, size = 3) +
+        #geom_point(data = df_full, aes(x = froh_all10_cent, fit, color = age_cent)) +
+        geom_line(data = df_full, aes(x = x, predicted, color = group), size = 1) +
+        geom_ribbon(data= df_full, aes(x=x, ymin=conf.low, ymax=conf.high, fill = group, color = group), alpha= 0.2,
+                    linetype = 2, size = 0.1) +
+        scale_color_viridis_d("Age", labels = c(0, 1, 4, 7)) +
+        scale_fill_viridis_d("Age", labels = c(0, 1, 4, 7)) +
+        theme_simple(grid_lines = FALSE, axis_lines = TRUE) 
+
 
 
 
@@ -192,13 +216,13 @@ annual_survival <- annual_survival %>%
 #annual_survival_test <- annual_survival %>% sample_frac(0.2)
 prec_prior <- list(prior = "loggamma", param = c(0.5, 0.5))
 # model 2, with lamb 
-formula_surv <- as.formula(paste('survival ~ froh_all10_cent * (lamb + age_cent) + sex + twin + 1', 
+formula_surv <- as.formula(paste('survival ~ froh_all10_cent * age_cent + froh_all10_cent * lamb + sex + twin + 1', 
                                  'f(birth_year, model = "iid", hyper = list(prec = prec_prior))',
                                  'f(sheep_year, model = "iid", hyper = list(prec = prec_prior))',
                                  'f(IndexA2, model = "iid", hyper = list(prec = prec_prior))',
                                  #'f(mum_id, model="iid",  hyper = list(prec = prec_prior))', 
                                  'f(IndexA, model="generic0", hyper = list(theta = list(param = c(0.5, 0.5))),Cmatrix=Cmatrix)', sep = " + "))
-control.family1 = list(control.link=list(model="probit"))
+control.family1 = list(control.link=list(model="logit"))
 mod_inla <- inla(formula=formula_surv, family="binomial",
                  data=annual_survival, 
                  control.family = control.family1,

@@ -97,9 +97,9 @@ fitness_data <- annual_fitness %>%
         left_join(froh, by = "ID")
 
 # add homozygosity not in roh
-homs <- read_delim("output/ROH/roh_nofilt_hom_not_in_roh.txt", delim = " ")
-fitness_data <- fitness_data %>% 
-        left_join(homs, by = "ID")
+#homs <- read_delim("output/ROH/roh_nofilt_hom_not_in_roh.txt", delim = " ")
+#fitness_data <- fitness_data %>% 
+#        left_join(homs, by = "ID")
 
 # prepare for analysis
 fitness_data <- fitness_data %>% 
@@ -114,7 +114,7 @@ fitness_data <- fitness_data %>%
                 froh_medium = FROH_medium,
                 froh_long = FROH_long,
                 froh_all = FROH_all,
-                froh_not_roh = hom,
+               # froh_not_roh = hom,
                 survival = Survival,
                 comment = Comment,
                 seen_in_rut = SeenInRut,
