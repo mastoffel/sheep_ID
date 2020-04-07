@@ -37,11 +37,12 @@ system(paste0("/usr/local/bin/plink --bfile output/plink_files/sheep_geno_impute
               "--homozyg-window-het 1"))
 
 # calculate ROH unpruned =======================================================
-# system(paste0("/usr/local/bin/plink --bfile ../sheep/data/SNP_chip/ramb_mapping/sheep_geno_imputed_ram_27092019 --sheep --out output/ROH/roh_nofilt_ram",
-#               "--homozyg --homozyg-window-snp 30 --homozyg-snp 25 --homozyg-kb 600 ",
-#               "--homozyg-gap 500 --homozyg-density 50 --homozyg-window-missing 2 ",
-#               "--homozyg-het 1 ",
-#               "--homozyg-window-het 1"))
+system(paste0("/usr/local/bin/plink --bfile ../sheep/data/SNP_chip/ramb_mapping/sheep_geno_imputed_ram_27092019 --sheep --out output/ROH/roh_nofilt_ram ",
+              "--keep output/ROH/ids_surv.txt ",
+              "--homozyg --homozyg-window-snp 30 --homozyg-snp 25 --homozyg-kb 600 ",
+              "--homozyg-gap 500 --homozyg-density 50 --homozyg-window-missing 2 ",
+              "--homozyg-het 1 ",
+              "--homozyg-window-het 1"))
 
 # # calculate ROH, unpruned with subset for survival analysis
 # system(paste0("/usr/local/bin/plink --bfile ../sheep/data/SNP_chip/ramb_mapping/sheep_geno_imputed_ram_27092019 --sheep --out output/ROH/ROH_surv_subset/roh_nofilt_ram ",
