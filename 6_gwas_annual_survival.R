@@ -21,7 +21,7 @@ if (!(length(chr_inp) == 0)) {
 # data
 load("data/survival_mods_data.RData")
 load("data/sheep_ped.RData")
-IDs_lots_missing <- read_delim("data/ids_more_than_5perc_missing.txt", delim = " ")
+#IDs_lots_missing <- read_delim("data/ids_more_than_5perc_missing.txt", delim = " ")
 
 # pcas 
 pcs <- read_delim("data/ann_surv_pca.txt", " ", col_names = TRUE) %>% 
