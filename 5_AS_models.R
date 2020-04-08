@@ -188,7 +188,7 @@ control.family1 = list(control.link=list(model="logit"))
 mod_inla <- inla(formula=formula_surv, family="binomial",
                  data=annual_survival, 
                  control.family = control.family1,
-                 control.compute = list(dic = TRUE),
+                 control.compute = list(dic = TRUE, config=TRUE),
                  control.inla = list(correct = TRUE)
                  )
 

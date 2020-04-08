@@ -3,61 +3,40 @@ library(snpStats)
 library(tidyverse)
 
 # data
-load("data/fitness_roh_df.RData")
+load("data/survival_mods_data.RData")
 load("data/sheep_ped.RData")
 IDs_lots_missing <- read_delim("data/ids_more_than_5perc_missing.txt", delim = " ")
 
 # survival data
 annual_survival <- fitness_data %>% 
-        dplyr::rename(birth_year = BIRTHYEAR,
-                      sheep_year = SheepYear,
-                      age = Age,
-                      id = ID,
-                      twin = TWIN,
-                      sex = SEX,
-                      mum_id = MOTHER,
-                      froh_short = FROH_short,
-                      froh_medium = FROH_medium,
-                      froh_long = FROH_long,
-                      froh_all = FROH_all,
-                      froh_not_roh = hom,
-                      survival = Survival) %>% 
-        # some individuals arent imputed well and should be discarded 
-        filter(!(id %in% IDs_lots_missing$id)) %>% 
-        #filter(age == 0) %>% 
-        filter(!is.na(survival)) %>% 
-        filter(!is.na(froh_all)) %>% 
-        filter(!(is.na(birth_year) | is.na(sheep_year))) %>%  # no mum_id here
-        mutate_at(c("id", "birth_year", "sex", "sheep_year", "survival"), as.factor) %>% 
-        mutate(age2 = age^2) %>% 
-        mutate(age_std = as.numeric(scale(age)),
-               age2_std = as.numeric(scale(age2))) %>% 
+        # filter na rows
+        filter_at(vars(survival, froh_all, birth_year, sheep_year), ~ !is.na(.)) %>% 
+        mutate(age_cent = age - mean(age, na.rm = TRUE),
+               age_cent2 = age_cent^2,
+               age_std = as.numeric(scale(age)),
+               age_std2 = age_std^2,
+               # times 10 to estimate a 10% percent increase
+               froh_all10 = froh_all * 10,
+               froh_all10_cent = froh_all10 - mean(froh_all10, na.rm = TRUE),
+               lamb = ifelse(age == 0, 1, 0),
+               lamb_cent = lamb - mean(lamb, na.rm = TRUE),
+               lamb = as.factor(lamb)) %>% 
         as.data.frame() 
 
 
-# make PCs for all annual survival individuals
+# pcs made in script 1_ROH_calling.R
 
-# extraxt all ids for gwas
-ids <- as.character(unique(annual_survival$id))
-
-# make data.frame as input for plink 
-id_df <- data.frame(1, ids) 
-write.table(id_df, "data/ids_annual_survival.txt", col.names = FALSE, row.names = FALSE, quote = FALSE)
-
-# pca using only individuals in annual survival analysis
-system(paste0("~/programs/plink --bfile data/sheep_geno_imputed_ram_27092019_pruned --sheep ",
-              "--pca 40 --keep data/ids_annual_survival.txt --nonfounders --out output/sheep_pca_ann_survival")) # --keep data/ind_testset_80.txt --keep data/ids_annual_survival.txt
 
 # check scree plot / looks like 7 is a good number
-pca_eigenval <- read_lines("output/sheep_pca_ann_survival.eigenval") %>% as.numeric() %>% plot()
+pca_eigenval <- read_lines("output/sheep_pca.eigenval") %>% as.numeric() %>% plot()
 
 # prepare eigenvectors to include in gwas
-col_from <- paste0("X", 3:42)
-col_to <- paste0("pc", 1:40)
-pca_eigenvec <- read_delim("output/sheep_pca_ann_survival.eigenvec", delim = " ", col_names = FALSE) %>% 
+col_to <- paste0("pc", 1:20)
+pca_eigenvec <- read_delim("output/sheep_pca.eigenvec", delim = " ", col_names = FALSE) %>% 
                         dplyr::rename(id = X2) %>% 
-                        select(-X1) %>% 
-                        dplyr::rename_at(vars(col_from), ~col_to) %>% 
+                        dplyr::select(-X1) %>% 
+                        #rename(across(starts_with("X")), ~col_to)
+                        dplyr::rename_at(vars(X3:X22), ~col_to) %>% 
                         select(id, pc1, pc2, pc3, pc4, pc5, pc6, pc7)
 
 # plot
