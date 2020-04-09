@@ -29,6 +29,122 @@ annual_survival <- fitness_data %>%
         as.data.frame() 
 
 
+# INLA -------------------------------------------------------------------------
+# prepare pedigree for animal inla
+sheep_ped_inla <- ped %>% 
+        as_tibble() %>% 
+        dplyr::rename(id = ID,
+                      mother = MOTHER,
+                      father = FATHER) %>% 
+        mutate_at(c("id", "mother", "father"), function(x) str_replace(x, "F", "888")) %>% 
+        mutate_at(c("id", "mother", "father"), function(x) str_replace(x, "M", "999")) %>% 
+        mutate(father = ifelse(is.na(father), 0, father),
+               mother = ifelse(is.na(mother), 0, mother)) %>% 
+        mutate_if(is.character, list(as.numeric)) %>% 
+        as.data.frame() 
+
+# compute Ainverse and map
+comp_inv <- AnimalINLA::compute.Ainverse(sheep_ped_inla)
+
+# make Cmatrix and map
+ainv <- comp_inv$Ainverse
+ainv_map <- comp_inv$map
+Cmatrix <- sparseMatrix(i=ainv[,1],j=ainv[,2],x=ainv[,3])
+
+# link id to cmatrix
+annual_survival$IndexA <- match(annual_survival$id, ainv_map[, 1])
+
+# ~~~~~~~~~~~~~~~~~~
+annual_survival <- annual_survival %>% 
+        mutate(IndexA2 = IndexA) 
+
+#annual_survival_test <- annual_survival %>% sample_frac(0.2)
+prec_prior <- list(prior = "loggamma", param = c(0.5, 0.5))
+# model 2, with lamb 
+formula_surv <- as.formula(paste('survival ~ froh_all10_cent * age_cent + froh_all10_cent * lamb + sex + twin + 1', 
+                                 'f(birth_year, model = "iid", hyper = list(prec = prec_prior))',
+                                 'f(sheep_year, model = "iid", hyper = list(prec = prec_prior))',
+                                 'f(IndexA2, model = "iid", hyper = list(prec = prec_prior))',
+                                 #'f(mum_id, model="iid",  hyper = list(prec = prec_prior))', 
+                                 'f(IndexA, model="generic0", hyper = list(theta = list(param = c(0.5, 0.5))),Cmatrix=Cmatrix)', sep = " + "))
+control.family1 = list(control.link=list(model="logit"))
+mod_inla <- inla(formula=formula_surv, family="binomial",
+                 data=annual_survival, 
+                 control.family = control.family1,
+                 control.compute = list(dic = TRUE, config=TRUE),
+                 control.inla = list(correct = TRUE)
+                 )
+
+saveRDS(mod_inla, file = "output/AS_mod_INLA.rds")
+mod_inla <- readRDS("output/AS_mod_INLA.rds")
+
+summary(mod_inla)
+tidy(mod_AS)
+
+mod_inla$summary.fixed
+tidy(mod_AS, conf.int = TRUE)
+
+# plot INLA marginal effects
+fun <- function(...) {
+        one <-  invlogit(Intercept + 
+                                 df1$x1 * froh_all10_cent + 
+                                 df1$x2 * age_cent + 
+                                 df1$x3 * lamb1 + 
+                                 df1$x4 * twin1 + 
+                                 df1$x5 * sexM + 
+                                 df1$x6 * `froh_all10_cent:lamb1` + 
+                                 df1$x7 * `froh_all10_cent:age_cent`)
+        
+        return (list(one))
+}
+
+invlogit <- function(x) exp(x)/(1+exp(x))
+
+froh <- seq(from = min(annual_survival$froh_all10_cent), to = (max(annual_survival$froh_all10_cent)), by = 0.1)
+age <- c(-2.4, -1.4, 1.6, 4.6)
+combined_df <- expand_grid(froh, age) %>% 
+        mutate(lamb = ifelse(age == -2.4, 1, 0),
+               twin = 0.15,
+               sex = 0.4,
+               frohxlamb = froh*lamb,
+               frohxage = froh*age) 
+names(combined_df) <- paste0("x", 1:7)
+
+xx <- inla.posterior.sample(1000, mod_inla)
+marg_means <- purrr::map(1:nrow(combined_df), function(x) {
+        df1 <<- combined_df[x, ]
+        out <- inla.posterior.sample.eval(fun, xx)
+}) 
+
+
+d <- marg_means %>% 
+        map(as_tibble) %>% 
+        bind_rows() %>% 
+        pmap_df(function(...) {
+                samp <- as.numeric(unlist(list(...)))
+                c(mean = mean(samp), quantile(samp, probs = c(0.025, 0.975)))
+        }) %>% 
+        bind_cols(combined_df) %>% 
+        .[, 1:5] %>% 
+        setNames(c("prediction", "ci_lower", "ci_upper", "froh", "age")) %>% 
+        mutate(age = as.factor(round(age + mean(annual_survival$age), 0)),
+               froh = (froh + mean(annual_survival$froh_all10))/10)
+        
+
+#saveRDS(d, file = "output/AS_mod_INLA_predictions_for_plot.rds")
+ggplot(d, aes(froh, prediction)) +
+        geom_line(aes(color = age), size = 1.5) +
+        geom_ribbon(aes(x=froh, ymin = ci_lower, ymax = ci_upper, fill = age, color = age),
+                    alpha = 0.2, linetype = 2, size = 0.1)+
+        scale_color_viridis_d("Age", labels = c(0, 1, 4, 7)) +
+        scale_fill_viridis_d("Age", labels = c(0, 1, 4, 7)) +
+        theme_simple(grid_lines = FALSE, axis_lines = TRUE) 
+
+
+
+# Modeling with lme4 and MCMCglmm ----------------------------------------------
+
+
 # lme4 -------------------------------------------------------------------------
 # time saver function for modeling
 nlopt <- function(par, fn, lower, upper, control) {
@@ -43,8 +159,8 @@ nlopt <- function(par, fn, lower, upper, control) {
 }
 
 mod_lme4 <- glmer(survival ~ froh_all10_cent * age_cent + froh_all10_cent * lamb + sex + twin + (1|birth_year) + (1|sheep_year) + (1|id),
-              family = binomial, data = annual_survival,
-              control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+                  family = binomial, data = annual_survival,
+                  control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
 summary(mod_lme4)
 
 df1 <- get_model_data(mod_lme4, type = "eff", 
@@ -145,70 +261,4 @@ ggplot() +
 
 
 
-
-# INLA -------------------------------------------------------------------------
-# prepare pedigree for animal inla
-sheep_ped_inla <- ped %>% 
-        as_tibble() %>% 
-        dplyr::rename(id = ID,
-                      mother = MOTHER,
-                      father = FATHER) %>% 
-        mutate_at(c("id", "mother", "father"), function(x) str_replace(x, "F", "888")) %>% 
-        mutate_at(c("id", "mother", "father"), function(x) str_replace(x, "M", "999")) %>% 
-        mutate(father = ifelse(is.na(father), 0, father),
-               mother = ifelse(is.na(mother), 0, mother)) %>% 
-        mutate_if(is.character, list(as.numeric)) %>% 
-        as.data.frame() 
-
-# compute Ainverse and map
-comp_inv <- AnimalINLA::compute.Ainverse(sheep_ped_inla)
-
-# make Cmatrix and map
-ainv <- comp_inv$Ainverse
-ainv_map <- comp_inv$map
-Cmatrix <- sparseMatrix(i=ainv[,1],j=ainv[,2],x=ainv[,3])
-
-# link id to cmatrix
-annual_survival$IndexA <- match(annual_survival$id, ainv_map[, 1])
-
-# ~~~~~~~~~~~~~~~~~~
-annual_survival <- annual_survival %>% 
-        mutate(IndexA2 = IndexA) 
-
-#annual_survival_test <- annual_survival %>% sample_frac(0.2)
-prec_prior <- list(prior = "loggamma", param = c(0.5, 0.5))
-# model 2, with lamb 
-formula_surv <- as.formula(paste('survival ~ froh_all10_cent * age_cent + froh_all10_cent * lamb + sex + twin + 1', 
-                                 'f(birth_year, model = "iid", hyper = list(prec = prec_prior))',
-                                 'f(sheep_year, model = "iid", hyper = list(prec = prec_prior))',
-                                 'f(IndexA2, model = "iid", hyper = list(prec = prec_prior))',
-                                 #'f(mum_id, model="iid",  hyper = list(prec = prec_prior))', 
-                                 'f(IndexA, model="generic0", hyper = list(theta = list(param = c(0.5, 0.5))),Cmatrix=Cmatrix)', sep = " + "))
-control.family1 = list(control.link=list(model="logit"))
-mod_inla <- inla(formula=formula_surv, family="binomial",
-                 data=annual_survival, 
-                 control.family = control.family1,
-                 control.compute = list(dic = TRUE, config=TRUE),
-                 control.inla = list(correct = TRUE)
-                 )
-
-saveRDS(mod_inla, file = "output/AS_mod_INLA.rds")
-
-summary(mod_inla)
-tidy(mod_AS)
-
-mod_inla$summary.fixed
-tidy(mod_AS, conf.int = TRUE)
-# 
-# inv.phylo <- MCMCglmm::inverseA(ped)
-# A <- solve(inv.phylo$Ainv)
-# rownames(A) <- rownames(inv.phylo$Ainv)
-# 
-# library(brms)
-# 
-# model_simple <- brm(
-#         survival ~ froh_all10_cent * age_cent + froh_all10_cent * lamb + sex + twin +(1|animal) + (1|id) + (1|birth_year) + (1|sheep_year),
-#         data = annual_survival, 
-#         family = bernoulli(), cov_ranef = list(animal = A),
-#         chains = 1, cores = 1, iter = 100
 

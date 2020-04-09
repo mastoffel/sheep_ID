@@ -6,7 +6,7 @@ library(broom.mixed)
 library(snpStats)
 library(data.table)
 library(furrr)
-library(caret)
+#library(caret)
 # for running on server
 chr_inp  <- commandArgs(trailingOnly=TRUE)
 if (!(length(chr_inp) == 0)) {
