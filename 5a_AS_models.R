@@ -158,9 +158,12 @@ nlopt <- function(par, fn, lower, upper, control) {
         )
 }
 
+start_time <- Sys.time()
 mod_lme4 <- glmer(survival ~ froh_all10_cent * age_cent + froh_all10_cent * lamb + sex + twin + (1|birth_year) + (1|sheep_year) + (1|id),
                   family = binomial, data = annual_survival,
                   control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+end_time <- Sys.time()
+end_time - start_time
 summary(mod_lme4)
 
 df1 <- get_model_data(mod_lme4, type = "eff", 

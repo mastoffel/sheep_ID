@@ -7,29 +7,29 @@ library(snpStats)
 library(data.table)
 library(furrr)
 #library(caret)
-# for running on server
-chr_inp  <- commandArgs(trailingOnly=TRUE)
-if (!(length(chr_inp) == 0)) {
-        chr <- as.numeric(chr_inp[[1]])
-} else {
-        # SNP data
-        # which chromosome
-        chr <- 26
-}
 
+# for running on server
+
+part_inp  <- commandArgs(trailingOnly=TRUE)
+if (!(length(part_inp) == 0)) {
+        part <- as.numeric(part_inp[[1]])
+} else {
+        # if no part selected, take first 1000
+        part <- 1
+}
 
 # data
 load("data/survival_mods_data.RData")
 load("data/sheep_ped.RData")
 #IDs_lots_missing <- read_delim("data/ids_more_than_5perc_missing.txt", delim = " ")
 
-# pcas 
+# pcs 
 pcs <- read_delim("data/ann_surv_pca.txt", " ", col_names = TRUE) %>% 
         mutate(id = as.character(id))
 
 # roh data
 file_path <- "data/roh_nofilt_ram_pruned.hom"
-roh_lengths <- fread(file_path) 
+roh_lengths <- fread(file_path)
 
 # plink name
 sheep_plink_name <- "data/sheep_geno_imputed_ram_pruned"
@@ -39,9 +39,16 @@ sheep_bim <- paste0(sheep_plink_name, ".bim")
 sheep_fam <- paste0(sheep_plink_name, ".fam")
 full_sample <- read.plink(sheep_bed, sheep_bim, sheep_fam)
 
-snps_map_sub <- full_sample$map %>% 
-        filter(chromosome == chr) 
+# make list with all parts
+all_snps <- 1:nrow(full_sample$map)
+all_parts <- split(all_snps, ceiling(seq_along(all_snps )/1000))
+snp_indices <- all_parts[[part]]
 
+# filter map data
+snps_map_sub <- as_tibble(full_sample$map[snp_indices, ])
+# additive genotypes
+geno_sub <- as_tibble(as(full_sample$genotypes[, snps_map_sub$snp.name], Class = "numeric"),
+                      rownames = "id")
 # survival data
 # survival data preprocessing
 annual_survival <- fitness_data %>% 
@@ -59,65 +66,40 @@ annual_survival <- fitness_data %>%
                lamb = as.factor(lamb)) %>% 
         as.data.frame() 
 
-froh_no_chr <- paste0("froh_no_chr", chr)
+#roh_lengths <- as.data.table(roh_lengths)
+# check whether snp is in ROH for a given individual
 
-# prepare additive genotypes subset
-snps_sub <- full_sample$map %>% 
-        filter(chromosome == chr) %>% 
-        .$snp.name
-geno_sub <- as_tibble(as(full_sample$genotypes[, snps_sub], Class = "numeric"),
-                      rownames = "id")
+setkey(roh_lengths, IID)
+roh_id_per_snp <- function(i) {
+        position <- as.numeric(snps_map_sub[i, "position"])
+        chromosome <- as.numeric(snps_map_sub[i, "chromosome"])
+        # varname <- paste0("roh", i)
+        #roh <- as.numeric((roh_lengths$POS1 <= position) & (roh_lengths$POS2 >= position) & (roh_lengths$CHR == chromosome))
+        #roh_lengths$roh <- roh
+        roh_lengths[, roh := as.numeric((CHR == chromosome) & (POS1 <= position) & (POS2 >= position))]
+        #roh_lengths[, roh := fifelse((POS1 <= position)&(POS2 >= position)&(CHR == chromosome), 1, 0)]
+        roh_id <- roh_lengths[,  .(roh = max(roh)), by = c("IID")]$roh
+}
 
-# subset roh // not subsetted anymore for ROH length / previously 1Mb
-roh_sub <- roh_lengths %>% filter(CHR == chr) %>% filter(KB > 600)
+roh_ind <- map(1:nrow(snps_map_sub), roh_id_per_snp)
+roh_df <- as.data.frame(do.call(cbind, roh_ind))
+names(roh_df) <- paste0("roh_", snps_map_sub$snp.name)
+roh_df$id <- as.character(unique(roh_lengths$IID))
 
-# define vectorized seq to work with mutate
-seq2 <- Vectorize(seq.default, vectorize.args = c("from", "to"))
 
-# create indices for all rohs
-roh_snps <- roh_sub %>% 
-        as_tibble() %>% 
-        # sample_frac(0.01) %>% 
-        mutate(index1 = as.numeric(match(SNP1, names(geno_sub))),
-               index2 = as.numeric(index1 + NSNP - 1)) %>% 
-        mutate(all_snps = seq2(from = index1, to = index2)) %>% 
-        group_by(IID) %>% 
-        summarise(all_snps = list(all_snps)) %>% 
-        mutate(all_snps = simplify_all(all_snps)) %>% 
-        mutate(IID = as.character(IID)) %>% 
-        rename(id = IID)
-
-# join roh_snps
-roh_snps_reord <- geno_sub %>% 
-        dplyr::select(id) %>% 
-        left_join(roh_snps, by = "id") %>% 
-        dplyr::rename(id_roh = id)
-
-# prepare roh yes/no matrix
-roh_mat <- matrix(data = 0, nrow = nrow(geno_sub), ncol = ncol(geno_sub))
-
-# set 1 where SNP is in an roh
-roh_list <- pmap(roh_snps_reord, function(id_roh, all_snps) {
-        df <- as.matrix(t(as.numeric(c(id_roh, rep(0, ncol(geno_sub) - 1)))))
-        df[, all_snps] <- 1
-        df
-}) 
-
-# make a tibble like for genotypes but with 0/1 for whether a SNP is in ROH or not
-roh_df <- do.call(rbind, roh_list) %>% 
-        as_tibble() %>% 
-        mutate(V1 = as.character(V1))
-names(roh_df) <- c("id", paste0("roh_", names(geno_sub)[-1]))
+#library(SparseM)
+#image(as.matrix.csr(roh_df[1:1000, 1:1000]))
 
 
 # make some space
 rm(full_sample)
-rm(roh_list)
-rm(roh_mat)
+
+froh_no_chr <- paste0("froh_no_chr", part)
 
 # join additive and roh data to survival for gwas
 annual_survival_gwas <- annual_survival %>% 
-        dplyr::select(id, survival, sex, twin, birth_year, sheep_year, mum_id, age_std, age_std2, {{ froh_no_chr }}) %>% 
+        #mutate_at(vars(starts_with("froh_no_chr")), scale) %>% 
+        dplyr::select(id, survival, sex, twin, lamb, birth_year, sheep_year, mum_id, age_std, age_std2, {{ froh_no_chr }}) %>% 
         left_join(pcs, by = "id") %>% 
         left_join(geno_sub, by = "id") %>% 
         left_join(roh_df, by = "id") %>% 
@@ -137,10 +119,12 @@ nlopt <- function(par, fn, lower, upper, control) {
 
 
 run_gwas <- function(snp, data) {
-        formula_snp <- as.formula(paste0("survival ~ 1 + sex + twin + age_std + age_std2 + ", 
+        formula_snp <- as.formula(paste0("survival ~ 1 + sex + twin + age_std + age_std2 + lamb + ", 
                                          froh_no_chr, " + ",
                                          "pc1 + pc2 + pc3 + pc4 + pc5 + pc6 + pc7 + ",
+                                         #"pc1 + pc2 + pc3 + pc4 +",
                                          snp, "+ ", paste0("roh_", snp), "+ (1|birth_year) + (1|sheep_year) + (1|id)"))
+                                         #snp, "+ ", paste0("roh_", snp), " + (1|sheep_year) + (1|id)"))
         mod <- glmer(formula = formula_snp,
                      data = data, family = "binomial",
                      control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
@@ -148,11 +132,13 @@ run_gwas <- function(snp, data) {
         out
 }
 
-# 
 safe_run_gwas <- purrr::safely(run_gwas)
 
-# split in pieces of 1000 snps / rohs, each approximately 0.25 Gb)
-num_parts <- round(length(seq_along(snps_sub)) / 1000)
+# 
+
+snps_sub <- snps_map_sub$snp.name
+# split into pieces of 50 SNPs 
+num_parts <- round(length(seq_along(snps_sub )) / 50)
 snps_pieces <- split(snps_sub, cut(seq_along(snps_sub), num_parts, labels = FALSE))
 roh_pieces <- map(snps_pieces, function(x) paste0("roh_", x))
 
@@ -162,21 +148,21 @@ annual_survival_gwas_pieces <-
         })
 
 # clean up
-rm(annual_survival, annual_survival_gwas, fitness_data, geno_sub, roh_lengths, roh_pieces, 
-   roh_snps, roh_snps_reord, sheep_ped, snps_map_sub, roh_sub, roh_df)
+rm(annual_survival, annual_survival_gwas, fitness_data, geno_sub, 
+   roh_lengths, roh_pieces, sheep_ped, snps_map_sub,roh_df)
 
 # set up plan
 plan(multiprocess, workers = 8)
 
 # increase maxSize
 options(future.globals.maxSize = 3000 * 1024^2)
-all_out <- purrr::pmap(list(snps_pieces, annual_survival_gwas_pieces, 1:num_parts),  function(snps, data, num_part) {
-        out <- future_map(snps, safe_run_gwas, data)
-        # remove one hierarchical level
-        all_out_simple <- purrr::flatten(out)
-        saveRDS(all_out_simple, file = paste0("output/GWAS_roh_chr", chr, "_", num_part, ".rds"))
+
+all_out <- future_map2(snps_pieces, annual_survival_gwas_pieces, function(snps, data) {
+        out <- purrr::map(snps, safe_run_gwas, data)
 })
 
+all_out_simple <- purrr::flatten(all_out)
+saveRDS(all_out_simple, file = paste0("output/GWAS_roh_part", "_", part, ".rds"))
 
 
 

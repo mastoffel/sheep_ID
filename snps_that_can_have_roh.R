@@ -24,7 +24,7 @@ roh_possible <- function(snp_ind, hom_sum_df, roh_snps = 25, roh_kb = 600) {
                  win_step = 1,
                  funs = c("max", "min"))
   out$KB_diff <- out$KB_max - out$KB_min
-  res <- ifelse(any(out[1:roh_snps, ]$KB_diff >= roh_kb), "yes", "no")
+  res <- ifelse(any(out[1:roh_snps, ]$KB_diff <= roh_kb), "yes", "no")
 
 }
 
