@@ -15,7 +15,7 @@ if (!(length(part_inp) == 0)) {
         part <- as.numeric(part_inp[[1]])
 } else {
         # if no part selected, take first 1000
-        part <- 1
+        part <- 21
 }
 
 # data
@@ -94,8 +94,9 @@ roh_df$id <- as.character(unique(roh_lengths$IID))
 # make some space
 rm(full_sample)
 
-froh_no_chr <- paste0("froh_no_chr", part)
-
+# which chromosomes do the snps span?
+chrs <- unique(snps_map_sub$chromosome)
+froh_no_chr <- paste0("froh_no_chr", chrs)
 # join additive and roh data to survival for gwas
 annual_survival_gwas <- annual_survival %>% 
         #mutate_at(vars(starts_with("froh_no_chr")), scale) %>% 
@@ -117,8 +118,12 @@ nlopt <- function(par, fn, lower, upper, control) {
         )
 }
 
-
+# focal SNP, chromosome of focal snp, data
 run_gwas <- function(snp, data) {
+        # for mean froh without focal chr
+        chr <- as.numeric(snps_map_sub[snps_map_sub$snp.name == snp, "chromosome"])
+        froh_no_chr <- paste0("froh_no_chr", chr)
+        
         formula_snp <- as.formula(paste0("survival ~ 1 + sex + twin + age_std + age_std2 + lamb + ", 
                                          froh_no_chr, " + ",
                                          "pc1 + pc2 + pc3 + pc4 + pc5 + pc6 + pc7 + ",
@@ -149,10 +154,10 @@ annual_survival_gwas_pieces <-
 
 # clean up
 rm(annual_survival, annual_survival_gwas, fitness_data, geno_sub, 
-   roh_lengths, roh_pieces, sheep_ped, snps_map_sub,roh_df)
+   roh_lengths, roh_pieces, sheep_ped, roh_df)
 
 # set up plan
-plan(multiprocess, workers = 8)
+plan(multiprocess, workers = 6)
 
 # increase maxSize
 options(future.globals.maxSize = 3000 * 1024^2)
