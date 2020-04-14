@@ -28,11 +28,11 @@ pcs <- read_delim("data/ann_surv_pca.txt", " ", col_names = TRUE) %>%
         mutate(id = as.character(id))
 
 # roh data
-file_path <- "data/roh_nofilt_ram_pruned.hom"
+file_path <- "data/roh_nofilt_ram.hom"
 roh_lengths <- fread(file_path)
 
 # plink name
-sheep_plink_name <- "data/sheep_geno_imputed_ram_pruned"
+sheep_plink_name <- "data/sheep_geno_imputed_ram_400k_filt"
 # read merged plink data
 sheep_bed <- paste0(sheep_plink_name, ".bed")
 sheep_bim <- paste0(sheep_plink_name, ".bim")
@@ -124,7 +124,7 @@ run_gwas <- function(snp, data) {
         chr <- as.numeric(snps_map_sub[snps_map_sub$snp.name == snp, "chromosome"])
         froh_no_chr <- paste0("froh_no_chr", chr)
         
-        formula_snp <- as.formula(paste0("survival ~ 1 + sex + twin + age_std + age_std2 + lamb + ", 
+        formula_snp <- as.formula(paste0("survival ~ 1 + sex + twin + age_std + age_std2 + ", 
                                          froh_no_chr, " + ",
                                          "pc1 + pc2 + pc3 + pc4 + pc5 + pc6 + pc7 + ",
                                          #"pc1 + pc2 + pc3 + pc4 +",
@@ -162,7 +162,7 @@ plan(multiprocess, workers = 6)
 # increase maxSize
 options(future.globals.maxSize = 3000 * 1024^2)
 
-all_out <- future_map2(snps_pieces, annual_survival_gwas_pieces, function(snps, data) {
+all_out <- future_map2(snps_pieces[1:2], annual_survival_gwas_pieces[1:2], function(snps, data) {
         out <- purrr::map(snps, safe_run_gwas, data)
 })
 

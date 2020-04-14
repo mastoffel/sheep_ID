@@ -10,6 +10,10 @@ library(snpStats)
 # # test ROH on subset
 # system("~/programs/plink --bfile data/sheep_imp --keep data/subset_inds.txt --make-bed --out data/geno_sub --sheep")
 
+# terminology:
+# _filt for files where individuals were filtered
+# _pruned for files where SNPs were LD pruned
+
 # LD pruning ===================================================================
 # old pruning resulting in 137K SNPs
 # system(paste0("~/programs/plink --bfile ../sheep/data/SNP_chip/ramb_mapping/sheep_geno_imputed_ram_27092019 --sheep --out output/ROH/sheep_geno_imputed_ram_27092019_pruned ",
@@ -17,54 +21,49 @@ library(snpStats)
 # new pruning resulting in 195k SNPs
 # get pruning file
 # all following analyses based on the subset of individuals in the survival analysis
-system(paste0("/usr/local/bin/plink --bfile ../sheep/data/SNP_chip/ramb_mapping/sheep_geno_imputed_ram_27092019 ",
-             "--sheep --keep output/ROH/ids_surv.txt --out output/plink_files/sheep_geno_imputed_ram_pruned ",
-              "--indep-pairwise 500 50 0.999"))
+# system(paste0("/usr/local/bin/plink --bfile ../sheep/data/SNP_chip/ramb_mapping/sheep_geno_imputed_ram_27092019 ",
+#              "--sheep --keep output/ROH/ids_surv.txt --out output/plink_files/sheep_geno_imputed_ram_pruned ",
+#               "--indep-pairwise 500 50 0.999"))
+# 
+# # prune SNPs, filter individuals and make new data
+# system(paste0("/usr/local/bin/plink --bfile ../sheep/data/SNP_chip/ramb_mapping/sheep_geno_imputed_ram_27092019 --sheep --keep output/ROH/ids_surv.txt ",
+#               "--extract output/plink_files/sheep_geno_imputed_ram_pruned.prune.in --make-bed --out output/plink_files/sheep_geno_imputed_ram_pruned"))
 
-# prune SNPs, filter individuals and make new data
-system(paste0("/usr/local/bin/plink --bfile ../sheep/data/SNP_chip/ramb_mapping/sheep_geno_imputed_ram_27092019 --sheep --keep output/ROH/ids_surv.txt ",
-              "--extract output/plink_files/sheep_geno_imputed_ram_pruned.prune.in --make-bed --out output/plink_files/sheep_geno_imputed_ram_pruned"))
+# 400k SNPs, only filter individuals and make new data 
+system(paste0("/usr/local/bin/plink --bfile data/sheep_geno_imputed_ram_400k --sheep --keep output/ROH/ids_surv.txt ",
+              "--make-bed --out output/plink_files/sheep_geno_imputed_ram_400k_filt"))
 
 # PCA for GWAS =================================================================
-system(paste0("/usr/local/bin/plink --bfile output/plink_files/sheep_geno_imputed_ram_pruned --sheep ",
-              "--pca --out output/sheep_pca")) # sheep_pca
+# for pruned data
+# system(paste0("/usr/local/bin/plink --bfile output/plink_files/sheep_geno_imputed_ram_pruned --sheep ",
+#               "--pca --out output/sheep_pca")) # sheep_pca
+
+# for 400k / PCA on pruned data as unpruned data fails for some reason
+system(paste0("/usr/local/bin/plink --bfile output/plink_files/sheep_geno_imputed_ram_400k_filt --sheep ",
+              "--pca --out output/sheep_pca_400k",
+              "--indep-pairwise 500 50 0.999")) # sheep_pca
 
 # calculate ROH pruned =========================================================
-system(paste0("/usr/local/bin/plink --bfile output/plink_files/sheep_geno_imputed_ram_pruned --sheep --out output/ROH/roh_nofilt_ram_pruned ",
-              "--homozyg --homozyg-window-snp 30 --homozyg-snp 25 --homozyg-kb 600 ",
-              "--homozyg-gap 500 --homozyg-density 50 --homozyg-window-missing 2 ",
-              "--homozyg-het 1 ",
-              "--homozyg-window-het 1"))
+# system(paste0("/usr/local/bin/plink --bfile output/plink_files/sheep_geno_imputed_ram_pruned --sheep --out output/ROH/roh_nofilt_ram_pruned ",
+#               "--homozyg --homozyg-window-snp 30 --homozyg-snp 25 --homozyg-kb 600 ",
+#               "--homozyg-gap 500 --homozyg-density 50 --homozyg-window-missing 2 ",
+#               "--homozyg-het 1 ",
+#               "--homozyg-window-het 1"))
 
 # calculate ROH unpruned =======================================================
-system(paste0("/usr/local/bin/plink --bfile ../sheep/data/SNP_chip/ramb_mapping/sheep_geno_imputed_ram_27092019 --sheep --out output/ROH/roh_nofilt_ram ",
-              "--keep output/ROH/ids_surv.txt ",
-              "--homozyg --homozyg-window-snp 30 --homozyg-snp 25 --homozyg-kb 600 ",
+system(paste0("/usr/local/bin/plink --bfile output/plink_files/sheep_geno_imputed_ram_400k_filt --sheep --out output/ROH/roh_nofilt_ram ",
+             # "--keep output/ROH/ids_surv.txt ",
+              "--homozyg --homozyg-window-snp 30 --homozyg-snp 30 --homozyg-kb 600 ",
               "--homozyg-gap 500 --homozyg-density 50 --homozyg-window-missing 2 ",
               "--homozyg-het 1 ",
               "--homozyg-window-het 1"))
 
-# # calculate ROH, unpruned with subset for survival analysis
-# system(paste0("/usr/local/bin/plink --bfile ../sheep/data/SNP_chip/ramb_mapping/sheep_geno_imputed_ram_27092019 --sheep --out output/ROH/ROH_surv_subset/roh_nofilt_ram ",
-#               "--homozyg --homozyg-window-snp 30 --homozyg-snp 25 --homozyg-kb 600 ",
-#               "--homozyg-gap 500 --homozyg-density 50 --homozyg-window-missing 2 ",
-#               "--homozyg-het 1 ",
-#               "--homozyg-window-het 1 ",
-#               "--keep output/ROH/ROH_surv_subset/ids_surv.txt"))
-# 
-# # calculate ROH, pruned with subset for survival analysis
-# system(paste0("/usr/local/bin/plink --bfile ../sheep/data/SNP_chip/ramb_mapping/sheep_geno_imputed_ram_27092019_pruned --sheep --out output/ROH/ROH_surv_subset/roh_nofilt_ram_pruned ",
-#               "--homozyg --homozyg-window-snp 30 --homozyg-snp 25 --homozyg-kb 600 ",
-#               "--homozyg-gap 500 --homozyg-density 50 --homozyg-window-missing 2 ",
-#               "--homozyg-het 1 ",
-#               "--homozyg-window-het 1 ",
-#               "--keep output/ROH/ROH_surv_subset/ids_surv.txt"))
 
 # inferred ROH output ==========================================================
 # without pruning
 # file_path <- "output/ROH/roh_nofilt_ram.hom"
 # with pruning
-file_path <- "output/ROH/roh_nofilt_ram_pruned.hom"
+file_path <- "output/ROH/roh_nofilt_ram.hom"
 roh_lengths <- fread(file_path)
 
 # distribution
@@ -159,19 +158,31 @@ sum(ind_missing_snps > (0.05*400637)) # 392 individuals
 
 # genotype file for simpleM
 
-plink_geno_path <- "data/"
+# which ids are HD
+plink_geno_path <- "../sheep/data/SNP_chip/Plates_1-2_HD_QC2"
+# read merged plink data
+sheep_bed <- paste0(plink_geno_path, ".bed")
+sheep_bim <- paste0(plink_geno_path, ".bim")
+sheep_fam <- paste0(plink_geno_path, ".fam")
+hd_sample <- read.plink(sheep_bed, sheep_bim, sheep_fam)
+write_delim(data.frame(id = hd_sample$fam$member), path = "data/hd_ids.txt", " ")
+
+id <- hd_sample$fam$member
+plink_geno_path <- "output/plink_files/"
 # plink name
 #sheep_plink_name <- "sheep_geno_imputed_ram_27092019_pruned"
-sheep_plink_name <- "sheep_geno_imputed_ram_27092019"
+sheep_plink_name <- "sheep_geno_imputed_ram_pruned"
 # read merged plink data
 sheep_bed <- paste0(plink_geno_path, sheep_plink_name, ".bed")
 sheep_bim <- paste0(plink_geno_path, sheep_plink_name, ".bim")
 sheep_fam <- paste0(plink_geno_path, sheep_plink_name, ".fam")
 full_sample <- read.plink(sheep_bed, sheep_bim, sheep_fam)
 
-genos_hd <- as(full_sample$genotypes[1:188, ], Class = "numeric")
+hd_inds <- which(full_sample$fam$member %in% id)
+
+genos_hd <- as(full_sample$genotypes[hd_inds, ], Class = "numeric")
 # in the few cases with NA add random genotype so that simpleM works
 library(imputeTS)
 genos_hd <- na_mean(genos_hd)
 #genos_hd[is.na(genos_hd)] <- sample(c(0,1,2), replace=TRUE, sum(is.na(genos_hd)))
-fwrite(data.table::transpose(as.data.table(genos_hd)), "data/geno_mat_simpleM_allchr_400k.txt")
+fwrite(data.table::transpose(as.data.table(genos_hd)), "data/geno_mat_simpleM_allchr_190k.txt")

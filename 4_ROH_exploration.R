@@ -340,15 +340,20 @@ running_roh <- winScan(x = hom_sum,
                        groups = "CHR",
                        position = "KB",
                        values = "UNAFF",
-                       win_size = 1000,
-                       win_step = 1000,
+                       win_size = 100,
+                       win_step = 100,
                        funs = c("mean"))
 
 # ROH sharing 1
 running_roh %>% 
   mutate(UNAFF_mean = UNAFF_mean/5952) %>% 
   filter(UNAFF_n > 0) -> running_roh_p
+
+cor(running_roh$UNAFF_mean, running_roh$UNAFF_n, use = "complete.obs")
   #filter(CHR == 1) %>% 
+running_roh %>% 
+  mutate(UNAFF_mean = UNAFF_mean/5952) %>% 
+  filter(UNAFF_n > 0) -> running_roh_p
 
 # check distribution of snps
 ggplot(running_roh, aes(win_start, UNAFF_n)) + 

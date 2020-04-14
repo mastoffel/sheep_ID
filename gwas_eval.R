@@ -4,6 +4,7 @@ source("theme_simple.R")
 library(viridis)
 library(magrittr)
 library(patchwork)
+library(furrr)
 chr_info <- read_delim("../sheep/data/sheep_genome/chromosome_info_ram.txt", "\t") %>% 
                 .[-1, ] %>% 
                 rename(chromosome = Part) %>% 
@@ -11,19 +12,29 @@ chr_info <- read_delim("../sheep/data/sheep_genome/chromosome_info_ram.txt", "\t
                 mutate(chromosome = as.integer(chromosome)) %>% 
                 filter(!is.na(chromosome))
 
-gwas_files <- list.files("output/gwas_full_pca_with_f", pattern = "*.rds", full.names = TRUE)
+#gwas_files <- list.files("output/gwas_full_pca_with_f", pattern = "*.rds", full.names = TRUE)
+gwas_files <- list.files("output/gwas_new/second_run_age_nolamb/", pattern = "*.rds", full.names = TRUE)
 #gwas_files <- list.files("output/gwas_survival_gaussian/", pattern = "*.rds", full.names = TRUE)
 
 # extract results
 all_gwas <- purrr::map(gwas_files, readRDS) %>% 
             purrr::flatten() %>% 
-            # only extract results
-            .[seq(1,length(.),by=2)] %>% 
+            purrr::flatten() %>% 
+            .[seq(1,length(.),by=2)] #%>% 
            # remove snps that didnt work
-            purrr::compact()
+           # purrr::compact()
 
 # get roh/add pval
-gwas_res <- map_df(all_gwas, function(x) x %>% .[c(14,15), ] %>% 
+not_working <- map(all_gwas, is.null)
+which(unlist(not_working))
+all_gwas[[1364]]
+gwas_res0 <- map(all_gwas, function(x) nrow(x) == 19) %>% unlist()
+which(!gwas_res0)
+
+all_gwas <- all_gwas[-which(unlist(not_working))]
+
+plan(multiprocess, workers = 8)
+gwas_res <- future_map_dfr(all_gwas, function(x) x %>% .[c(14,15), ] %>% 
                            dplyr::select(term, estimate, p.value))
 
 # check whether snp roh didnt work in some models anywhere
@@ -33,7 +44,7 @@ gwas_res[which(str_detect(gwas_res$term, "sd")), ]
 gwas_res <- gwas_res[-which(str_detect(gwas_res$term, "sd")), ]
 
 # plink name
-sheep_plink_name <- "data/sheep_geno_imputed_ram_27092019_pruned"
+sheep_plink_name <- "output/plink_files/sheep_geno_imputed_ram_pruned"
 # read merged plink data
 sheep_bed <- paste0(sheep_plink_name, ".bed")
 sheep_bim <- paste0(sheep_plink_name, ".bim")
@@ -73,13 +84,13 @@ p1 <- gwas_roh %>%
   mutate(estimate = abs(estimate)) %>% 
   ggplot(aes(estimate, fill = direction)) +
   geom_histogram(bins = 1000) +
-  theme_simple(axis_lines = TRUE) +
+  theme_simple(axis_lines = TRUE, grid_lines = FALSE) +
   theme(axis.line.y = element_blank()) +
   scale_fill_manual("Direction of\neffect on survival", values = cols) +
-  scale_x_log10(breaks = c(0.001, 0.01, 0.1, 1, 5), labels = c(0.001, 0.01, 0.1, 1, 5),
-                limits = c(0.00001, 5)) +
+  scale_x_log10(breaks = c(0.001, 0.01, 0.1, 1), labels = c(0.001, 0.01, 0.1, 1),
+                limits = c(0.00001, 2)) +
   scale_y_continuous(expand = c(0,0)) +
-  xlab("estimate") +
+  xlab("Estimate (log-odds of survival)") +
   ylab("SNPs")
 p1
 
@@ -87,8 +98,8 @@ p2 <- gwas_roh %>%
   mutate(direction = ifelse(estimate < 0, "negative", "positive")) %>% 
   mutate(estimate = abs(estimate)) %>% 
   ggplot(aes(estimate, fill = direction)) +
-  geom_histogram(bins = 20) +
-  theme_simple(axis_lines = TRUE, base_size = 7) +
+  geom_histogram(bins = 10) +
+  theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_size = 7) +
   theme(axis.line.y = element_blank(),
         legend.position = "none",
         axis.title.x = element_text(margin=margin(t=1)),
@@ -96,9 +107,9 @@ p2 <- gwas_roh %>%
         axis.text.x=element_text(margin=margin(t=1)),
         axis.text.y=element_text(margin=margin(r=1))) +
   scale_fill_manual("Direction of\neffect on survival", values = cols) +
-  scale_x_continuous(limits = c(1, 5)) +
+  scale_x_continuous(limits = c(0.7, 1.6)) +
   scale_y_continuous(expand = c(0,0)) +
-  xlab("estimate") +
+  xlab("Estimate") +
   ylab("SNPs")
 p2
 
@@ -106,19 +117,20 @@ p3 <- gwas_roh %>%
   mutate(direction = ifelse(estimate < 0, "negative", "positive")) %>% 
   ggplot(aes(p.value, fill = direction)) +
   geom_histogram(bins = 1000) +
-  theme_simple(axis_lines = TRUE) +
+  theme_simple(axis_lines = TRUE, grid_lines = FALSE) +
   scale_fill_manual("Direction of\neffect on survival", values = cols) +
   theme(axis.line.y = element_blank()) +
   scale_x_continuous(limits = c(0, 1),  expand = c(0,0)) +
   scale_y_continuous(expand = c(0,0)) +
   ylab("SNPs") +
   xlab("p-value")
+p3
 
 p4 <- gwas_roh %>% 
   mutate(direction = ifelse(estimate < 0, "negative", "positive")) %>% 
   ggplot(aes(p.value, fill = direction)) +
   geom_histogram(bins = 30) +
-  theme_simple(axis_lines = TRUE, base_size = 7) +
+  theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_size = 7) +
   scale_fill_manual("Direction of\neffect on survival", values = cols) +
   theme(axis.line.y = element_blank(),
         legend.position = "none",
@@ -154,12 +166,12 @@ chr_labels <- c(c(1:18),"","20","",  "22","", "24","", "26")
 cols <- c("#336B87", "#2A3132")
 
 # get cumsums
-chr_info %<>% 
+chr_info2 <- chr_info %>% 
         mutate(tot=cumsum(Length)-Length) %>% 
         dplyr::select(chromosome, tot)
 
 gwas_p <- gwas_roh %>% 
-        left_join(chr_info) %>% 
+        left_join(chr_info2) %>% 
         # Add a cumulative position of each SNP
         arrange(chromosome, position) %>%
         mutate(positive_cum = position + tot) 
@@ -189,11 +201,13 @@ p_rohvsgwas <- ggplot(gwas_plot, aes(roh_count, estimate)) +
       geom_point(shape = 21, alpha = 1, stroke = 0.1) +
       geom_smooth(se = FALSE, method = "lm") +
       theme_simple(axis_lines = TRUE, 
+                   grid_lines = FALSE,
                    base_size = 8) + 
       facet_wrap(~chromosome, scales = "free") +
       theme(axis.title = element_text(size = 13)) +
       ylab("Estimate (log-odds)") +
       xlab("ROH count")
+p_rohvsgwas
 #ggsave("figs/roh_vs_gwas.jpg", width = 10, height = 6)
 
 cols <- c("#4393c3", "#2A3132")
@@ -208,18 +222,19 @@ pgwas <- ggplot(gwas_plot, aes(x=positive_cum, y=-log10(p.value))) +
         #           size = 2, shape = 21, alpha = 0.7, stroke = 0.02, color = "black") +
         geom_point(aes(fill = chromosome %%2 == 0),#shape = roh_prevalence  #fill = chromosome %%2 == 0
                    size = 2, shape = 21, alpha = 1, stroke = 0, color = "black") +
-        geom_point(data = gwas_plot %>% filter(-log10(p.value) > -log10(0.0001)), 
-                   aes(fill = direction), size = 2, shape = 21, alpha = 0.5, stroke = 0.3, color = "black") +
+        geom_point(data = gwas_plot %>% filter(-log10(p.value) > -log10(0.05/31705)), # aes(fill = direction),  0.00001
+                  fill=cols[[1]], size = 2, shape = 21, alpha = 0.5, stroke = 0.3, color = "black") +
        # gghighlight(-log10(p.value) > 2,
         #            unhighlighted_params = list(aes(fill = chromosome %%2 == 0))) +
-        geom_hline(yintercept = -log10(0.05/28946), linetype="dashed", color = "grey") +
+        geom_hline(yintercept = -log10(0.05/31705), linetype="dashed", color = "grey") +
         scale_x_continuous(labels = chr_labels, breaks= axisdf$center ) +
         scale_y_continuous(expand = c(0, 0), limits = c(0,8)) +
         xlab("Chromosome") + 
         ylab(expression(-log[10](italic(p)))) + ## y label from qqman::qq
-        scale_fill_manual(values = c("#d8dee9", viridis(2),"#ECEFF4")) + 
+        #scale_fill_manual(values = c("#d8dee9", viridis(2),"#ECEFF4")) + 
+        scale_fill_manual(values = c("#d8dee9","#ECEFF4")) + 
         #scale_fill_manual(values = c("#d8dee9","#4393c3","#2A3132","#ECEFF4")) +
-        theme_simple(axis_lines = TRUE) +
+        theme_simple(axis_lines = TRUE, grid_lines = FALSE) +
         theme(axis.text.x = element_text(size = 8),
               axis.ticks = element_line(size = 0.1)) +
         guides(fill=FALSE) 
@@ -245,13 +260,14 @@ cols <- c("#440154FF", "#FDE725FF")
 # add effect size of significant snps
 pgwas2 <- gwas_plot %>% 
   #filter(-log10(p.value) > -log10(0.05/28946)) %>% 
-  filter(-log10(p.value) > 4) %>% 
+  filter(-log10(p.value) > -log10(0.05/31705)) %>% 
   mutate(direction = ifelse(estimate < 0, "negative", "positive")) %>% 
 ggplot(aes(estimate, fill = direction)) +
-  geom_histogram(bins = 40) +
+  geom_histogram(bins = 7) +
   scale_fill_manual("Direction of\neffect on survival", values = cols) +
-  theme_simple(axis_lines = TRUE, base_size = 7) +
-  scale_x_continuous(breaks = c(-1.5, -1, -0.5, 0, 0.5), limits = c(-1.6, 0.7)) +
+  theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_size = 7) +
+  #scale_x_continuous(breaks = c(-1.5, -1, -0.5, 0, 0.5), limits = c(-1.6, 0.7)) +
+  scale_x_continuous(limits = c(-0.9, -0.55)) +
   theme(axis.line.y = element_blank(),
         legend.position = "none",
         axis.title.x = element_text(margin=margin(t=1)),
@@ -276,10 +292,62 @@ p_effsize_h2 <- p1 + p2 + p3 + p4 + pgwas + pgwas2 +
   plot_annotation(tag_levels = 'A')
 p_effsize_h2
 
-ggsave(filename = "figs/gwas_plot_viridis2.jpg", p_effsize_h2, width = 9, height = 5)
+ggsave(filename = "figs/gwas_plot_viridis_190k.jpg", p_effsize_h2, width = 9, height = 5)
 
 
+# detailed look at significant regions
+gwas_plot %>% arrange(p.value)
 
+get_genome_region <- function(chr, pos) {
+  gwas_tbl <- gwas_plot %>% filter(
+    (chromosome == chr) & ((position > (pos - plusminus  * 1000000)) & (position < (pos +  plusminus * 1000000)))
+  )
+  out <- gwas_tbl %>% left_join(hom_sum) %>%
+      mutate(log_p = -log10(p.value), estimate = abs(estimate)) %>%
+      pivot_longer(names_to = "var", values_to = "vals",
+                                cols = c("log_p", "roh_count", "estimate"))
+  
+}
+plusminus <- 1.5 # Mb
+
+top_snps <- gwas_plot %>% filter(-log10(p.value) > 5.6) %>% 
+                      group_by(chromosome) %>% 
+                      top_n(-1, wt = p.value)
+
+out <- map2_df(top_snps$chromosome, top_snps$position, get_genome_region, .id = "snp")
+df_plot <- out %>% 
+            mutate(top_snp = ifelse(-log10(p.value) > 5.6, 1, 0)) %>% 
+            mutate(top_snp = as.factor(top_snp)) %>% 
+            mutate(pos_Mb = position/1000000) 
+
+ggplot() +
+  geom_point(data= df_plot %>% filter(top_snp == 0), aes(pos_Mb, y = vals), color = "lightgrey") +
+  geom_point(data=df_plot %>% filter(top_snp == 1), aes(pos_Mb, y = vals), color = "blue") +
+  facet_wrap(var~chromosome, scales = "free", nrow = 3,ncol = 6) +
+ # scale_color_manual(values = viridis(2)) +
+  #facet_wrap(~var, nrow = 3, scales = "free") + 
+  theme_simple(grid_lines = FALSE, axis_lines = TRUE) + 
+  theme(axis.line.x=element_line())
+
+gwas_chr11 <- ggplot(gwas_plot_chr11, aes(x=positive_cum, y=-log10(p.value))) +
+  geom_point()
+  geom_point(size = 2, shape = 21, alpha = 1, stroke = 0, color = "black") +
+  geom_point(data = gwas_plot_chr11 %>% filter(-log10(p.value) > -log10(0.05/31705)), # aes(fill = direction),  0.00001
+             fill=cols[[1]], size = 2, shape = 21, alpha = 0.5, stroke = 0.3, color = "black") +
+  # gghighlight(-log10(p.value) > 2,
+  #            unhighlighted_params = list(aes(fill = chromosome %%2 == 0))) +
+  geom_hline(yintercept = -log10(0.05/31705), linetype="dashed", color = "grey") +
+  scale_x_continuous(labels = chr_labels, breaks= axisdf$center ) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0,8)) +
+  xlab("Chromosome") + 
+  ylab(expression(-log[10](italic(p)))) + ## y label from qqman::qq
+  #scale_fill_manual(values = c("#d8dee9", viridis(2),"#ECEFF4")) + 
+  scale_fill_manual(values = c("#d8dee9","#ECEFF4")) + 
+  #scale_fill_manual(values = c("#d8dee9","#4393c3","#2A3132","#ECEFF4")) +
+  theme_simple(axis_lines = TRUE, grid_lines = FALSE) +
+  theme(axis.text.x = element_text(size = 8),
+        axis.ticks = element_line(size = 0.1)) +
+  guides(fill=FALSE) 
 
 
 
