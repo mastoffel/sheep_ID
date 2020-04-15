@@ -3,7 +3,8 @@ library(data.table)
 library(tidyverse)
 
 #~~~ ROH density
-hom_sum <- fread("output/ROH/roh_nofilt_ram_pruned.hom.summary") # ROH_surv_subset/
+hom_sum <- fread("output/ROH/roh_ram.hom.summary") # ROH_surv_subset/
+#hom_sum_sub <- hom_sum %>% filter(UNAFF == 0)
 
 hom_sum <- hom_sum %>%
         mutate(MB = BP / 1000000,
@@ -11,7 +12,7 @@ hom_sum <- hom_sum %>%
                index = 1:nrow(.))
 
 #check at every SNP that calling an ROH would be possible
-roh_possible <- function(snp_ind, hom_sum_df, roh_snps = 25, roh_kb = 600) {
+roh_possible <- function(snp_ind, hom_sum_df, roh_snps = 30, roh_kb = 600) {
 
  # hom_sum_df <- hom_sum_df[hom_sum_df$CHR == chr, ]
   snp_min <- snp_ind-roh_snps+1
@@ -28,14 +29,10 @@ roh_possible <- function(snp_ind, hom_sum_df, roh_snps = 25, roh_kb = 600) {
 
 }
 
-library(furrr)
-plan(multiprocess, workers = 10)
-snps_ok <- list()
-for (chr in 1:26) {
-  hom_sum_chr <- hom_sum[hom_sum$CHR == chr, ]
-  snps_ok[[chr]] <- future_map_chr(1:nrow(hom_sum_chr), roh_possible, hom_sum_chr,
-                                     .progress = TRUE)
-}
-snps_ok_df <- snps_ok %>% map(function(x) data.frame(snps_ok = x)) %>% bind_rows()
-write_delim(snps_ok_df, "output/snps_that_can_have_roh_190k")
+# check at which SNPs there is 
+pot_snps <- hom_sum %>% filter(UNAFF == 0) %>% .$SNP
+pot_snps_ind <- which(hom_sum$SNP %in% pot_snps)
+snps_ok <- data.frame(pot_snps, roh_possible = map_chr(pot_snps_ind, roh_possible, hom_sum))
+
+write_delim(snps_ok_df, "output/snps_that_can_have_roh_400k")
 

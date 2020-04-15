@@ -162,7 +162,7 @@ plan(multiprocess, workers = 6)
 # increase maxSize
 options(future.globals.maxSize = 3000 * 1024^2)
 
-all_out <- future_map2(snps_pieces[1:2], annual_survival_gwas_pieces[1:2], function(snps, data) {
+all_out <- future_map2(snps_pieces, annual_survival_gwas_pieces, function(snps, data) {
         out <- purrr::map(snps, safe_run_gwas, data)
 })
 

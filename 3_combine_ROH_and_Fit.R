@@ -22,7 +22,7 @@ IDs_lots_missing <- read_delim("data/ids_more_than_5perc_missing.txt", delim = "
 ##### ROH data #####
 #file_path <- "output/ROH/roh_nofilt_ram_pruned.hom"
 # use unpruned data
-file_path <-  "output/ROH/roh_nofilt_ram.hom"
+file_path <-  "output/ROH/roh_ram.hom"
 #file <- "roh_nofilt_pruned"
 roh_lengths <- fread(file_path)
 hist(roh_lengths$KB, breaks = 1000, xlim = c(0,10000))

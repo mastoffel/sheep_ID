@@ -30,16 +30,16 @@ library(snpStats)
 #               "--extract output/plink_files/sheep_geno_imputed_ram_pruned.prune.in --make-bed --out output/plink_files/sheep_geno_imputed_ram_pruned"))
 
 # 400k SNPs, only filter individuals and make new data 
-system(paste0("/usr/local/bin/plink --bfile data/sheep_geno_imputed_ram_400k --sheep --keep output/ROH/ids_surv.txt ",
-              "--make-bed --out output/plink_files/sheep_geno_imputed_ram_400k_filt"))
+system(paste0("/usr/local/bin/plink --bfile ../sheep/data/SNP_chip/ramb_mapping/sheep_geno_imputed_ram_27092019 --sheep --keep output/ROH/ids_surv.txt ",
+              "--make-bed --out data/sheep_geno_imputed_ram_400k_filt"))
 
 # PCA for GWAS =================================================================
 # for pruned data
 # system(paste0("/usr/local/bin/plink --bfile output/plink_files/sheep_geno_imputed_ram_pruned --sheep ",
 #               "--pca --out output/sheep_pca")) # sheep_pca
 
-# for 400k / PCA on pruned data as unpruned data fails for some reason
-system(paste0("/usr/local/bin/plink --bfile output/plink_files/sheep_geno_imputed_ram_400k_filt --sheep ",
+# for 400k PCA we need to prune data as unpruned data fails for some reason
+system(paste0("/usr/local/bin/plink --bfile data/sheep_geno_imputed_ram_400k_filt --sheep ",
               "--pca --out output/sheep_pca_400k",
               "--indep-pairwise 500 50 0.999")) # sheep_pca
 
@@ -51,7 +51,7 @@ system(paste0("/usr/local/bin/plink --bfile output/plink_files/sheep_geno_impute
 #               "--homozyg-window-het 1"))
 
 # calculate ROH unpruned =======================================================
-system(paste0("/usr/local/bin/plink --bfile output/plink_files/sheep_geno_imputed_ram_400k_filt --sheep --out output/ROH/roh_nofilt_ram ",
+system(paste0("/usr/local/bin/plink --bfile data/sheep_geno_imputed_ram_400k_filt --sheep --out output/ROH/roh_ram ",
              # "--keep output/ROH/ids_surv.txt ",
               "--homozyg --homozyg-window-snp 30 --homozyg-snp 30 --homozyg-kb 600 ",
               "--homozyg-gap 500 --homozyg-density 50 --homozyg-window-missing 2 ",
@@ -63,7 +63,7 @@ system(paste0("/usr/local/bin/plink --bfile output/plink_files/sheep_geno_impute
 # without pruning
 # file_path <- "output/ROH/roh_nofilt_ram.hom"
 # with pruning
-file_path <- "output/ROH/roh_nofilt_ram.hom"
+file_path <- "output/ROH/roh_ram.hom"
 roh_lengths <- fread(file_path)
 
 # distribution
