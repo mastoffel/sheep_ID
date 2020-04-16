@@ -411,12 +411,13 @@ fitness_data
 
 #~~~ ROH density
 hom_sum <- fread("output/ROH/roh_ram.hom.summary") # ROH_surv_subset/
+head(hom_sum)
 
 hom_sum <- hom_sum %>%
   mutate(MB = BP / 1000000,
          KB = BP / 1000,
-         index = 1:nrow(.)) %>% 
-         filter(UNAFF > 0) 
+         index = 1:nrow(.))# %>% 
+        # filter(UNAFF > 0) 
 
 # non of the SNPs where UNAFF = 0 can actually have an roh (see script snps_that_can_have_roh.R)
 # hom_sum_filt
@@ -440,6 +441,9 @@ running_roh <- winScan(x = hom_sum,
                        win_step = 500,
                        funs = c("mean"),
                        cores = 8)
+head(running_roh)
+plot(running_roh$UNAFF_mean, running_roh$UNAFF_n)
+cor(running_roh$UNAFF_mean, running_roh$UNAFF_n, use = "complete")
 
 #running_roh <- winScan(x = hom_sum,
 #                       groups = "CHR",

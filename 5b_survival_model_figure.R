@@ -1,14 +1,6 @@
 library(ghibli)
-library(wesanderson)
-library(viridis)
-library(ggthemes)
-library(nord)
-library(ggridges)
-library(viridis)
 library(tidyverse)
 library(data.table)
-library(magrittr)
-library(rlang)
 source("theme_simple.R")
 library(patchwork)
 library(lme4)
@@ -21,10 +13,26 @@ library(performance)
 library(sjPlot)
 library(ggeffects)
 library(patchwork)
+library(inlafuns)
+
 # data
 # annual measures of traits and fitness
 load("data/survival_mods_data.RData")
-
+# survival data preprocessing
+annual_survival <- fitness_data %>% 
+        # filter na rows
+        filter_at(vars(survival, froh_all, birth_year, sheep_year), ~ !is.na(.)) %>% 
+        mutate(age_cent = age - mean(age, na.rm = TRUE),
+               age_cent2 = age_cent^2,
+               age_std = as.numeric(scale(age)),
+               age_std2 = age_std^2,
+               # times 10 to estimate a 10% percent increase
+               froh_all10 = froh_all * 10,
+               froh_all10_cent = froh_all10 - mean(froh_all10, na.rm = TRUE),
+               lamb = ifelse(age == 0, 1, 0),
+               lamb_cent = lamb - mean(lamb, na.rm = TRUE),
+               lamb = as.factor(lamb)) %>% 
+        as.data.frame() 
 # Plot A: froh across age classes ----------------------------------------------
 # number of individuals in each age class
 max_age_df <- fitness_data %>% 
@@ -57,7 +65,7 @@ names(ids_per_age) <- paste0("age_", c(0:10))
 num_ind_per_age <- unlist(map(ids_per_age, length))
 
 # load ROH info
-file_path <- "output/ROH/roh_nofilt_ram_pruned.hom"
+file_path <- "output/ROH/roh_ram.hom"
 roh_lengths <- fread(file_path) 
 
 # FROH across age cohorts 
@@ -87,14 +95,15 @@ roh_plot %>%
         mutate(FROH = MB_sum/2655) %>% 
         mutate(age = str_replace(age, "_", " ")) %>% 
         mutate(age_num = as.numeric(str_replace(age, "age ", ""))) %>% 
+        mutate(age_num_fct = factor(age_num, levels = as.character(0:10))) %>% 
         as.data.frame() %>% 
         mutate(age = factor(age)) %>% 
         mutate(age = fct_reorder(age, age_num))-> roh_plot2
 
 roh_plot2 %>% 
         #ungroup() %>% 
-        #sample_frac(0.1) %>% 
-        ggplot(aes(x = FROH, y = age)) +
+       # sample_frac(0.1) %>% 
+        ggplot(aes(x = FROH, y = age_num_fct)) +
         geom_density_ridges(scale = 0.85,
                             jittered_points=TRUE, color = "#4c566a",  # # "#4c566a"  "#eceff4"
                             fill = "#eceff4",
@@ -102,10 +111,8 @@ roh_plot2 %>%
                             position = position_points_jitter(height = 0),
                             point_alpha = 1, point_color = "#4c566a", 
                             alpha = 0.9, bandwidth = 0.006) +
-        # scale_fill_viridis() +
-        #theme_ridges(font_family = "Avenir") + 
         theme_simple(axis_lines = FALSE, base_size = 14) +
-        ylab("") + 
+        ylab("Age") + 
         xlab(expression(F[ROH]~across~age~cohorts)) +
         theme(strip.background = element_blank(),
               panel.grid.major = element_line(colour = "#d8dee9", size = 0.5),
@@ -121,7 +128,7 @@ p_froh_across_ages
 
 
 # Plot B: effect sizes ---------------------------------------------------------
-mod_inla <- readRDS("output/AS_mod_INLA.rds")
+mod_inla <- readRDS("output/AS_mod_INLA_400k.rds")
 
 trans_link_to_dat <- function(pred, mod_inla) {
        trans_pred <-  inla.rmarginal(n = 10000, marginal = mod_inla$marginals.fixed[[pred]]) %>% 
@@ -161,8 +168,7 @@ p_surv_mod <- ggplot(fix_eff, aes(mean, Predictor, xmax = upper_CI, xmin = lower
 
 
 # Plot C marginal effects ------------------------------------------------------
-
-mod_inla <- readRDS("output/AS_mod_INLA.rds")
+#mod_inla <- readRDS("output/AS_mod_INLA_400k.rds")
 
 # plot INLA marginal effects
 fun <- function(...) {
@@ -211,8 +217,8 @@ d <- marg_means %>%
                froh = (froh + mean(annual_survival$froh_all10))/10)
 
 
-#saveRDS(d, file = "output/AS_mod_INLA_predictions_for_plot.rds")
-inla_preds <- readRDS("output/AS_mod_INLA_predictions_for_plot.rds") %>% 
+saveRDS(d, file = "output/AS_mod_INLA_400k_predictions_for_plot.rds")
+inla_preds <- readRDS("output/AS_mod_INLA_400k_predictions_for_plot.rds") %>% 
         mutate(prediction = prediction * 100,
                ci_lower = ci_lower * 100,
                ci_upper = ci_upper * 100)
@@ -243,5 +249,81 @@ ggsave("figs/Fig2_inla.jpg", height = 6, width = 9)
 
 
 
+mod_inla <- readRDS("output/AS_mod_INLA_400k.rds")
 
+# make Supplementary table / figure for model
+
+fix_eff <- mod_inla$summary.fixed %>% 
+                map_df(round, 2) %>% 
+                select(-kld) %>% 
+                setNames(c("mean", "std_err", "ci_lower", "median", "ci_upper", "mode")) %>% 
+                mutate(term = rownames(mod_inla$summary.fixed)) %>% 
+                select(term, everything()) 
+
+fix_eff2 <- fix_eff %>% 
+        mutate(add_info = c("", "continuous", "continuous", "categorical (0=no, 1=yes)",
+                        "categorical (0=female, 1=male)", "categorical (0=no, 1=yes)",
+                        "", "")) %>% 
+        mutate(standardisation = c("", "(x * 10)-mean(x * 10)", "x-mean(x)", rep("", 5))) %>% 
+        mutate(term = c("Intercept", "F<sub>ROH</sub>", "Age", "Lamb", "Sex", "Twin", "F<sub>ROH</sub> * Age", "F<sub>ROH</sub> * Lamb"))
+
+raneff <- get_raneff(mod_inla, scales = "var") %>% 
+                mutate(across(is.numeric, round, 2)) %>% 
+                mutate(term = c("Birth year", "Year of obs.", "Individual", "Add. genetic")) %>% 
+                mutate(add_info = c("n = 44", "n = 44", "n = 5952", "Pedigree-based")) %>% 
+                mutate(standardisation = "")
+                #mutate(groups = c(44, 44, 5952, ""))
+
+mod_tab <- bind_rows(fix_eff2, raneff) %>% 
+        select(term, mean, std_err, ci_lower, ci_upper, add_info, standardisation) %>% 
+        mutate(effect = c(rep("Fixed effects (log-odds scale)", 8), 
+                          rep("Random effects (variances)", 4))) %>% 
+        select(8, 1:5, 7, 6) %>% 
+        setNames(c("effect", "Term", "Post.Mean", "Std.Error", "CI (2.5%)", "CI (97.5%)", "Standardisation", "Info"))
+
+mod_tab %>% gt(
+        rowname_col = "term",
+        groupname_col = "effect"
+        ) %>% 
+        tab_style(
+                style = cell_text( weight = "bold"),
+                locations = cells_column_labels(columns = TRUE)
+        ) %>% 
+        fmt_markdown(columns = TRUE) %>% 
+        gtsave("AS_model_table.png", path = "figs/tables/")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# lme4
+# time saver function for modeling
+nlopt <- function(par, fn, lower, upper, control) {
+        .nloptr <<- res <- nloptr(par, fn, lb = lower, ub = upper, 
+                                  opts = list(algorithm = "NLOPT_LN_BOBYQA", print_level = 1,
+                                              maxeval = 1000, xtol_abs = 1e-6, ftol_abs = 1e-6))
+        list(par = res$solution,
+             fval = res$objective,
+             conv = if (res$status > 0) 0 else res$status,
+             message = res$message
+        )
+}
+
+# age interaction and lamb
+library(lme4)
+library(broom.mixed)
+mod_lme4 <- glmer(survival ~ froh_all10_cent * age_cent + froh_all10_cent * lamb + sex + twin + (1|birth_year) + (1|sheep_year) + (1|id),
+              family = binomial, data = annual_survival,
+              control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+tidy(mod_lme4, effects = "ran_pars", scales = "vcov")
 

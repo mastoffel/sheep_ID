@@ -18,6 +18,7 @@ if (!(length(part_inp) == 0)) {
         part <- 21
 }
 
+part <- 304
 # data
 load("data/survival_mods_data.RData")
 load("data/sheep_ped.RData")
@@ -28,7 +29,8 @@ pcs <- read_delim("data/ann_surv_pca.txt", " ", col_names = TRUE) %>%
         mutate(id = as.character(id))
 
 # roh data
-file_path <- "data/roh_nofilt_ram.hom"
+#file_path <- "data/roh_ram.hom"
+file_path <- "output/ROH/roh_ram.hom"
 roh_lengths <- fread(file_path)
 
 # plink name

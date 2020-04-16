@@ -75,14 +75,10 @@ mod_inla <- inla(formula=formula_surv, family="binomial",
                  control.inla = list(correct = TRUE)
                  )
 
-saveRDS(mod_inla, file = "output/AS_mod_INLA.rds")
-mod_inla <- readRDS("output/AS_mod_INLA.rds")
-
-summary(mod_inla)
-tidy(mod_AS)
+saveRDS(mod_inla, file = "output/AS_mod_INLA_400k.rds")
+mod_inla <- readRDS("output/AS_mod_INLA_400k.rds")
 
 mod_inla$summary.fixed
-tidy(mod_AS, conf.int = TRUE)
 
 # plot INLA marginal effects
 fun <- function(...) {
@@ -139,6 +135,16 @@ ggplot(d, aes(froh, prediction)) +
         scale_color_viridis_d("Age", labels = c(0, 1, 4, 7)) +
         scale_fill_viridis_d("Age", labels = c(0, 1, 4, 7)) +
         theme_simple(grid_lines = FALSE, axis_lines = TRUE) 
+
+
+
+
+
+
+
+
+
+
 
 
 
