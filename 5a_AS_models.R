@@ -139,11 +139,46 @@ ggplot(d, aes(froh, prediction)) +
 
 
 
+# INLA models across age classes
 
+# ~~~~~~~~~~~~~~~~~~~~~ Survival across different life-stages ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
+survival_inla <- function(ageclass) {
+        dat_survival <- annual_survival %>% filter(age %in% c(ageclass)) 
+        prec_prior <- list(prior = "loggamma", param = c(0.5, 0.5))
+        formula_surv <- as.formula(paste(#'survival ~ froh_long + froh_medium + froh_short + sex + twin + 1', 
+                'survival ~ froh_all10_cent + sex + twin + 1', 
+                'f(birth_year, model = "iid", hyper = list(prec = prec_prior))',
+                'f(sheep_year, model = "iid", hyper = list(prec = prec_prior))',
+                #'f(IndexA2, model = "iid", hyper = list(prec = prec_prior))',
+                #'f(mum_id, model="iid",  hyper = list(prec = prec_prior))', 
+                'f(IndexA, model="generic0", hyper = list(theta = list(param = c(0.5, 0.5))),Cmatrix=Cmatrix)', sep = " + "))
+        mod_inla <- inla(formula=formula_surv, family="binomial",
+                         data= dat_survival, 
+                         control.inla = list(correct = TRUE),
+                         control.compute = list(dic = TRUE))
+}
 
+all_inla_mods <- map(0:10, survival_inla)
+saveRDS(all_inla_mods, file = "output/inla_survival_models_diff_ages_froh_all_400k.rds")
 
+# plot for supplementary
+inla_plot <- map_df(all_inla_mods, function(x) as_tibble(x$summary.fixed[2, ]), .id = "age") %>% 
+        mutate(age = as.numeric(age) - 1) %>% 
+        filter(age < 10) %>% 
+        mutate(age = fct_inorder(as.factor(age))) 
+   
 
+ggplot(inla_plot, aes(age, mean)) +
+        geom_errorbar(aes(ymin = `0.025quant`, ymax = `0.975quant`),  width = 0.5) +
+        geom_point(size = 3, shape = 21, col = "#4c566a", fill = "#eceff4", # "grey69"
+                   alpha = 1, stroke = 0.7) +
+        xlab("Age class") + 
+        ylab(expression(beta[F[ROH]])) +
+        geom_hline(yintercept = 0, linetype='dashed', colour =  "#4c566a", size = 0.3) +
+        theme_simple(grid_lines = FALSE, axis_lines = TRUE) -> p_froh_across_life
+
+ggsave("figs/sup_froh_across_life.jpg", width = 5, height = 3)
 
 
 

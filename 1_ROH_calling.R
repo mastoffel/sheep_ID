@@ -29,9 +29,20 @@ library(snpStats)
 # system(paste0("/usr/local/bin/plink --bfile ../sheep/data/SNP_chip/ramb_mapping/sheep_geno_imputed_ram_27092019 --sheep --keep output/ROH/ids_surv.txt ",
 #               "--extract output/plink_files/sheep_geno_imputed_ram_pruned.prune.in --make-bed --out output/plink_files/sheep_geno_imputed_ram_pruned"))
 
-# 400k SNPs, only filter individuals and make new data 
+# load wrongly mapped snps to exclude
+wrongly_mapped <- read_delim("data/wrongly_mapped_hd.txt", " ") %>% 
+                        rbind(read_delim("data/wrongly_mapped_ld.txt", " ")) %>% 
+                        .$snp.name %>% 
+                        unique() %>% 
+                        write_lines("data/wrongly_mapped_hdld_plink.txt")
+
+# 400k SNPs, filter individuals and wrongly mapped SNPs
 system(paste0("/usr/local/bin/plink --bfile ../sheep/data/SNP_chip/ramb_mapping/sheep_geno_imputed_ram_27092019 --sheep --keep output/ROH/ids_surv.txt ",
-              "--make-bed --out data/sheep_geno_imputed_ram_400k_filt"))
+              "--make-bed --exclude data/wrongly_mapped_hdld_plink.txt --out data/sheep_geno_imputed_ram_400k_filt"))
+
+# 400k SNPs, only filter individuals and make new data 
+#system(paste0("/usr/local/bin/plink --bfile ../sheep/data/SNP_chip/ramb_mapping/sheep_geno_imputed_ram_27092019 --sheep --keep output/ROH/ids_surv.txt ",
+#              "--make-bed --out data/sheep_geno_imputed_ram_400k_filt"))
 
 # PCA for GWAS =================================================================
 # for pruned data
@@ -40,8 +51,8 @@ system(paste0("/usr/local/bin/plink --bfile ../sheep/data/SNP_chip/ramb_mapping/
 
 # for 400k PCA we need to prune data as unpruned data fails for some reason
 system(paste0("/usr/local/bin/plink --bfile data/sheep_geno_imputed_ram_400k_filt --sheep ",
-              "--pca --out output/sheep_pca_400k",
-              "--indep-pairwise 500 50 0.999")) # sheep_pca
+              "--indep-pairwise 500 50 0.999 --pca ",
+              "--out output/sheep_pca_397k")) # sheep_pca
 
 # calculate ROH pruned =========================================================
 # system(paste0("/usr/local/bin/plink --bfile output/plink_files/sheep_geno_imputed_ram_pruned --sheep --out output/ROH/roh_nofilt_ram_pruned ",
@@ -57,7 +68,6 @@ system(paste0("/usr/local/bin/plink --bfile data/sheep_geno_imputed_ram_400k_fil
               "--homozyg-gap 500 --homozyg-density 50 --homozyg-window-missing 2 ",
               "--homozyg-het 1 ",
               "--homozyg-window-het 1"))
-
 
 # inferred ROH output ==========================================================
 # without pruning

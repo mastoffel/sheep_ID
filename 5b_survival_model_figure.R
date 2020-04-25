@@ -64,6 +64,7 @@ ids_per_age <- map(0:10, function(x) {
 names(ids_per_age) <- paste0("age_", c(0:10))
 num_ind_per_age <- unlist(map(ids_per_age, length))
 
+#saveRDS(ids_per_age, file = "output/ids_per_age.rds")
 # load ROH info
 file_path <- "output/ROH/roh_ram.hom"
 roh_lengths <- fread(file_path) 
@@ -92,7 +93,7 @@ roh_plot %>%
         group_by(ID, age) %>% 
         summarise(MB_mean = mean(MB),
                   MB_sum = sum(MB)) %>% 
-        mutate(FROH = MB_sum/2655) %>% 
+        mutate(FROH = MB_sum/2655) %>% ### check this
         mutate(age = str_replace(age, "_", " ")) %>% 
         mutate(age_num = as.numeric(str_replace(age, "age ", ""))) %>% 
         mutate(age_num_fct = factor(age_num, levels = as.character(0:10))) %>% 
@@ -188,6 +189,7 @@ invlogit <- function(x) exp(x)/(1+exp(x))
 
 froh <- seq(from = min(annual_survival$froh_all10_cent), to = (max(annual_survival$froh_all10_cent)), by = 0.1)
 age <- c(-2.4, -1.4, 1.6, 4.6)
+#age <- c(-2.4, -0.4, 1.6, 3.6)
 combined_df <- expand_grid(froh, age) %>% 
         mutate(lamb = ifelse(age == -2.4, 1, 0),
                twin = 0.15,
@@ -217,8 +219,8 @@ d <- marg_means %>%
                froh = (froh + mean(annual_survival$froh_all10))/10)
 
 
-saveRDS(d, file = "output/AS_mod_INLA_400k_predictions_for_plot.rds")
-inla_preds <- readRDS("output/AS_mod_INLA_400k_predictions_for_plot.rds") %>% 
+saveRDS(d, file = "output/AS_mod_INLA_400k_predictions_for_plot2.rds")
+inla_preds <- readRDS("output/AS_mod_INLA_400k_predictions_for_plot2.rds") %>% 
         mutate(prediction = prediction * 100,
                ci_lower = ci_lower * 100,
                ci_upper = ci_upper * 100)
@@ -267,7 +269,7 @@ fix_eff2 <- fix_eff %>%
         mutate(standardisation = c("", "(x * 10)-mean(x * 10)", "x-mean(x)", rep("", 5))) %>% 
         mutate(term = c("Intercept", "F<sub>ROH</sub>", "Age", "Lamb", "Sex", "Twin", "F<sub>ROH</sub> * Age", "F<sub>ROH</sub> * Lamb"))
 
-raneff <- get_raneff(mod_inla, scales = "var") %>% 
+raneff <- get_raneff(mod_inla, scales = "sd") %>% 
                 mutate(across(is.numeric, round, 2)) %>% 
                 mutate(term = c("Birth year", "Year of obs.", "Individual", "Add. genetic")) %>% 
                 mutate(add_info = c("n = 44", "n = 44", "n = 5952", "Pedigree-based")) %>% 
@@ -327,3 +329,7 @@ mod_lme4 <- glmer(survival ~ froh_all10_cent * age_cent + froh_all10_cent * lamb
               control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
 tidy(mod_lme4, effects = "ran_pars", scales = "vcov")
 
+mod_lme42 <- lmer(survival ~ froh_all10_cent * age_cent + froh_all10_cent * lamb + sex + twin + (1|birth_year) + (1|sheep_year) + (1|id),
+                  data = annual_survival)
+
+tidy(mod_lme42, effects = "ran_pars", scales = "vcov")

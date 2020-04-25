@@ -9,13 +9,13 @@ load("data/survival_mods_data.RData")
 load("data/sheep_ped.RData")
 
 # roh data
-file_path <- "data/roh_nofilt_ram_pruned.hom"
+file_path <- "output/ROH/roh_ram.hom"
 roh_lengths <- fread(file_path) 
 
 ped <- sheep_ped[, c(1,3,2)]
 ped_fin <- prePed(ped)
 ID <- pedInbreeding(ped_fin) %>% as_tibble() %>% rename(id = Indiv, fped = Inbr)
-ggplot(ID, aes(Fped)) +
+ggplot(ID, aes(fped)) +
         geom_histogram(bins = 500) +
         scale_y_log10() 
         
@@ -56,6 +56,7 @@ p_F <- ggplot(F_df, aes(fped, froh_all)) +
         xlab(expression(F[PED]))
 
 ggsave("figs/sup_Froh_vs_Fped.jpg", height = 3, width = 7)
+
 # num individuals
 annual_survival %>% group_by(id) %>% tally()
 annual_survival %>% group_by(id) %>% summarise(age = max(age)) %>% summarise(mean_age = mean(age))

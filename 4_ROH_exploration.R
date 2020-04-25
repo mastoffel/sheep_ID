@@ -54,6 +54,9 @@ froh <- roh_lengths %>%
 mean(froh$FROH)
 range(froh$FROH)
 
+# longest ROH
+roh_lengths %>% arrange(-KB)
+
 # longest ROH proportional to chr size
 chr_sizes <- chr_data %>% .[-1, ] %>% 
   mutate(CHR = str_replace(CHR, "Chromosome ", "")) %>% 
@@ -70,9 +73,9 @@ plot(froh$KBSUM, num_roh_per_ind$n)
 # ROH length and abundance in the least and most inbred individuals
 num_roh_per_ind %>% 
   left_join(froh) %>% 
-  top_frac(0.005, FROH) %>% 
+  top_frac(-0.005, FROH) %>% 
   #top_frac(0.005, desc(FROH)) %>% 
-  arrange(desc(FROH)) %>% 
+ # arrange(desc(FROH)) %>% 
   summarise(mean(n), mean(KBAVG))
 
 # Supplementary: FROH / ROH across individuals
@@ -100,12 +103,13 @@ ggsave("figs/Sup_ROH_dist.jpg", p_roh_dist, width = 6, height = 2.7)
 
 # Supplementary: plot HD vs. imputed individuals
 # HD inds 
-hd_inds <- read_delim("../sheep/data/SNP_chip/Plates_1-2_HD_QC2.fam", " ", col_names = FALSE)[[2]]
+hd_inds <- read_delim("../sheep/data/SNP_chip/ramb_mapping/Plates_1-2_HD_QC3_ram.fam", " ", col_names = FALSE)[[2]]
 froh_plot <- froh %>% mutate(hd = ifelse(IID %in% hd_inds, "HD", "imputed")) %>% 
                       mutate(hd = as.factor(hd)) %>% mutate(hd = relevel(hd, "imputed"))
 
 # medians
 froh_plot %>% group_by(hd) %>% summarise(median(FROH))
+
 #
 froh_imp_vs_hd <- ggplot(froh_plot, aes(x=FROH, fill = relevel(hd, "imputed"))) +
   geom_histogram(bins = 100,  color = "black", size = 0.1, position = "identity",
@@ -152,15 +156,15 @@ prop_IBD_df <- roh_lengths %>%
                                  length_Mb < 1.221366094 & length_Mb >= 0.6 ~ 64)) %>% 
                                  #length_Mb < 0.610683047 & length_Mb >= 0.30 ~ 128)) %>% # 0.610683047
         mutate(length_class = case_when(
-          class == 1 ~ "> 39 (1G)",
-          class == 2 ~ "19.5-39 (2G)",
-          class == 4 ~ "9.8-19.5 (4G)",
+          class == 1 ~ ">39 (1G)",
+          class == 2 ~ ">19.5-39 (>1-2G)",
+          class == 4 ~ ">9.8-19.5 (>2-4G)",
          # class == 6 ~ "6.5-9.7 (6G)",
-          class == 8 ~ "4.9-6.5 (8G)",
+          class == 8 ~ ">4.9-6.5 (>4-8G)",
          # class == 10 ~ "3.9-4.9 (10G",
-          class == 16 ~ "2.4-4.9 (16G)",
-          class == 32 ~ "1.2-2.4 (32G)",
-          class == 64 ~ "0.6-1.2 (64G)"
+          class == 16 ~ ">2.4-4.9 (>8-16G)",
+          class == 32 ~ ">1.2-2.4 (>16-32G)",
+          class == 64 ~ ">0.6-1.2 (>32-64G)"
          # class == 128 ~ "0.6-0.3 (128G)"
         )) %>% 
         mutate(length_class = fct_reorder(length_class, class)) %>% 
@@ -207,7 +211,7 @@ p_roh_classes <- prop_IBD_df_with_0 %>%
         axis.text = element_text(color = "black")) + 
   xlab("ROH classes in Mb") 
 
-ggsave("figs/fig1a_roh_classes_boxplots.jpg", p_roh_classes, width = 6, height = 2.5)
+ggsave("figs/fig1a_roh_classes_boxplots.jpg", p_roh_classes, width = 7, height = 3)
 
 
 #ggsave("figs/roh_classes_subset_inds.jpg", p_roh2, width = 15, height = 5)
@@ -380,14 +384,14 @@ p1 <- ggplot(running_roh_p, aes(x = win_start, y = 0.5, fill = UNAFF_mean)) +
                                 barwidth = 10.95, barheight = 0.5))
 p1
 p2 <- ggplot(running_roh_p, aes(UNAFF_mean, "test", fill = ..x..)) +
-  geom_density_ridges_gradient(scale = 3) +
+  geom_density_ridges_gradient(scale = 2.5, lwd = 0.1) +
   scale_x_continuous(breaks = c(0.2, 0.5, 0.8)) +
   theme_void() +
   scale_fill_gradientn("Proportion of Sheep with ROH",
                        colors = rev(fill_cols), values = qn,
                        breaks = c(0.1,0.3, 0.5, 0.7, 0.9)) +
   theme(legend.position = "none",
-        plot.margin = margin(0.5, 0.5, 0.5, 0, unit = "cm"))
+        plot.margin = margin(1, 1, 1, 1, unit = "cm"))
         #axis.ticks.x = element_line(size = 1)) 
 
 p2
@@ -397,12 +401,12 @@ layout <- c(
 )
 p_final <- p1 + p2 + plot_layout(design = layout)
 p_final
-ggsave("figs/roh_genome_400K_1Mb.jpg", p1, width = 8, height = 6)
-ggsave("figs/roh_genome_legend_400K_1Mb.jpg", p2, width = 4, height = 2)
+ggsave("figs/roh_genome_397K.jpg", p1, width = 8, height = 6)
+ggsave("figs/roh_genome_legend_397K.jpg", p2, width = 5, height = 3)
 
 p_roh_comb <- plot_grid(p_roh_classes, ROH_per_ind, nrow = 2, rel_heights = c(2.2,3, 5.2))
 p_roh_comb
-ggsave("figs/roh_comb.jpg", p_roh_comb, width = 8, height = 6)
+#ggsave("figs/roh_comb.jpg", p_roh_comb, width = 8, height = 6)
 
 
 fitness_data
@@ -426,6 +430,7 @@ hom_sum %>%
   mutate(prop_roh = UNAFF/5952) %>% 
   arrange(prop_roh) %>% 
   .[1:50, ]
+
 
 hom_sum %>% 
   filter(UNAFF > 0) %>% 
@@ -459,19 +464,19 @@ hist(running_roh$UNAFF_mean, xlim = c(0,6000), breaks = 1000)
 library(gt)
 # roh desert
 roh_deserts <- running_roh %>% 
-  filter(UNAFF_n > 0) %>% 
+  filter(UNAFF_n > 10) %>% 
   mutate(prop_roh = UNAFF_mean/5952) %>%  # 7691 5952
   arrange(prop_roh) %>% 
   # top 0.1% of windows
-  .[1:53, ]
+  .[1:26, ]
 mean(roh_deserts$prop_roh)
 
 # make table for supplementary
 roh_deserts %>% 
   mutate(win_start = round(win_start/1000, 2), win_end = round(win_end/1000, 2), 
          prop_roh = round(prop_roh * 100, 2)) %>% 
-  select(CHR, win_start, win_end, prop_roh) %>%
-  setNames(c("Chromosome", "WinStart", "WinEnd", "% of individuals with ROH")) %>% 
+  select(CHR, win_start, win_end, prop_roh, UNAFF_n) %>%
+  setNames(c("Chromosome", "WinStart", "WinEnd", "% of individuals with ROH", "N (SNPs)")) %>% 
   gt() %>% 
   tab_header(
     title = "Top 1% ROH deserts",
@@ -480,10 +485,10 @@ roh_deserts %>%
   gtsave(filename = "figs/tables/roh_desert.png")
 
 roh_islands <- running_roh %>% 
-  filter(UNAFF_n > 0) %>% 
+  filter(UNAFF_n > 10) %>% 
   mutate(prop_roh = UNAFF_mean/5952) %>%  # 7691 5952
   arrange(desc(prop_roh)) %>% 
-  .[1:53, ]
+  .[1:26, ]
 
 mean(roh_islands$prop_roh)
 
@@ -491,8 +496,8 @@ mean(roh_islands$prop_roh)
 roh_islands %>% 
   mutate(win_start = round(win_start/1000, 2), win_end = round(win_end/1000, 2), 
          prop_roh = round(prop_roh * 100, 2)) %>% 
-  select(CHR, win_start, win_end, prop_roh) %>%
-  setNames(c("Chromosome", "WinStart", "WinEnd", "% of individuals with ROH")) %>% 
+  select(CHR, win_start, win_end, prop_roh, UNAFF_n) %>%
+  setNames(c("Chromosome", "WinStart", "WinEnd", "% of individuals with ROH", "N (SNPs)")) %>% 
   gt() %>% 
   tab_header(
     title = "Top 1% ROH islands",
