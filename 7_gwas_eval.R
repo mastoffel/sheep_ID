@@ -46,8 +46,8 @@ gwas_res[which(str_detect(gwas_res$term, "sd")), ]
 # remove those 
 gwas_res <- gwas_res[-which(str_detect(gwas_res$term, "sd")), ]
 
-# saveRDS(gwas_res, file = "output/gwas_res_400k.rds")
-gwas_res <- read_rds("output/gwas_res_400k.RDS")
+#saveRDS(gwas_res, file = "output/gwas_res_397k.rds")
+gwas_res <- read_rds("output/gwas_res_397k.rds")
 
 # plink name
 sheep_plink_name <- "data/sheep_geno_imputed_ram_400k_filt"
@@ -74,16 +74,37 @@ gwas_full <- gwas_res %>%
 roh_neg_pos <- gwas_full %>% filter(groups == "roh") %>% 
                     mutate(eff = ifelse(estimate <0, "neg", "pos")) %>% 
                     group_by(eff) %>% tally()
-235524/(163791 + 235524)
-163791/(163791 + 235524)
 
-163791/235524
+233920/(233920 + 163913)
+binom.test(x= 233920, n = (233920 + 163913),
+           p = 0.5, alternative = "greater",
+           conf.level = 0.95)
+formatC(0.00000000000000022, format = "e", digits = 2)
 
 add_neg_pos <- gwas_full %>% filter(groups == "add") %>% 
   mutate(eff = ifelse(estimate <0, "neg", "pos")) %>% 
   group_by(eff) %>% tally()
 
-195250/204066
+binom.test(x= 203712, n = (203712 + 194122),
+           p = 0.5, alternative = "two.sided",
+           conf.level = 0.95)
+
+# test whether negative estimates are more often larger estimates or
+# smaller p-values
+gwas_full %>% filter(groups == "roh") %>% 
+  mutate(p_log = -log10(p.value)) %>% 
+  mutate(p_log = as.numeric(scale(p_log)),
+         estimate = as.numeric(scale(estimate))) %>% 
+  mutate(eff = ifelse(estimate <0, "neg", "pos")) %>% 
+  mutate(eff = factor(eff, levels = c("pos", "neg"))) -> gwas_roh_mod
+gwas_roh_mod
+
+mod1 <- glm(eff ~ p_log, data = gwas_roh_mod,
+      family = "binomial")
+tidy(mod1, conf.int = TRUE)
+mod2 <- glm(eff ~ abs(estimate), data = gwas_roh_mod,
+            family = "binomial")
+tidy(mod2, conf.int = TRUE)
 
 # manhattan
 ## computing new x axis
@@ -99,12 +120,12 @@ p1 <- gwas_roh %>%
   mutate(direction = ifelse(estimate < 0, "negative", "positive")) %>% 
   mutate(estimate = abs(estimate)) %>% 
   ggplot(aes(estimate, fill = direction)) +
-  geom_histogram(bins = 1000, position="identity") +
+  geom_histogram(bins = 500, position="identity") +
   theme_simple(axis_lines = TRUE, grid_lines = FALSE) +
   theme(axis.line.y = element_blank()) +
   scale_fill_manual("Direction of\neffect on survival", values = cols) +
   scale_x_log10(breaks = c(0.001, 0.01, 0.1, 1, 3), labels = c(0.001, 0.01, 0.1, 1, 3),
-                limits = c(0.00001, 3)) +
+                limits = c(0.00005, 5.8)) +
   scale_y_continuous(expand = c(0,0)) +
   xlab("Estimate (log-odds of survival)") +
   ylab("SNPs")
@@ -132,7 +153,7 @@ p2
 p3 <- gwas_roh %>% 
   mutate(direction = ifelse(estimate < 0, "negative", "positive")) %>% 
   ggplot(aes(p.value, fill = direction)) +
-  geom_histogram(bins = 1000, position="identity") +
+  geom_histogram(bins = 500, position="identity") +
   theme_simple(axis_lines = TRUE, grid_lines = FALSE) +
   scale_fill_manual("Direction of\neffect on survival", values = cols) +
   theme(axis.line.y = element_blank()) +
@@ -178,6 +199,7 @@ ggsave("figs/eff_size_dist_roh.jpg", p_effsize, width = 4.5, height = 4.5)
 
 # manhattan plots
 chr_labels <- c(c(1:18),"","20","",  "22","", "24","", "26")
+chr_labels <- c(c(1:10),"","12","", "14","", "16","", "18", "", "20","", "22","", "24","", "26")
 chr_labels_full <- as.character(1:26)
 cols <- c("#336B87", "#2A3132")
 
@@ -236,15 +258,14 @@ pgwas <- ggplot(gwas_plot, aes(x=positive_cum, y=-log10(p.value))) +
         # Show all points
         #geom_point(aes(fill = chromosome %%2 == 0),#shape = roh_prevalence  #fill = chromosome %%2 == 0
         #           size = 2, shape = 21, alpha = 0.7, stroke = 0.02, color = "black") +
+        geom_hline(yintercept = -log10(0.05/39149), linetype="dashed", color = "grey") +
         geom_point(data = gwas_plot %>% filter(-log10(p.value) <= -log10(0.05/39149)),
                    aes(fill = chromosome %%2 == 0),#shape = roh_prevalence  #fill = chromosome %%2 == 0
                    size = 2, shape = 21, alpha = 1, stroke = 0, color = "black") +
         geom_point(data = gwas_plot %>% filter(-log10(p.value) > -log10(0.05/39149)), # aes(fill = direction),  0.00001
-                  fill=alpha(cols[[1]], 0.5), size = 2, shape = 21, stroke = 0.5, color = "black") + # "#d8dee9"
-        
+                  fill=alpha(cols[[1]], 0.5), size = 2.5, shape = 21, stroke = 0.1, color = "black") + # "#d8dee9"
        # gghighlight(-log10(p.value) > 2,
         #            unhighlighted_params = list(aes(fill = chromosome %%2 == 0))) +
-        geom_hline(yintercept = -log10(0.05/39149), linetype="dashed", color = "grey") +
         scale_x_continuous(labels = chr_labels, breaks= axisdf$center) +
         scale_y_continuous(expand = c(0, 0), limits = c(0,9), labels = as.character(0:8), breaks = 0:8) +
         xlab("Chromosome") + 
@@ -260,6 +281,16 @@ pgwas <- ggplot(gwas_plot, aes(x=positive_cum, y=-log10(p.value))) +
 
 pgwas
 #ggsave( "figs/survival_gwas_roh_pca.jpg",pgwas, height = 3, width = 15)
+
+# simple plot without subplots
+p_gwas_simple <- (p1 + p3) / pgwas +
+  plot_layout(guides = 'collect', height = c(1, 1.6)) +
+  plot_annotation(tag_levels = 'A')
+p_gwas_simple
+
+ggsave(filename = "figs/gwas_plot_viridis_397k.jpg", 
+       p_gwas_simple, width = 8, height = 4)
+
 
 
 layout2 <- c(

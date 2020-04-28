@@ -43,7 +43,7 @@ F_df <- annual_survival %>%
         dplyr::select(id, sex, fped, froh_all, froh_long, froh_medium, froh_short)
 
 lm(froh_all ~ fped, data = F_df) %>% summary()
-df_rel <- data.frame(rel = fct_inorder(c("First cousins once removed", "First cousins", "Half-siblings", "Parents-Children")), 
+df_rel <- data.frame(rel = fct_inorder(c("First cousins once removed", "First cousins", "Half-siblings", "Parents-offspring")), 
                      fped = c(0.03125, 0.0625, 0.125, 0.25))
 p_F <- ggplot(F_df, aes(fped, froh_all)) +
         geom_point(size = 1.3, alpha = 1, shape = 21, fill = "#d8dee9", color = "#2e3440", stroke = 0.1) +        

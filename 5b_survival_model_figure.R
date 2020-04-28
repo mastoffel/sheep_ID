@@ -14,7 +14,8 @@ library(sjPlot)
 library(ggeffects)
 library(patchwork)
 library(inlafuns)
-
+library(ggridges)
+library(gt)
 # data
 # annual measures of traits and fitness
 load("data/survival_mods_data.RData")
@@ -129,7 +130,7 @@ p_froh_across_ages
 
 
 # Plot B: effect sizes ---------------------------------------------------------
-mod_inla <- readRDS("output/AS_mod_INLA_400k.rds")
+mod_inla <- readRDS("output/AS_mod_INLA_397k.rds")
 
 trans_link_to_dat <- function(pred, mod_inla) {
        trans_pred <-  inla.rmarginal(n = 10000, marginal = mod_inla$marginals.fixed[[pred]]) %>% 
@@ -219,8 +220,8 @@ d <- marg_means %>%
                froh = (froh + mean(annual_survival$froh_all10))/10)
 
 
-saveRDS(d, file = "output/AS_mod_INLA_400k_predictions_for_plot2.rds")
-inla_preds <- readRDS("output/AS_mod_INLA_400k_predictions_for_plot2.rds") %>% 
+saveRDS(d, file = "output/AS_mod_INLA_397k_predictions_for_plot2.rds")
+inla_preds <- readRDS("output/AS_mod_INLA_397k_predictions_for_plot2.rds") %>% 
         mutate(prediction = prediction * 100,
                ci_lower = ci_lower * 100,
                ci_upper = ci_upper * 100)
@@ -251,7 +252,7 @@ ggsave("figs/Fig2_inla.jpg", height = 6, width = 9)
 
 
 
-mod_inla <- readRDS("output/AS_mod_INLA_400k.rds")
+mod_inla <- readRDS("output/AS_mod_INLA_397k.rds")
 
 # make Supplementary table / figure for model
 
@@ -271,14 +272,14 @@ fix_eff2 <- fix_eff %>%
 
 raneff <- get_raneff(mod_inla, scales = "sd") %>% 
                 mutate(across(is.numeric, round, 2)) %>% 
-                mutate(term = c("Birth year", "Year of obs.", "Individual", "Add. genetic")) %>% 
+                mutate(term = c("Birth year", "Capture year", "Individual", "Add. genetic")) %>% 
                 mutate(add_info = c("n = 44", "n = 44", "n = 5952", "Pedigree-based")) %>% 
                 mutate(standardisation = "")
                 #mutate(groups = c(44, 44, 5952, ""))
 
 mod_tab <- bind_rows(fix_eff2, raneff) %>% 
         select(term, mean, std_err, ci_lower, ci_upper, add_info, standardisation) %>% 
-        mutate(effect = c(rep("Fixed effects (log-odds scale)", 8), 
+        mutate(effect = c(rep("Fixed effects", 8), 
                           rep("Random effects (variances)", 4))) %>% 
         select(8, 1:5, 7, 6) %>% 
         setNames(c("effect", "Term", "Post.Mean", "Std.Error", "CI (2.5%)", "CI (97.5%)", "Standardisation", "Info"))

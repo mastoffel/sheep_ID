@@ -20,6 +20,7 @@ annual_survival <- fitness_data %>%
                age_cent2 = age_cent^2,
                age_std = as.numeric(scale(age)),
                age_std2 = age_std^2,
+               froh_all_cent = froh_all - mean(froh_all, na.rm = TRUE),
                # times 10 to estimate a 10% percent increase
                froh_all10 = froh_all * 10,
                froh_all10_cent = froh_all10 - mean(froh_all10, na.rm = TRUE),
@@ -75,12 +76,47 @@ mod_inla <- inla(formula=formula_surv, family="binomial",
                  control.inla = list(correct = TRUE)
                  )
 
-saveRDS(mod_inla, file = "output/AS_mod_INLA_400k.rds")
-mod_inla <- readRDS("output/AS_mod_INLA_400k.rds")
-
+saveRDS(mod_inla, file = "output/AS_mod_INLA_397k.rds")
+mod_inla <- readRDS("output/AS_mod_INLA_397k.rds")
 mod_inla$summary.fixed
 
-# plot INLA marginal effects
+# POISSON model for inbreeding load --------------------------------------------
+# to calculate lethal equivalents according to Nietlisbach et al 2019
+
+# model 2, with lamb 
+#' formula_surv <- as.formula(paste('survival ~ froh_all10_cent * age_cent + froh_all10_cent * lamb + sex + twin + 1', 
+#'                                  'f(birth_year, model = "iid", hyper = list(prec = prec_prior))',
+#'                                  'f(sheep_year, model = "iid", hyper = list(prec = prec_prior))',
+#'                                  'f(IndexA2, model = "iid", hyper = list(prec = prec_prior))',
+#'                                  #'f(mum_id, model="iid",  hyper = list(prec = prec_prior))', 
+#'                                  'f(IndexA, model="generic0", hyper = list(theta = list(param = c(0.5, 0.5))),Cmatrix=Cmatrix)', sep = " + "))
+
+formula_surv <- as.formula(paste('survival ~ froh_all10_cent + age_std + age_std2 + sex + twin + 1', 
+                                 'f(birth_year, model = "iid", hyper = list(prec = prec_prior))',
+                                 'f(sheep_year, model = "iid", hyper = list(prec = prec_prior))',
+                                 'f(IndexA2, model = "iid", hyper = list(prec = prec_prior))',
+                                 #'f(mum_id, model="iid",  hyper = list(prec = prec_prior))', 
+                                 'f(IndexA, model="generic0", hyper = list(theta = list(param = c(0.5, 0.5))),Cmatrix=Cmatrix)', sep = " + "))
+mod_inla_pois3 <- inla(formula=formula_surv, family="poisson",
+                       data=annual_survival, 
+                       control.compute = list(dic = TRUE, config=TRUE)
+)
+
+saveRDS(mod_inla_pois3, file = "output/AS_mod_INLA_397k_poisson_full.rds")
+summary(mod_inla_pois4)
+
+# inbreeding load (lethal equivalents) 2B
+#  froh_all10_cent  4.78 [2.76, 6.81]  
+mod_inla_pois4$summary.fixed %>% 
+        rownames_to_column(var = "pred") %>% 
+        as_tibble() %>% 
+        select(c(1,2,4,6)) %>% 
+        setNames(c("pred", "est", "lower_ci", "upper_ci")) %>% 
+        filter(pred == "froh_all10_cent") %>% 
+        mutate(across(is.numeric, function(x) abs(2 * x/0.10)))
+
+# plot INLA marginal effects ---------------------------------------------------
+mod_inla <- readRDS("output/AS_mod_INLA_397k_.rds")
 fun <- function(...) {
         one <-  invlogit(Intercept + 
                                  df1$x1 * froh_all10_cent + 

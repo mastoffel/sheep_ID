@@ -41,7 +41,7 @@ annual_survival <- fitness_data %>%
         as.data.frame() 
 
 # detailed look at significant regions -----------------------------------------
-gwas_res <- read_rds("output/gwas_res_400k.RDS")
+gwas_res <- read_rds("output/gwas_res_397k.rds")
 # put into df
 gwas_full <- gwas_res %>%
         rename(snp.name = term) %>%
@@ -88,8 +88,9 @@ gwas_plot <- gwas_p %>% left_join(hom_sum)
 
 gwas_plot %>% arrange(p.value)
 
-
-
+# check MAF in region
+#geno_sub <- as(full_sample$genotypes[, df_plot$snp.name], "numeric")
+#maf <- col.summary(full_sample$genotypes[, df_plot$snp.name])$maf
 
 # plot 1: Regional estimates, log10p and ROH counts ---------------------------- 
 get_genome_region <- function(chr, pos) {
@@ -137,7 +138,7 @@ snp_stats <- c(estimate = "Estimate\n(log-odds)", log_p = "-log10(p-value)", # o
 #levels(df_plot$var) <- c("Estimate~(log-odds)", "-log[10]p-value", "%~sheep~with~ROH")
 
 chrs <- c(`1` = "Chr. 1", `2` = "Chr. 2", `10` = "Chr. 10", `14` = "Chr. 14", `23` = "Chr. 23")
-hlines <- data.frame(y_val = c(NA, NA, 1679/5952 * 100), var = c("estimate", "log_p", "roh_count"))
+hlines <- data.frame(y_val = c(NA, NA, 1682/5952 * 100), var = c("estimate", "log_p", "roh_count"))
 
 
 top_snps_regions_p <- ggplot(df_plot) +
@@ -163,8 +164,8 @@ top_snps_regions_p <- ggplot(df_plot) +
         theme(axis.line.x=element_line(),
               panel.border = element_rect(size = 0.2, fill = NA))
 top_snps_regions_p
-ggsave("figs/top_snps_regions.jpg", plot = top_snps_regions_p,
-       width = 6, height = 3.5)
+#ggsave("figs/top_snps_regions.jpg", plot = top_snps_regions_p,
+#       width = 6, height = 3.5)
 
 
 # get heterozygosity
@@ -178,9 +179,9 @@ het2 <- het %>%
         left_join(df_plot) 
 
 # smoothing across 30 SNPs
-span <- 30
+span <- 25
 het$heterozygosity <- ksmooth(1:nrow(het), het$het, kernel = "normal", bandwidth = span)$y
-hlines <- data.frame(y_val = c(NA, NA, 1679/5952 * 100, 0.3086), var = c("estimate", "log_p", "roh_count", "heterozygosity"))
+hlines <- data.frame(y_val = c(NA, -log10(0.05/39149), 1679/5952 * 100, 0.3086), var = c("estimate", "log_p", "roh_count", "heterozygosity"))
 
 df_plot2 <- df_plot %>% 
                 pivot_wider(names_from = var, values_from = vals) %>% 
@@ -190,7 +191,7 @@ df_plot2 <- df_plot %>%
                 mutate(var = factor(var, levels = c("estimate", "log_p", "roh_count", "heterozygosity")))
 
 snp_stats <- c(estimate = "Estimate\n(log-odds)", log_p = "-log10(p-value)", # og_p = "-log10(p-value)", 
-               roh_count = "% of sheep\n with ROH", heterozygosity = "Multilocus\nheterozygosity")
+               roh_count = "% of sheep\n with ROH", heterozygosity = "SNP\nheterozygosity")
 df_plot2 <- df_plot2 %>% 
         mutate(type = ifelse(var %in% c("estimate", "log_p"), "gwas", "diversity")) %>% 
         mutate(type = as.factor(type))
@@ -205,10 +206,10 @@ p_final <- ggplot(df_plot2) +
                    shape = 21, 
                    #fill = "green",
                    #fill = viridis(2)[2], 
-                   fill = viridis(10)[10],
-                   #fill = "white",
+                   #fill = viridis(10)[10],
+                   fill = "white",
                    #color = "white",
-                   size = 2, # viridis(7)[7]
+                   size = 1.5, # viridis(7)[7]
                    stroke = 0.6) +
         #facet_wrap(var~chromosome, scales = "free", nrow = 3,ncol = 5) +
         facet_grid(var~chromosome, scales = "free", switch = "y",
@@ -227,8 +228,13 @@ p_final <- ggplot(df_plot2) +
         theme(axis.line.x=element_line(),
               panel.border = element_rect(size = 0.2, fill = NA),
               legend.position = "none")
+p_final
+ggsave("figs/gwas_and_diversity.jpg", p_final, width = 6, height = 5)
 
-ggsave("figs/gwas_and_diversity.jpg", p_final, width = 8, height = 5.7)
+
+
+
+
 
 
 # plot 2: check whether top SNP roh decreases with increasing age---------------
@@ -340,6 +346,7 @@ comp_plot_df %>%
         filter(var == "roh_count") %>% 
         ggplot() +
                 geom_point(aes(pos_Mb, y = vals, color = as.factor(age)), size =0.15) 
+
 # plot 3: ROH for every hit across all individuals -----------------------------
 get_genome_region_roh <- function(x) {
         pos <- as.numeric(top_snps[x, "position"])
@@ -357,7 +364,7 @@ all_roh_regional <- map_dfr(1:nrow(top_snps), get_genome_region_roh, .id = "snp"
 
 top_snp_pos <- top_snps %>% 
         ungroup() %>% 
-        mutate(snp = c(1:5)) %>% 
+        mutate(snp = c(1:4)) %>% 
         mutate(pos_Mb = position/1000000)
 
 all_roh_regional %>% 
@@ -372,6 +379,7 @@ all_roh_regional %>%
         facet_wrap(~snp, scales = "free", ncol = 5) +
         geom_vline(data = top_snp_pos, mapping = aes(xintercept = pos_Mb),
                    size = 0.5, color = "#eceff4", linetype="longdash") -> all_roh_regional_p
+all_roh_regional_p
 ggsave("figs/roh_regional.jpg", width = 10, height = 3.5)
 
 
@@ -380,6 +388,12 @@ ggsave("figs/roh_regional.jpg", width = 10, height = 3.5)
 gene_files <- list.files("data/ncbi", full.names = TRUE)
 all_genes <- map(gene_files, read_csv, skip = 1, col_types = "cddccdc") %>% 
                 bind_rows(.id = "chr")
+
+# check maf in regions
+top_snps_region
+
+
+
 
 # plot proportion of survival vs. detailed hom/het classes ---------------------
 top_snps_lab <- top_snps$snp.name
@@ -412,7 +426,7 @@ rohs_per_top_snp <- map(1:nrow(top_snps), get_roh_per_snp) %>%
                                 }) %>% 
                         reduce(left_join) %>% 
                         mutate(id = as.character(id))
-names(rohs_per_top_snp)[2:6] <- paste0("roh_", names(rohs_per_top_snp)[2:6])
+names(rohs_per_top_snp)[2:5] <- paste0("roh_", names(rohs_per_top_snp)[2:5])
 
 # add to additive genotypes
 geno_full <- geno_info %>% 
@@ -420,14 +434,14 @@ geno_full <- geno_info %>%
         select(id, survival, sheep_year, everything()) 
 geno_simple <- setNames(geno_full, 
                         c("id", "survival", "sheep_year", 
-                          paste0("snp", 1:5), paste0("roh_snp", 1:5)))
+                          paste0("snp", 1:4), paste0("roh_snp", 1:4)))
 
 
 # check additive effects
 gwas_full %>% filter(snp.name %in% top_snps$snp.name)
 
 # check MAF
-map(geno_simple[4:8], function(x) {
+map(geno_simple[4:7], function(x) {
         freqs <- as.numeric(table(x))
         maf <- (freqs[1]*2 + freqs[1]) / (sum(freqs) * 2)
 })
@@ -465,18 +479,10 @@ geno_simple <- geno_simple %>%
                 snp4 == 2 & roh_snp4 == 1 ~ "2roh",
                 snp4 == 1 ~ "1",
                 is.na(snp4) | is.na(roh_snp4) ~ "NA"
-        )) %>% 
-        mutate(class5 = case_when(
-                snp5 == 0 & roh_snp5 == 0 ~ "0",
-                snp5 == 0 & roh_snp5 == 1 ~ "0roh",
-                snp5 == 2 & roh_snp5 == 0 ~ "2",
-                snp5 == 2 & roh_snp5 == 1 ~ "2roh",
-                snp5 == 1 ~ "1",
-                is.na(snp5) | is.na(roh_snp5) ~ "NA"
         )) 
 
-geno_simple %>% group_by(class5) %>% summarise(mean(survival), n())
-
+geno_simple %>% group_by(class4) %>% summarise(mean(survival), n())
+geno_simple %>% group_by(id) %>% sample_n(1) %>% group_by(class1) %>% summarise(mean(survival), n())
 
 ggplot(test, aes(class1)) +
         geom_bar(aes(fill = survival))
