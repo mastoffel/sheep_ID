@@ -73,7 +73,7 @@ plot(froh$KBSUM, num_roh_per_ind$n)
 # ROH length and abundance in the least and most inbred individuals
 num_roh_per_ind %>% 
   left_join(froh) %>% 
-  top_frac(-0.005, FROH) %>% 
+  top_frac(0.01, FROH) %>% 
   #top_frac(0.005, desc(FROH)) %>% 
  # arrange(desc(FROH)) %>% 
   summarise(mean(n), mean(KBAVG))
@@ -207,7 +207,7 @@ p_roh_classes <- prop_IBD_df_with_0 %>%
   scale_fill_manual(values = col_pal, name = "ROH class (Mb)") +
   theme(legend.position = "none",
         #axis.ticks.x = element_blank(),
-        #axis.title=element_text(size=15), 
+        axis.title=element_text(size = rel(1.1)), 
         axis.text = element_text(color = "black")) + 
   xlab("ROH classes in Mb") 
 
@@ -363,9 +363,10 @@ p1 <- ggplot(running_roh_p, aes(x = win_start, y = 0.5, fill = UNAFF_mean)) +
   scale_y_continuous(expand = c(0,0))+
   scale_x_continuous(expand = c(0,0), labels = c(0, 100, 200, 300))+
   ylab("Chromosome") +
-  scale_fill_gradientn("Proportion of Sheep with ROH",
+  scale_fill_gradientn("% of sheep with ROH",
                        colors = rev(fill_cols), values = qn,
-                       breaks = c(0.1,0.3, 0.5, 0.7, 0.9)) +
+                       breaks = c(0.1,0.3, 0.5, 0.7, 0.9),
+                       labels = c(10, 30, 50 , 70, 90)) +
   facet_grid(CHR~., switch="both") +
   xlab("Position in Mb") +
   theme(panel.spacing.y=unit(0.1, "lines"),
