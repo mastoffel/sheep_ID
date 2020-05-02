@@ -16,8 +16,18 @@ sheep_ped <- read_delim("../sheep/data/SNP_chip/20190711_Soay_Pedigree.txt",
         MasterBayes::orderPed() 
 #save(sheep_ped,  file = "model_in/sheep_ped.RData")
 
+# check call rate
+# no individual has less than 95 %
+sheep_plink_name <- "data/sheep_geno_imputed_ram_398k_filt"
+# read merged plink data
+sheep_bed <- paste0(sheep_plink_name, ".bed")
+sheep_bim <- paste0(sheep_plink_name, ".bim")
+sheep_fam <- paste0(sheep_plink_name, ".fam")
+full_sample <- read.plink(sheep_bed, sheep_bim, sheep_fam)
+summary(full_sample$genotypes)
+
 # IDs which weren't well imputed and should be removed
-IDs_lots_missing <- read_delim("data/ids_more_than_5perc_missing.txt", delim = " ")
+#IDs_lots_missing <- read_delim("data/ids_more_than_5perc_missing.txt", delim = " ")
 
 ##### ROH data #####
 #file_path <- "output/ROH/roh_nofilt_ram_pruned.hom"
@@ -144,7 +154,7 @@ fitness_data <- fitness_data %>%
         # for sex, check what Cas is
         filter(sex %in% c("F", "M")) %>% 
         # some individuals arent imputed well and should be discarded 
-        filter(!(id %in% IDs_lots_missing$id)) %>% 
+        #filter(!(id %in% IDs_lots_missing$id)) %>% 
         # na rows should be discarded
         mutate_at(c("id", "sheep_year", "birth_year", "sex",
                     "mum_id", "twin"), as.factor)
