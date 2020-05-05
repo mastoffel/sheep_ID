@@ -106,7 +106,7 @@ roh_plot2 %>%
         #ungroup() %>% 
        # sample_frac(0.1) %>% 
         ggplot(aes(x = FROH, y = age_num_fct)) +
-        geom_density_ridges(scale = 0.85,
+        geom_density_ridges(scale = 0.83,
                             jittered_points=TRUE, color = "#4c566a",  # # "#4c566a"  "#eceff4"
                             fill = "#eceff4",
                             point_shape = "|", point_size = 2.5, size = 0.4,
@@ -114,12 +114,15 @@ roh_plot2 %>%
                             point_alpha = 1, point_color = "#4c566a", 
                             alpha = 0.9, bandwidth = 0.006) +
         theme_simple(axis_lines = FALSE, base_size = 14) +
+        scale_x_continuous(limits = c(0.199, 0.55)) +
         ylab("Age") + 
+        scale_y_discrete(expand = expand_scale(add = c(0.2, 1.01))) +
         xlab(expression(F[ROH]~across~age~cohorts)) +
         theme(strip.background = element_blank(),
               panel.grid.major = element_line(colour = "#d8dee9", size = 0.5),
               strip.text = element_text(vjust=2),
               panel.spacing.x = unit(1, "lines"),
+              #plot.margin=unit(c(1,0,0,0),"cm"),
               strip.text.x = element_text(margin = margin(1,0,0,0, "cm")),
               legend.position = "none") -> p_froh_across_ages #+
 #labs(title = "Inbreeding across life in Soay sheep",
@@ -130,7 +133,7 @@ p_froh_across_ages
 
 
 # Plot B: effect sizes ---------------------------------------------------------
-mod_inla <- readRDS("output/AS_mod_INLA_397k.rds")
+mod_inla <- readRDS("output/AS_mod_INLA_398k.rds")
 
 trans_link_to_dat <- function(pred, mod_inla) {
        trans_pred <-  inla.rmarginal(n = 10000, marginal = mod_inla$marginals.fixed[[pred]]) %>% 
@@ -146,6 +149,8 @@ fix_eff <- map_df(names(mod_inla$marginals.fixed), trans_link_to_dat, mod_inla) 
         .[c(2,7,8), ] %>% 
         mutate(pred = factor(pred, levels = rev(pred)))
 names(fix_eff) <- c("Predictor", "mean", "lower_CI", "upper_CI")
+
+1-fix_eff
 
 p_surv_mod <- ggplot(fix_eff, aes(mean, Predictor, xmax = upper_CI, xmin = lower_CI)) +
         geom_vline(xintercept = 1, linetype='dashed', colour =  "#4c566a", size = 0.3) +     # "#4c566a"  "#eceff4"
@@ -220,8 +225,8 @@ d <- marg_means %>%
                froh = (froh + mean(annual_survival$froh_all10))/10)
 
 
-saveRDS(d, file = "output/AS_mod_INLA_397k_predictions_for_plot2.rds")
-inla_preds <- readRDS("output/AS_mod_INLA_397k_predictions_for_plot2.rds") %>% 
+saveRDS(d, file = "output/AS_mod_INLA_398k_predictions_for_plot2.rds")
+inla_preds <- readRDS("output/AS_mod_INLA_398k_predictions_for_plot2.rds") %>% 
         mutate(prediction = prediction * 100,
                ci_lower = ci_lower * 100,
                ci_upper = ci_upper * 100)
@@ -251,8 +256,7 @@ ggsave("figs/Fig2_inla.jpg", height = 6, width = 9)
 
 
 
-
-mod_inla <- readRDS("output/AS_mod_INLA_397k.rds")
+#mod_inla <- readRDS("output/AS_mod_INLA_397k.rds")
 
 # make Supplementary table / figure for model
 

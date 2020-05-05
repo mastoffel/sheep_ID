@@ -14,7 +14,6 @@ library(snpStats)
 # _filt for files where individuals were filtered
 # _pruned for files where SNPs were LD pruned
 
-
 # 398K SNPs, filter individuals
 system(paste0("/usr/local/bin/plink --bfile ../sheep/data/SNP_chip/ramb_mapping/sheep_geno_imputed_ram_01052020 --sheep --keep output/ROH/ids_surv.txt ",
               "--make-bed --out data/sheep_geno_imputed_ram_398k_filt"))

@@ -28,11 +28,11 @@ annual_survival <- fitness_data %>%
 
 
 # check scree plot / looks like 7 is a good number
-pca_eigenval <- read_lines("output/sheep_pca_400k.eigenval") %>% as.numeric() %>% plot()
+pca_eigenval <- read_lines("output/sheep_pca_398k.eigenval") %>% as.numeric() %>% plot()
 
 # prepare eigenvectors to include in gwas
 col_to <- paste0("pc", 1:20)
-pca_eigenvec <- read_delim("output/sheep_pca.eigenvec", delim = " ", col_names = FALSE) %>% 
+pca_eigenvec <- read_delim("output/sheep_pca_398k.eigenvec", delim = " ", col_names = FALSE) %>% 
                         dplyr::rename(id = X2) %>% 
                         dplyr::select(-X1) %>% 
                         #rename(across(starts_with("X")), ~col_to)

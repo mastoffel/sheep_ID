@@ -3,10 +3,8 @@
 library(data.table)
 library(RColorBrewer)
 library(wesanderson)
-library(readxl)
 library(patchwork)
 library(tidyverse)
-library(zoo)
 source("theme_simple.R")
 library(ggridges)
 library(viridis)
@@ -73,7 +71,7 @@ plot(froh$KBSUM, num_roh_per_ind$n)
 # ROH length and abundance in the least and most inbred individuals
 num_roh_per_ind %>% 
   left_join(froh) %>% 
-  top_frac(0.01, FROH) %>% 
+  top_frac(-0.01, FROH) %>% 
   #top_frac(0.005, desc(FROH)) %>% 
  # arrange(desc(FROH)) %>% 
   summarise(mean(n), mean(KBAVG))
@@ -99,7 +97,7 @@ p_roh
 
 p_roh_dist <- p_froh + p_roh + plot_annotation(tag_levels = 'A')
 p_roh_dist
-ggsave("figs/Sup_ROH_dist.jpg", p_roh_dist, width = 6, height = 2.7)
+ggsave("figs/Sup_ROH_dist.jpg", p_roh_dist, width = 6, height = 2.2)
 
 # Supplementary: plot HD vs. imputed individuals
 # HD inds 
@@ -402,8 +400,8 @@ layout <- c(
 )
 p_final <- p1 + p2 + plot_layout(design = layout)
 p_final
-ggsave("figs/roh_genome_397K.jpg", p1, width = 8, height = 6)
-ggsave("figs/roh_genome_legend_397K.jpg", p2, width = 5, height = 3)
+ggsave("figs/roh_genome_398K.jpg", p1, width = 8, height = 6)
+ggsave("figs/roh_genome_legend_398K.jpg", p2, width = 5, height = 3)
 
 p_roh_comb <- plot_grid(p_roh_classes, ROH_per_ind, nrow = 2, rel_heights = c(2.2,3, 5.2))
 p_roh_comb
@@ -468,7 +466,7 @@ roh_deserts <- running_roh %>%
   filter(UNAFF_n > 10) %>% 
   mutate(prop_roh = UNAFF_mean/5952) %>%  # 7691 5952
   arrange(prop_roh) %>% 
-  # top 0.1% of windows
+  # top 0.5% of windows
   .[1:26, ]
 mean(roh_deserts$prop_roh)
 
@@ -480,7 +478,7 @@ roh_deserts %>%
   setNames(c("Chromosome", "WinStart", "WinEnd", "% of individuals with ROH", "N (SNPs)")) %>% 
   gt() %>% 
   tab_header(
-    title = "Top 1% ROH deserts",
+    title = "Top 0.5% ROH deserts",
     subtitle = "ROH density measured in 500Kb running windows"
   ) %>% 
   gtsave(filename = "figs/tables/roh_desert.png")
@@ -501,7 +499,7 @@ roh_islands %>%
   setNames(c("Chromosome", "WinStart", "WinEnd", "% of individuals with ROH", "N (SNPs)")) %>% 
   gt() %>% 
   tab_header(
-    title = "Top 1% ROH islands",
+    title = "Top 0.5% ROH islands",
     subtitle = "ROH density measured in 500Kb running windows"
   ) %>% 
   gtsave(filename = "figs/tables/roh_islands.png")

@@ -76,20 +76,12 @@ mod_inla <- inla(formula=formula_surv, family="binomial",
                  control.inla = list(correct = TRUE)
                  )
 
-saveRDS(mod_inla, file = "output/AS_mod_INLA_397k.rds")
-mod_inla <- readRDS("output/AS_mod_INLA_397k.rds")
+saveRDS(mod_inla, file = "output/AS_mod_INLA_398k.rds")
+mod_inla <- readRDS("output/AS_mod_INLA_398k.rds")
 mod_inla$summary.fixed
 
 # POISSON model for inbreeding load --------------------------------------------
 # to calculate lethal equivalents according to Nietlisbach et al 2019
-
-# model 2, with lamb 
-#' formula_surv <- as.formula(paste('survival ~ froh_all10_cent * age_cent + froh_all10_cent * lamb + sex + twin + 1', 
-#'                                  'f(birth_year, model = "iid", hyper = list(prec = prec_prior))',
-#'                                  'f(sheep_year, model = "iid", hyper = list(prec = prec_prior))',
-#'                                  'f(IndexA2, model = "iid", hyper = list(prec = prec_prior))',
-#'                                  #'f(mum_id, model="iid",  hyper = list(prec = prec_prior))', 
-#'                                  'f(IndexA, model="generic0", hyper = list(theta = list(param = c(0.5, 0.5))),Cmatrix=Cmatrix)', sep = " + "))
 
 formula_surv <- as.formula(paste('survival ~ froh_all10_cent + age_std + age_std2 + sex + twin + 1', 
                                  'f(birth_year, model = "iid", hyper = list(prec = prec_prior))',
@@ -102,12 +94,12 @@ mod_inla_pois3 <- inla(formula=formula_surv, family="poisson",
                        control.compute = list(dic = TRUE, config=TRUE)
 )
 
-saveRDS(mod_inla_pois3, file = "output/AS_mod_INLA_397k_poisson_full.rds")
-summary(mod_inla_pois4)
+saveRDS(mod_inla_pois3, file = "output/AS_mod_INLA_398k_poisson_full.rds")
+summary(mod_inla_pois3)
 
 # inbreeding load (lethal equivalents) 2B
 #  froh_all10_cent  4.78 [2.76, 6.81]  
-mod_inla_pois4$summary.fixed %>% 
+mod_inla_pois3$summary.fixed %>% 
         rownames_to_column(var = "pred") %>% 
         as_tibble() %>% 
         select(c(1,2,4,6)) %>% 
@@ -116,7 +108,7 @@ mod_inla_pois4$summary.fixed %>%
         mutate(across(is.numeric, function(x) abs(2 * x/0.10)))
 
 # plot INLA marginal effects ---------------------------------------------------
-mod_inla <- readRDS("output/AS_mod_INLA_397k_.rds")
+mod_inla <- readRDS("output/AS_mod_INLA_398k.rds")
 fun <- function(...) {
         one <-  invlogit(Intercept + 
                                  df1$x1 * froh_all10_cent + 
@@ -196,7 +188,7 @@ survival_inla <- function(ageclass) {
 }
 
 all_inla_mods <- map(0:10, survival_inla)
-saveRDS(all_inla_mods, file = "output/inla_survival_models_diff_ages_froh_all_400k.rds")
+saveRDS(all_inla_mods, file = "output/inla_survival_models_diff_ages_froh_all_398k.rds")
 
 # plot for supplementary
 inla_plot <- map_df(all_inla_mods, function(x) as_tibble(x$summary.fixed[2, ]), .id = "age") %>% 
