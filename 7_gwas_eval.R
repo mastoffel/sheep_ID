@@ -50,7 +50,7 @@ gwas_res <- gwas_res[-which(str_detect(gwas_res$term, "sd")), ]
 gwas_res <- read_rds("output/gwas_res_397k.rds")
 
 # plink name
-sheep_plink_name <- "data/sheep_geno_imputed_ram_400k_filt"
+sheep_plink_name <- "data/sheep_geno_imputed_ram_398k_filt"
 # read merged plink data
 sheep_bed <- paste0(sheep_plink_name, ".bed")
 sheep_bim <- paste0(sheep_plink_name, ".bim")

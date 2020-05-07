@@ -474,7 +474,7 @@ mean(roh_deserts$prop_roh)
 roh_deserts %>% 
   mutate(win_start = round(win_start/1000, 2), win_end = round(win_end/1000, 2), 
          prop_roh = round(prop_roh * 100, 2)) %>% 
-  select(CHR, win_start, win_end, prop_roh, UNAFF_n) %>%
+  dplyr::select(CHR, win_start, win_end, prop_roh, UNAFF_n) %>%
   setNames(c("Chromosome", "WinStart", "WinEnd", "% of individuals with ROH", "N (SNPs)")) %>% 
   gt() %>% 
   tab_header(
@@ -495,7 +495,7 @@ mean(roh_islands$prop_roh)
 roh_islands %>% 
   mutate(win_start = round(win_start/1000, 2), win_end = round(win_end/1000, 2), 
          prop_roh = round(prop_roh * 100, 2)) %>% 
-  select(CHR, win_start, win_end, prop_roh, UNAFF_n) %>%
+  dplyr::select(CHR, win_start, win_end, prop_roh, UNAFF_n) %>%
   setNames(c("Chromosome", "WinStart", "WinEnd", "% of individuals with ROH", "N (SNPs)")) %>% 
   gt() %>% 
   tab_header(
