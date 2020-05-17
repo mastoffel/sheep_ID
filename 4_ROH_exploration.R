@@ -15,6 +15,8 @@ library(ggchicklet)
 library(windowscanr)
 library(cowplot)
 library(gt)
+library(grid)
+library(ggplotify)
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #          Full data           #   
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -68,7 +70,7 @@ roh_lengths %>%
 
 plot(froh$KBSUM, num_roh_per_ind$n)
 
-# ROH length and abundance in the least and most inbred individuals
+# ROH length and abundance in the least and most inbred individuals 
 num_roh_per_ind %>% 
   left_join(froh) %>% 
   top_frac(-0.01, FROH) %>% 
@@ -76,7 +78,7 @@ num_roh_per_ind %>%
  # arrange(desc(FROH)) %>% 
   summarise(mean(n), mean(KBAVG))
 
-# Supplementary: FROH / ROH across individuals
+# Supplementary: FROH / ROH across individuals ---------------------------------
 p_froh <- ggplot(froh, aes(FROH)) +
     geom_histogram(bins = 100, fill = "#E5E9F0", color = "black", size = 0.1) +
     ylab("individuals") +
@@ -99,9 +101,9 @@ p_roh_dist <- p_froh + p_roh + plot_annotation(tag_levels = 'A')
 p_roh_dist
 ggsave("figs/Sup_ROH_dist.jpg", p_roh_dist, width = 6, height = 2.2)
 
-# Supplementary: plot HD vs. imputed individuals
+# Supplementary: plot HD vs. imputed individuals -------------------------------
 # HD inds 
-hd_inds <- read_delim("../sheep/data/SNP_chip/ramb_mapping/Plates_1-2_HD_QC3_ram.fam", " ", col_names = FALSE)[[2]]
+hd_inds <- read_delim("../sheep/data/SNP_chip/oar31_mapping/Plates_1-2_HD_QC2.fam", " ", col_names = FALSE)[[2]]
 froh_plot <- froh %>% mutate(hd = ifelse(IID %in% hd_inds, "HD", "imputed")) %>% 
                       mutate(hd = as.factor(hd)) %>% mutate(hd = relevel(hd, "imputed"))
 
@@ -214,7 +216,7 @@ ggsave("figs/fig1a_roh_classes_boxplots.jpg", p_roh_classes, width = 7, height =
 
 #ggsave("figs/roh_classes_subset_inds.jpg", p_roh2, width = 15, height = 5)
 
-#~~ ROH for some indiividuals
+#~~ ROH for some indiividuals --------------------------------------------------
 all_roh <- roh_lengths %>% 
   group_by(IID) %>% 
   summarise(sum_roh = sum(KB)) %>% 
@@ -294,6 +296,7 @@ df %>%
         axis.text.y = element_text(colour = "white"),
         axis.line.y = element_blank(),
         axis.title=element_text(size=17))+
+  coord_cartesian(clip = 'off') +
   xlab("Chromosome") +
   ylab("Individuals") -> ROH_per_ind
 #ggtitle("ROH > 1Mb in the 10 most and 10 least inbred individuals") 
@@ -304,14 +307,13 @@ pg <- ggplotGrob(ROH_per_ind)
 for(i in which(grepl("strip-b", pg$layout$name))){
   pg$grobs[[i]]$layout$clip <- "off"
 }
-library("grid")
-library("ggplotify")
-p1 <- as.ggplot(pg)
-ggsave("figs/fig1b_roh_per_ind_5Mb.jpg", p1, width = 8, height = 3.5)
+
+ROH_per_ind_grob <- as.ggplot(pg)
+ggsave("figs/fig1b_roh_per_ind_5Mb.jpg", ROH_per_ind_grob, width = 6, height = 3.5)
 
 #p1 / p_roh_classes + plot_layout(heights = c(1, 0.8))
 
-#~~~ ROH density
+#~~~ ROH density ---------------------------------------------------------------
 # do not use pruned data here as this will bias ROH densities
 #hom_sum <- fread("output/ROH/roh_nofilt_ram_pruned.hom.summary")
 hom_sum <- fread("output/ROH/roh_ram.hom.summary")
@@ -345,9 +347,9 @@ running_roh %>%
   filter(UNAFF_n > 0) -> running_roh_p
 
 # check distribution of snps
-ggplot(running_roh, aes(win_start, UNAFF_n)) + 
-  geom_point() + geom_smooth(span = 0.1) +
-  facet_wrap(~CHR, scales = "free_x")
+#ggplot(running_roh, aes(win_start, UNAFF_n)) + 
+#  geom_point() + geom_smooth(span = 0.1) +
+#  facet_wrap(~CHR, scales = "free_x")
 
 # ROH across the genome plot
 library(scales)
@@ -402,6 +404,14 @@ p_final <- p1 + p2 + plot_layout(design = layout)
 p_final
 ggsave("figs/roh_genome_398K.jpg", p1, width = 8, height = 6)
 ggsave("figs/roh_genome_legend_398K.jpg", p2, width = 5, height = 3)
+
+
+
+# try simple combined plot
+p_roh_comb_simple <- plot_grid(ROH_per_ind_grob, p1, nrow = 2, 
+                               rel_heights = c(0.7, 1), label_size = 10, 
+                               labels = c("A", "B"))
+
 
 p_roh_comb <- plot_grid(p_roh_classes, ROH_per_ind, nrow = 2, rel_heights = c(2.2,3, 5.2))
 p_roh_comb

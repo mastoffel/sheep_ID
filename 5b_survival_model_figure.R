@@ -124,6 +124,7 @@ roh_plot2 %>%
               strip.text = element_text(vjust=2),
               panel.spacing.x = unit(1, "lines"),
               #plot.margin=unit(c(1,0,0,0),"cm"),
+              axis.text = element_text(size = 13),
               strip.text.x = element_text(margin = margin(1,0,0,0, "cm")),
               legend.position = "none") -> p_froh_across_ages #+
 #labs(title = "Inbreeding across life in Soay sheep",
@@ -170,7 +171,7 @@ p_surv_mod <- ggplot(fix_eff, aes(mean, Predictor, xmax = upper_CI, xmin = lower
                 axis.line.y = element_blank(),
                 axis.ticks.y = element_blank(),
                 axis.title.y = element_blank(),
-                axis.text = element_text(),
+                axis.text = element_text(size = 13),
                 axis.title.x = element_text(margin=margin(t=8))
         ) +
         xlab(expression(beta~and~95*"%"*~CI~(odds~of~survival))) -> p_forest
@@ -264,7 +265,8 @@ p_marginal_effs <- ggplot(inla_preds, aes(froh, prediction)) +
        # scale_x_continuous(limits = c(0.2, 0.55)) +
         theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_size = 14) +
         theme(axis.line.y = element_blank(),
-              legend.position = "top") +
+              legend.position = "top",
+              axis.text = element_text(size = 13)) +
         xlab(expression(F[ROH])) +
         ylab("Predicted\nsurvival probability %")
 
@@ -272,9 +274,9 @@ p_marginal_effs <- ggplot(inla_preds, aes(froh, prediction)) +
 p_froh_across_ages + (p_forest / p_marginal_effs)
 
 library(cowplot)
-p_final <- cowplot::plot_grid(p_froh_across_ages, plot_grid(p_forest, p_marginal_effs, nrow = 2, rel_heights = c(1,1.5),
-                                                            labels = c('B', 'C')),
-                              labels = c('A', ''), rel_widths = c(1, 0.9))
+p_final <- cowplot::plot_grid(p_froh_across_ages, 
+                              cowplot::plot_grid(p_forest, p_marginal_effs, label_size = 16, nrow = 2, rel_heights = c(1,1.5), labels = c('B', 'C')),
+                              labels = c('A', ''), rel_widths = c(1, 0.9), label_size = 16)
 ggsave("figs/Fig2_inla.jpg", height = 6, width = 8)
 
 

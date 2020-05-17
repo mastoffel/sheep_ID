@@ -5,7 +5,7 @@ library(tidyverse)
 # data
 load("data/survival_mods_data.RData")
 load("data/sheep_ped.RData")
-IDs_lots_missing <- read_delim("data/ids_more_than_5perc_missing.txt", delim = " ")
+#IDs_lots_missing <- read_delim("data/ids_more_than_5perc_missing.txt", delim = " ")
 
 # survival data
 annual_survival <- fitness_data %>% 
@@ -28,16 +28,16 @@ annual_survival <- fitness_data %>%
 
 
 # check scree plot / looks like 7 is a good number
-pca_eigenval <- read_lines("output/sheep_pca_398k.eigenval") %>% as.numeric() %>% plot()
+pca_eigenval <- read_lines("output/sheep_pca_oar.eigenval") %>% as.numeric() %>% plot()
 
 # prepare eigenvectors to include in gwas
 col_to <- paste0("pc", 1:20)
-pca_eigenvec <- read_delim("output/sheep_pca_398k.eigenvec", delim = " ", col_names = FALSE) %>% 
+pca_eigenvec <- read_delim("output/sheep_pca_oar.eigenvec", delim = " ", col_names = FALSE) %>% 
                         dplyr::rename(id = X2) %>% 
                         dplyr::select(-X1) %>% 
                         #rename(across(starts_with("X")), ~col_to)
                         dplyr::rename_at(vars(X3:X22), ~col_to) %>% 
-                        select(id, pc1, pc2, pc3, pc4, pc5, pc6, pc7)
+                        dplyr::select(id, pc1, pc2, pc3, pc4, pc5, pc6, pc7)
 
 # plot
 ggplot(pca_eigenvec, aes(pc1, pc7)) + geom_point()

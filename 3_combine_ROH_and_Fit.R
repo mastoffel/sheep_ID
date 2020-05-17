@@ -18,7 +18,7 @@ sheep_ped <- read_delim("../sheep/data/SNP_chip/20190711_Soay_Pedigree.txt",
 
 # check call rate
 # no individual has less than 95 %
-sheep_plink_name <- "data/sheep_geno_imputed_ram_398k_filt"
+sheep_plink_name <- "data/sheep_geno_imputed_oar_filt"
 # read merged plink data
 sheep_bed <- paste0(sheep_plink_name, ".bed")
 sheep_bim <- paste0(sheep_plink_name, ".bim")
@@ -38,7 +38,7 @@ roh_lengths <- fread(file_path)
 hist(roh_lengths$KB, breaks = 1000, xlim = c(0,10000))
 
 # Chr lengths
-chr_data <- read_delim("../sheep/data/sheep_genome/chromosome_info_ram.txt", delim = "\t") %>% 
+chr_data <- read_delim("../sheep/data/sheep_genome/chromosome_info_oar31.txt", delim = "\t") %>% 
   rename(size_BP = Length,
          CHR = Part) %>% 
   mutate(size_KB = size_BP / 1000)

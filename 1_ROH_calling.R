@@ -14,9 +14,21 @@ library(snpStats)
 # _filt for files where individuals were filtered
 # _pruned for files where SNPs were LD pruned
 
-# 398K SNPs, filter individuals
-system(paste0("/usr/local/bin/plink --bfile ../sheep/data/SNP_chip/ramb_mapping/sheep_geno_imputed_ram_01052020 --sheep --keep output/ROH/ids_surv.txt ",
-              "--make-bed --out data/sheep_geno_imputed_ram_398k_filt"))
+# oar filter individuals
+system(paste0("/usr/local/bin/plink --bfile ../sheep/data/SNP_chip/oar31_mapping/sheep_geno_imputed_oar31_17052020 --sheep --keep output/ROH/ids_surv.txt ",
+              "--make-bed --out data/sheep_geno_imputed_oar_filt"))
+
+# check for individuals with less than 95% genotyping rate
+# plink name
+sheep_plink_name <- "data/sheep_geno_imputed_oar_filt"
+# read merged plink data
+sheep_bed <- paste0(sheep_plink_name, ".bed")
+sheep_bim <- paste0(sheep_plink_name, ".bim")
+sheep_fam <- paste0(sheep_plink_name, ".fam")
+full_sample <- read.plink(sheep_bed, sheep_bim, sheep_fam)
+ind_sum <- row.summary(full_sample$genotypes)
+sum(ind_sum$Call.rate < 0.95) # fine
+summary(ind_sum)
 
 # PCA for GWAS =================================================================
 # for pruned data
@@ -24,13 +36,13 @@ system(paste0("/usr/local/bin/plink --bfile ../sheep/data/SNP_chip/ramb_mapping/
 #               "--pca --out output/sheep_pca")) # sheep_pca
 
 # for 400k PCA we need to prune data as unpruned data fails for some reason
-system(paste0("/usr/local/bin/plink --bfile data/sheep_geno_imputed_ram_398k_filt --sheep ",
+system(paste0("/usr/local/bin/plink --bfile data/sheep_geno_imputed_oar_filt --sheep ",
               "--indep-pairwise 500 50 0.999 ",
-              "--out data/sheep_geno_imputed_ram_398k_filt_pruned"))
+              "--out data/sheep_geno_imputed_oar_filt_pruned"))
 
-system(paste0("/usr/local/bin/plink --bfile data/sheep_geno_imputed_ram_398k_filt --sheep ",
-              "--pca --exclude data/sheep_geno_imputed_ram_398k_filt_pruned.prune.out ",
-              "--out output/sheep_pca_398k")) # sheep_pca
+system(paste0("/usr/local/bin/plink --bfile data/sheep_geno_imputed_oar_filt --sheep ",
+              "--pca --exclude data/sheep_geno_imputed_oar_filt_pruned.prune.out ",
+              "--out output/sheep_pca_oar")) # sheep_pca
 
 # calculate ROH pruned =========================================================
 # system(paste0("/usr/local/bin/plink --bfile output/plink_files/sheep_geno_imputed_ram_pruned --sheep --out output/ROH/roh_nofilt_ram_pruned ",
@@ -40,7 +52,7 @@ system(paste0("/usr/local/bin/plink --bfile data/sheep_geno_imputed_ram_398k_fil
 #               "--homozyg-window-het 1"))
 
 # calculate ROH unpruned =======================================================
-system(paste0("/usr/local/bin/plink --bfile data/sheep_geno_imputed_ram_398k_filt --sheep --out output/ROH/roh_ram ",
+system(paste0("/usr/local/bin/plink --bfile data/sheep_geno_imputed_oar_filt --sheep --out output/ROH/roh_ram ",
               # "--keep output/ROH/ids_surv.txt ",
               "--homozyg --homozyg-window-snp 30 --homozyg-snp 30 --homozyg-kb 600 ",
               "--homozyg-gap 500 --homozyg-density 50 --homozyg-window-missing 2 ",
@@ -75,15 +87,16 @@ roh_lengths[which.max(roh_lengths$KB), ]
 
 plink_geno_path <- "data/"
 # plink name
-sheep_plink_name <- "sheep_geno_imputed_ram_27092019_pruned"
-sheep_plink_name <- "sheep_geno_imputed_ram_27092019"
+sheep_plink_name <- "sheep_geno_imputed_ram_398k_filt"
 # read merged plink data
 sheep_bed <- paste0(plink_geno_path, sheep_plink_name, ".bed")
 sheep_bim <- paste0(plink_geno_path, sheep_plink_name, ".bim")
 sheep_fam <- paste0(plink_geno_path, sheep_plink_name, ".fam")
 full_sample <- read.plink(sheep_bed, sheep_bim, sheep_fam)
+
 summary(full_sample$genotypes)
-na_genos <- is.na(full_sample$genotypes)
+qc_geno <- row.summary(full_sample$genotypes)
+hist(qc_geno$Call.rate)
 
 # which individuals have lots of missing data?
 missing_per_ind <- rowSums(na_genos)
@@ -102,7 +115,6 @@ roh_hom_sum <- fread("output/ROH/roh_nofilt_ram_pruned.hom.indiv")
 
 snp_names <- colnames(sheep_geno)
 snp_index <- 1:length(snp_names)
-
 snps_df <- data.frame(SNP1 = snp_names, SNP1_index = snp_index, 
                       stringsAsFactors = FALSE)
 

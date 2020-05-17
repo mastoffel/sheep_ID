@@ -113,7 +113,7 @@ gwas_roh %>% arrange(desc(abs(estimate)))
 # distribution of effect sizes
 cols <- viridis(2)
 # alternative
-# cols <- c("#4393c3", "#2A3132")
+#cols <- c("#4393c3", "#2A3132")
 options(scipen = 999)
   
 p1 <- gwas_roh %>% 
@@ -284,7 +284,7 @@ pgwas
 
 # simple plot without subplots
 p_gwas_simple <- (p1 + p3) / pgwas +
-  plot_layout(guides = 'collect', height = c(1, 1.6)) +
+  plot_layout(guides = 'collect', height = c(1, 1.5)) +
   plot_annotation(tag_levels = 'A')
 p_gwas_simple
 

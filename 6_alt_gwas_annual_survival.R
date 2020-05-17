@@ -18,7 +18,6 @@ if (!(length(part_inp) == 0)) {
         part <- 21
 }
 
-part <- 304
 # data
 load("data/survival_mods_data.RData")
 load("data/sheep_ped.RData")
@@ -29,12 +28,11 @@ pcs <- read_delim("data/ann_surv_pca.txt", " ", col_names = TRUE) %>%
         mutate(id = as.character(id))
 
 # roh data
-#file_path <- "data/roh_ram.hom"
-file_path <- "output/ROH/roh_ram.hom"
+file_path <- "data/roh_ram.hom"
 roh_lengths <- fread(file_path)
 
 # plink name
-sheep_plink_name <- "data/sheep_geno_imputed_ram_400k_filt"
+sheep_plink_name <- "data/sheep_geno_imputed_oar_filt"
 # read merged plink data
 sheep_bed <- paste0(sheep_plink_name, ".bed")
 sheep_bim <- paste0(sheep_plink_name, ".bim")
@@ -43,7 +41,7 @@ full_sample <- read.plink(sheep_bed, sheep_bim, sheep_fam)
 
 # make list with all parts
 all_snps <- 1:nrow(full_sample$map)
-all_parts <- split(all_snps, ceiling(seq_along(all_snps )/1000))
+all_parts <- split(all_snps, ceiling(seq_along(all_snps )/500)) # every part runs 500 models
 snp_indices <- all_parts[[part]]
 
 # filter map data
@@ -159,7 +157,7 @@ rm(annual_survival, annual_survival_gwas, fitness_data, geno_sub,
    roh_lengths, roh_pieces, sheep_ped, roh_df)
 
 # set up plan
-plan(multiprocess, workers = 6)
+plan(multiprocess, workers = 5)
 
 # increase maxSize
 options(future.globals.maxSize = 3000 * 1024^2)
