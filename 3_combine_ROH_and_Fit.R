@@ -32,7 +32,7 @@ summary(full_sample$genotypes)
 ##### ROH data #####
 #file_path <- "output/ROH/roh_nofilt_ram_pruned.hom"
 # use unpruned data
-file_path <-  "output/ROH/roh_ram.hom"
+file_path <-  "output/ROH/roh.hom"
 #file <- "roh_nofilt_pruned"
 roh_lengths <- fread(file_path)
 hist(roh_lengths$KB, breaks = 1000, xlim = c(0,10000))

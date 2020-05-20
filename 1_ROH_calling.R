@@ -3,22 +3,40 @@ library(tidyverse)
 library(data.table)
 library(snpStats)
 
-# # get all ind ids
-# ids <- fread("../sheep_imputation/data/hdld_geno_merged.txt", select = 1)
-# ids %>% sample_n(1000) %>% mutate(ID2 = ID) %>% fwrite(file = "data/subset_inds.txt", sep = "\t", col.names = FALSE)
-# 
-# # test ROH on subset
-# system("~/programs/plink --bfile data/sheep_imp --keep data/subset_inds.txt --make-bed --out data/geno_sub --sheep")
-
 # terminology:
 # _filt for files where individuals were filtered
 # _pruned for files where SNPs were LD pruned
 
-# oar filter individuals
+# imputation based on Oar 3.1 mapping
+# retain individuals with survival data
 system(paste0("/usr/local/bin/plink --bfile ../sheep/data/SNP_chip/oar31_mapping/sheep_geno_imputed_oar31_17052020 --sheep --keep output/ROH/ids_surv.txt ",
+              "--make-bed --out data/sheep_geno_imputed_oar_indfilt"))
+
+# check SNP call rates ---------------------------------------------------------
+# plink name
+sheep_plink_name <- "data/sheep_geno_imputed_oar_indfilt"
+# read merged plink data
+sheep_bed <- paste0(sheep_plink_name, ".bed")
+sheep_bim <- paste0(sheep_plink_name, ".bim")
+sheep_fam <- paste0(sheep_plink_name, ".fam")
+full_sample <- read.plink(sheep_bed, sheep_bim, sheep_fam)
+
+# snp genotyping summary
+snp_sum <- col.summary(full_sample$genotypes) %>% 
+                as_tibble(rownames = "snp.name") %>% 
+                left_join(full_sample$map, ., by = "snp.name") 
+# filter call rate and monomorphic snps
+snp_sum %>% 
+        as_tibble() %>% 
+        filter((Call.rate < 0.95) | (MAF == 0)) %>% 
+        .$snp.name %>% 
+        write_lines("data/oar_imp_low_call_snps095.txt")
+
+# filter low call rate SNPs
+system(paste0("/usr/local/bin/plink --bfile data/sheep_geno_imputed_oar_indfilt --sheep --exclude data/oar_imp_low_call_snps095.txt ",
               "--make-bed --out data/sheep_geno_imputed_oar_filt"))
 
-# check for individuals with less than 95% genotyping rate
+# check genotyping rates -------------------------------------------------------
 # plink name
 sheep_plink_name <- "data/sheep_geno_imputed_oar_filt"
 # read merged plink data
@@ -26,9 +44,13 @@ sheep_bed <- paste0(sheep_plink_name, ".bed")
 sheep_bim <- paste0(sheep_plink_name, ".bim")
 sheep_fam <- paste0(sheep_plink_name, ".fam")
 full_sample <- read.plink(sheep_bed, sheep_bim, sheep_fam)
+# individual genotyping summary
 ind_sum <- row.summary(full_sample$genotypes)
-sum(ind_sum$Call.rate < 0.95) # fine
 summary(ind_sum)
+ind_sum[ind_sum$Call.rate < 0.95, ] # two individuals slightly under 95%, that's alright.
+# snp summary
+snp_sum <- col.summary(full_sample$genotypes)
+summary(snp_sum) 
 
 # PCA for GWAS =================================================================
 # for pruned data
@@ -44,26 +66,47 @@ system(paste0("/usr/local/bin/plink --bfile data/sheep_geno_imputed_oar_filt --s
               "--pca --exclude data/sheep_geno_imputed_oar_filt_pruned.prune.out ",
               "--out output/sheep_pca_oar")) # sheep_pca
 
-# calculate ROH pruned =========================================================
-# system(paste0("/usr/local/bin/plink --bfile output/plink_files/sheep_geno_imputed_ram_pruned --sheep --out output/ROH/roh_nofilt_ram_pruned ",
-#               "--homozyg --homozyg-window-snp 30 --homozyg-snp 25 --homozyg-kb 600 ",
+# calculate ROH unpruned =======================================================
+# system(paste0("/usr/local/bin/plink --bfile data/sheep_geno_imputed_oar_filt --sheep --out output/ROH/roh_ram ",
+#               # "--keep output/ROH/ids_surv.txt ",
+#               "--homozyg --homozyg-window-snp 30 --homozyg-snp 30 --homozyg-kb 600 ",
 #               "--homozyg-gap 500 --homozyg-density 50 --homozyg-window-missing 2 ",
 #               "--homozyg-het 1 ",
 #               "--homozyg-window-het 1"))
 
-# calculate ROH unpruned =======================================================
-system(paste0("/usr/local/bin/plink --bfile data/sheep_geno_imputed_oar_filt --sheep --out output/ROH/roh_ram ",
+# calculate ROH 
+system(paste0("/usr/local/bin/plink --bfile data/sheep_geno_imputed_oar_filt --sheep --out output/ROH/roh ",
               # "--keep output/ROH/ids_surv.txt ",
-              "--homozyg --homozyg-window-snp 30 --homozyg-snp 30 --homozyg-kb 600 ",
-              "--homozyg-gap 500 --homozyg-density 50 --homozyg-window-missing 2 ",
-              "--homozyg-het 1 ",
-              "--homozyg-window-het 1"))
+              "--homozyg --homozyg-window-snp 50 --homozyg-snp 50 --homozyg-kb 1200 ",
+              "--homozyg-gap 300 --homozyg-density 200 --homozyg-window-missing 2 ",
+              "--homozyg-het 2 ",
+              "--homozyg-window-het 2"))
+
+# calculate very long ROH only
+# system(paste0("/usr/local/bin/plink --bfile data/sheep_geno_imputed_oar_filt --sheep --out output/ROH/roh_ram_long5Mb ",
+#               # "--keep output/ROH/ids_surv.txt ",
+#               "--homozyg --homozyg-window-snp 50 --homozyg-snp 50 --homozyg-kb 5000 ",
+#               "--homozyg-gap 500 --homozyg-density 200 --homozyg-window-missing 2 ",
+#               "--homozyg-het 2 ",
+#               "--homozyg-window-het 2"))
+
+
+
+
+
+
+
+
+
+
+
+
 
 # inferred ROH output ==========================================================
 # without pruning
 # file_path <- "output/ROH/roh_nofilt_ram.hom"
 # with pruning
-file_path <- "output/ROH/roh_ram.hom"
+file_path <- "output/ROH/roh.hom"
 roh_lengths <- fread(file_path)
 
 # distribution
@@ -73,7 +116,7 @@ hist(roh_lengths$KB)
 froh <- roh_lengths %>%
         dplyr::group_by(IID) %>%
         dplyr::summarise(KBAVG = mean(KB), KBSUM = sum(KB)) %>%
-        mutate(FROH = KBSUM/2869914)
+        mutate(FROH = KBSUM/2400000)
 
 # roh stats
 roh_lengths %>% 

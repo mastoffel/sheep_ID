@@ -66,7 +66,7 @@ formula_surv <- as.formula(paste('survival ~ froh_all10_cent * age_cent + froh_a
                                  'f(birth_year, model = "iid", hyper = list(prec = prec_prior))',
                                  'f(sheep_year, model = "iid", hyper = list(prec = prec_prior))',
                                  'f(IndexA2, model = "iid", hyper = list(prec = prec_prior))',
-                                 'f(mum_id, model="iid",  hyper = list(prec = prec_prior))', 
+                                # 'f(mum_id, model="iid",  hyper = list(prec = prec_prior))', 
                                  'f(IndexA, model="generic0", hyper = list(theta = list(param = c(0.5, 0.5))),Cmatrix=Cmatrix)', sep = " + "))
 control.family1 = list(control.link=list(model="logit"))
 mod_inla <- inla(formula=formula_surv, family="binomial",

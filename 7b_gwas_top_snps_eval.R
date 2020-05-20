@@ -6,7 +6,7 @@ library(snpStats)
 library(viridis)
 library(gt)
 # prepare data -----------------------------------------------------------------
-chr_info <- read_delim("../sheep/data/sheep_genome/chromosome_info_ram.txt", "\t") %>% 
+chr_info <- read_delim("../sheep/data/sheep_genome/chromosome_info_oar31.txt", "\t") %>% 
         .[-1, ] %>% 
         rename(chromosome = Part) %>% 
         mutate(chromosome = str_replace(chromosome, "Chromosome ", "")) %>% 
@@ -14,7 +14,7 @@ chr_info <- read_delim("../sheep/data/sheep_genome/chromosome_info_ram.txt", "\t
         filter(!is.na(chromosome))
 
 # plink name
-sheep_plink_name <- "data/sheep_geno_imputed_ram_400k_filt"
+sheep_plink_name <- "data/sheep_geno_imputed_oar_filt"
 # read merged plink data
 sheep_bed <- paste0(sheep_plink_name, ".bed")
 sheep_bim <- paste0(sheep_plink_name, ".bim")
@@ -41,7 +41,7 @@ annual_survival <- fitness_data %>%
         as.data.frame() 
 
 # detailed look at significant regions -----------------------------------------
-gwas_res <- read_rds("output/gwas_res_397k.rds")
+gwas_res <- read_rds("output/gwas_res_oar_long.rds")
 # put into df
 gwas_full <- gwas_res %>%
         rename(snp.name = term) %>%
@@ -106,7 +106,7 @@ get_genome_region <- function(chr, pos) {
 }
 plusminus <- 1.5# Mb
 
-top_snps <- gwas_plot %>% filter(-log10(p.value) > -log10(0.05/39149)) %>% 
+top_snps <- gwas_plot %>% filter(-log10(p.value) > -log10(0.05/39149)) %>%  # -log10(0.05/39149)
         group_by(chromosome) %>% 
         top_n(-1, wt = p.value)
 
@@ -229,7 +229,7 @@ p_final <- ggplot(df_plot2) +
               panel.border = element_rect(size = 0.2, fill = NA),
               legend.position = "none")
 p_final
-ggsave("figs/gwas_and_diversity.jpg", p_final, width = 6, height = 5)
+ggsave("figs/gwas_and_diversity_oar_long.jpg", p_final, width = 6, height = 5)
 
 
 

@@ -6,7 +6,7 @@ library(magrittr)
 library(patchwork)
 library(furrr)
 
-chr_info <- read_delim("../sheep/data/sheep_genome/chromosome_info_ram.txt", "\t") %>% 
+chr_info <- read_delim("../sheep/data/sheep_genome/chromosome_info_oar31.txt", "\t") %>% 
                 .[-1, ] %>% 
                 rename(chromosome = Part) %>% 
                 mutate(chromosome = str_replace(chromosome, "Chromosome ", "")) %>% 
@@ -14,7 +14,7 @@ chr_info <- read_delim("../sheep/data/sheep_genome/chromosome_info_ram.txt", "\t
                 filter(!is.na(chromosome))
 
 #gwas_files <- list.files("output/gwas_full_pca_with_f", pattern = "*.rds", full.names = TRUE)
-gwas_files <- list.files("output/gwas_new/", pattern = "*.rds", full.names = TRUE)
+gwas_files <- list.files("output/gwas_new/", pattern = "*.rds", full.names = TRUE) # oar31_roh_long/
 #gwas_files <- list.files("output/gwas_survival_gaussian/", pattern = "*.rds", full.names = TRUE)
 
 # extract results
@@ -28,7 +28,7 @@ all_gwas <- purrr::map(gwas_files, readRDS) %>%
 # get roh/add pval
 not_working <- map(all_gwas, is.null)
 which(unlist(not_working))
-all_gwas[[1364]]
+all_gwas[[67507]]
 gwas_res0 <- map(all_gwas, function(x) nrow(x) == 19) %>% unlist()
 which(!gwas_res0)
 
@@ -46,11 +46,12 @@ gwas_res[which(str_detect(gwas_res$term, "sd")), ]
 # remove those 
 gwas_res <- gwas_res[-which(str_detect(gwas_res$term, "sd")), ]
 
-#saveRDS(gwas_res, file = "output/gwas_res_397k.rds")
-gwas_res <- read_rds("output/gwas_res_397k.rds")
+saveRDS(gwas_res, file = "output/gwas_res_oar.rds")
+gwas_res <- read_rds("output/gwas_res_oar.rds")
+#gwas_res <- read_rds("output/gwas_res_oar.rds")
 
 # plink name
-sheep_plink_name <- "data/sheep_geno_imputed_ram_398k_filt"
+sheep_plink_name <- "data/sheep_geno_imputed_oar_filt"
 # read merged plink data
 sheep_bed <- paste0(sheep_plink_name, ".bed")
 sheep_bim <- paste0(sheep_plink_name, ".bim")
@@ -266,7 +267,7 @@ pgwas <- ggplot(gwas_plot, aes(x=positive_cum, y=-log10(p.value))) +
                   fill=alpha(cols[[1]], 0.5), size = 2.5, shape = 21, stroke = 0.1, color = "black") + # "#d8dee9"
        # gghighlight(-log10(p.value) > 2,
         #            unhighlighted_params = list(aes(fill = chromosome %%2 == 0))) +
-        scale_x_continuous(labels = chr_labels, breaks= axisdf$center) +
+       # scale_x_continuous(labels = chr_labels, breaks= axisdf$center) +
         scale_y_continuous(expand = c(0, 0), limits = c(0,9), labels = as.character(0:8), breaks = 0:8) +
         xlab("Chromosome") + 
         ylab(expression(-log[10](italic(p)))) + ## y label from qqman::qq
@@ -280,7 +281,7 @@ pgwas <- ggplot(gwas_plot, aes(x=positive_cum, y=-log10(p.value))) +
         guides(fill=FALSE) 
 
 pgwas
-#ggsave( "figs/survival_gwas_roh_pca.jpg",pgwas, height = 3, width = 15)
+ggsave( "figs/survival_gwas_oar.jpg",pgwas, height = 3, width = 15)
 
 # simple plot without subplots
 p_gwas_simple <- (p1 + p3) / pgwas +

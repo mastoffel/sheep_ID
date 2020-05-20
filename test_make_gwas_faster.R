@@ -15,7 +15,7 @@ if (!(length(part_inp) == 0)) {
         part <- as.numeric(part_inp[[1]])
 } else {
         # if no part selected, take first 1000
-        part <- 415
+        part <- 420
 }
 
 # data
@@ -107,6 +107,46 @@ annual_survival_gwas <- annual_survival %>%
         as_tibble()
 
 # time saver function for modeling
+
+
+df <- annual_survival_gwas_pieces[[1]] %>% filter(!is.na(oar3_OAR26_42781227))
+annual_survival_gwas_pieces[[1]]$id <- as.factor(annual_survival_gwas_pieces[[1]]$id)
+
+lmod0 <- glFormula(survival ~ 1 + sex + twin + age_std + age_std2 + pc1 + pc2 + pc3 + pc4 + pc5 + pc6 + pc7 + (1|birth_year) + (1|id) + (1|sheep_year), #(1|birth_year) + (1|sheep_year) +  
+                  data = df , family = "binomial") ## basic structure
+# control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE)
+g <- c("oar3_OAR26_42781227",  "roh_oar3_OAR26_42781227")
+
+run_gwas_new <- function(snp, data) {
+        
+        # 
+        chr <- as.numeric(snps_map_sub[snps_map_sub$snp.name == snp, "chromosome"])
+        froh_no_chr <- paste0("froh_no_chr", chr)
+        
+        df <- data[!is.na(data[[snp]]), ]
+        add_fix <- c(snp, paste0("roh_", snp), froh_no_chr,
+                     "sex", "twin", "age_std", "age_std2", "pc1", "pc2", "pc3", "pc4", 
+                     "pc5", "pc6", "pc7")
+        ## set up new fixed and full formulas
+        f0 <- reformulate(add_fix, response="survival")
+        f <- reformulate(c(add_fix,"(1|birth_year) + (1|sheep_year) + (1|id)"),response="survival")
+        ## copy baseline structure and replace relevant pieces
+        lmod <- lmod0
+        lmod$formula <- f
+        lmod$X <- model.matrix(f0,data=df)
+        ## now finish the fit (construct dev fun, optimize,
+        ##  optionally return the full model)
+        devfun <- do.call(mkGlmerDevfun, lmod)
+        opt <- optimizeGlmer(devfun, calc.derivs = FALSE)
+     
+        mod <- mkMerMod(environment(devfun), opt, lmod$reTrms, fr = lmod$fr)
+        
+        out <- broom.mixed::tidy(mod)
+        out
+
+}
+refitGene(g, retmod = TRUE)
+
 nlopt <- function(par, fn, lower, upper, control) {
         .nloptr <<- res <- nloptr(par, fn, lb = lower, ub = upper, 
                                   opts = list(algorithm = "NLOPT_LN_BOBYQA", print_level = 1,
@@ -128,14 +168,35 @@ run_gwas <- function(snp, data) {
                                          froh_no_chr, " + ",
                                          "pc1 + pc2 + pc3 + pc4 + pc5 + pc6 + pc7 + ",
                                          #"pc1 + pc2 + pc3 + pc4 +",
-                                         snp, "+ ", paste0("roh_", snp), "+ (1|birth_year) + (1|sheep_year) + (1|id)"))
-                                         #snp, "+ ", paste0("roh_", snp), " + (1|sheep_year) + (1|id)"))
+                                         snp, "+ ", paste0("roh_", snp), "+ (1|sheep_year) + (1|birth_year) + (1|id)"))
+        #snp, "+ ", paste0("roh_", snp), " + (1|sheep_year) + (1|id)"))
         mod <- glmer(formula = formula_snp,
                      data = data, family = "binomial",
                      control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
         out <- broom.mixed::tidy(mod)
         out
 }
+
+mod <- glmer(formula = formula_snp,
+             data = data, family = "binomial",
+             control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+mod2 <- glmer(formula = formula_snp,
+              data = annual_survival_gwas_pieces[[1]], family = "binomial")
+mod3 <- glmer(formula = formula_snp,
+             data = data, family = "binomial",
+             control = glmerControl(calc.derivs = FALSE))
+
+all_fits <- allFit(mod2)
+ss <- summary(all_fits)
+ss
+all_fits$bobyqa
+
+afurl <- "https://raw.githubusercontent.com/lme4/lme4/master/misc/issues/allFit.R"
+eval(parse(text=getURL(afurl)))
+
+
+mod1 <- run_gwas(test_snps[[1]], annual_survival_gwas_pieces[[1]] )
+mod2 <- run_gwas_new(test_snps[[1]], annual_survival_gwas_pieces[[1]] )
 
 safe_run_gwas <- purrr::safely(run_gwas)
 
@@ -157,7 +218,7 @@ rm(annual_survival, annual_survival_gwas, fitness_data, geno_sub,
    roh_lengths, roh_pieces, sheep_ped, roh_df)
 
 # set up plan
-plan(multiprocess, workers = 3)
+plan(multiprocess, workers = 4)
 
 # increase maxSize
 options(future.globals.maxSize = 3000 * 1024^2)
@@ -167,12 +228,3 @@ all_out <- future_map2(snps_pieces, annual_survival_gwas_pieces, function(snps, 
 })
 
 all_out_simple <- purrr::flatten(all_out)
-saveRDS(all_out_simple, file = paste0("output/GWAS_roh_part", "_", part, ".rds"))
-
-
-
-
-
-
-
-
