@@ -2,7 +2,7 @@ library(tidyverse)
 library(MasterBayes)
 library(data.table)
 library(rlang)
-
+library(snpStats)
 # annual measures of traits and fitness
 fitness_path <- "../sheep/data/1_Annual_Fitness_Measures_April_20190501.txt"
 annual_fitness <- read_delim(fitness_path, delim = "\t")
@@ -25,7 +25,7 @@ sheep_bim <- paste0(sheep_plink_name, ".bim")
 sheep_fam <- paste0(sheep_plink_name, ".fam")
 full_sample <- read.plink(sheep_bed, sheep_bim, sheep_fam)
 summary(full_sample$genotypes)
-
+summary(col.summary(full_sample$genotypes))
 # IDs which weren't well imputed and should be removed
 #IDs_lots_missing <- read_delim("data/ids_more_than_5perc_missing.txt", delim = " ")
 

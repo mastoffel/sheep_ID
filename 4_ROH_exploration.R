@@ -1,5 +1,4 @@
 # Exploring ROH through plots
-
 library(data.table)
 library(RColorBrewer)
 library(wesanderson)
@@ -10,13 +9,13 @@ library(ggridges)
 library(viridis)
 library(GGally)
 library("naniar")
-options(scipen=999)
 library(ggchicklet)
 library(windowscanr)
 library(cowplot)
 library(gt)
 library(grid)
 library(ggplotify)
+options(scipen=999)
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #          Full data           #   
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -33,7 +32,7 @@ autosomal_genome_size <- chr_data %>%
         as.numeric()
 
 #~~ ROH for survival data subset
-file_path <- "output/ROH/roh_ram_long.hom"
+file_path <- "output/ROH/roh.hom"
 roh_lengths <- fread(file_path)
 
 # max ROH length
@@ -73,14 +72,16 @@ plot(froh$KBSUM, num_roh_per_ind$n)
 # ROH length and abundance in the least and most inbred individuals 
 num_roh_per_ind %>% 
         left_join(froh) %>% 
-        top_frac(-0.01, FROH) %>% 
+        top_frac(0.01, FROH) %>% 
         #top_frac(0.005, desc(FROH)) %>% 
         # arrange(desc(FROH)) %>% 
         summarise(mean(n), mean(KBAVG))
 
 # Supplementary: FROH / ROH across individuals ---------------------------------
 p_froh <- ggplot(froh, aes(FROH)) +
-        geom_histogram(bins = 100, fill = "#E5E9F0", color = "black", size = 0.1) +
+       # geom_histogram(bins = 100, fill = "#E5E9F0", color = "black", size = 0.1) +
+        geom_histogram(bins = 100,  color = "white", size = 0.1, position = "identity",
+                       alpha = 1, fill = "#4c566a") +
         ylab("individuals") +
         xlab(expression(inbreeding~coefficient~F[ROH])) +
         scale_y_continuous(expand = c(0, 0)) +
@@ -89,7 +90,9 @@ p_froh <- ggplot(froh, aes(FROH)) +
 p_froh
 
 p_roh <- ggplot(num_roh_per_ind, aes(n)) +
-        geom_histogram(binwidth = 1,  fill = "#E5E9F0", color = "black",  size = 0.1) +
+        #geom_histogram(binwidth = 1,  fill = "#E5E9F0", color = "black",  size = 0.1) +
+        geom_histogram(binwidth = 1, color = "white", size = 0.1, position = "identity",
+                       alpha = 1, fill = "#4c566a") +
         ylab("individuals") +
         xlab("ROH per genome") +
         scale_y_continuous(expand = c(0, 0)) +
@@ -99,7 +102,7 @@ p_roh
 
 p_roh_dist <- p_froh + p_roh + plot_annotation(tag_levels = 'A')
 p_roh_dist
-ggsave("figs/Sup_ROH_dist.jpg", p_roh_dist, width = 6, height = 2.2)
+ggsave("figs/Sup_ROH_dist.jpg", p_roh_dist, width = 7, height = 2.5)
 
 # Supplementary: plot HD vs. imputed individuals -------------------------------
 # HD inds 
@@ -112,109 +115,58 @@ froh_plot %>% group_by(hd) %>% summarise(median(FROH))
 
 #
 froh_imp_vs_hd <- ggplot(froh_plot, aes(x=FROH, fill = relevel(hd, "imputed"))) +
-        geom_histogram(bins = 100,  color = "black", size = 0.1, position = "identity",
+        geom_histogram(bins = 500,  color = "black", size = 0.1, position = "identity",
                        alpha = 0.8) +
         ylab("individuals") +
         xlab(expression(inbreeding~coefficient~F[ROH])) +
         scale_fill_manual(name = "Genotypes", values = c("#E5E9F0", "black"),
                           labels = c("partially imputed", "high-density")) +
-        scale_y_log10(expand = c(0, 0)) +
+       # scale_y_log10(expand = c(0, 0)) +
         theme_simple(grid_lines = FALSE, axis_lines = TRUE, base_size = 12,  # "#E5E9F0"
                      base_family = "Lato") +
         theme(legend.position="right")
 froh_imp_vs_hd
-ggsave("figs/Sup_imp_vs_hd.jpg", froh_imp_vs_hd, width = 6, height = 2.7)
+#ggsave("figs/Sup_imp_vs_hd.jpg", froh_imp_vs_hd, width = 6, height = 2.7)
 
+# alternative plot
+p_imp <- froh_plot %>% 
+        filter(hd == "imputed") %>% 
+        ggplot(aes(x=FROH)) +
+        geom_histogram(bins = 100,  color = "white", size = 0.1, position = "identity",
+                       alpha = 1, fill = "#4c566a") + # #E5E9F0
+        ylab("individuals") +
+        scale_x_continuous(limits = c(0.18, 0.53)) +
+        xlab(expression(inbreeding~coefficient~F[ROH])) +
+        scale_y_continuous(expand = c(0, 0)) +
+        theme_simple(grid_lines = FALSE, axis_lines = TRUE, base_size = 12,  # "#E5E9F0"
+                     base_family = "Lato") +
+        geom_vline(aes(xintercept = 0.241), size = 0.8, linetype = "dashed", color = "#d08770") +
+        theme(legend.position="right",
+              axis.line = element_blank(),
+              plot.title = element_text(size = 12, face = "bold")) +
+        ggtitle("imputed genotypes")
 
-# ROH length classes -----------------------------------------------------------
-# Specifiy length distributon:
-# a separation of m meisies (2m generations) results in segment lengths that are
-# exponentially distributied with mean 100/m cM
+p_hd <- froh_plot %>% 
+        filter(hd == "HD") %>% 
+        ggplot(aes(x=FROH)) +
+        geom_histogram(bins = 100,  color = "white", size = 0.1, position = "identity",
+                       alpha = 1, fill = "#4c566a") +
+        ylab("individuals") +
+        scale_x_continuous(limits = c(0.18, 0.53)) +
+        xlab(expression(inbreeding~coefficient~F[ROH])) +
+        theme_simple(grid_lines = FALSE, axis_lines = TRUE, base_size = 12,  # "#E5E9F0"
+                     base_family = "Lato") +
+        geom_vline(aes(xintercept = 0.239), size = 0.8, linetype = "dashed", color = "#d08770") +
+        theme(legend.position="right",
+              axis.line = element_blank(),
+              plot.title = element_text(size = 12, face = "bold")) +
+        scale_y_continuous(expand = c(0, 0)) +
+        ggtitle("high-density genotypes")
 
-# 1.451221 cM/Mb for Males
-# 1.037693 cM/Mb for Females
-# 1.279305 cM/Mb sex-averaged
-# 
-# 1cM is 0.6890747 in males
-# 1cM is 0.9636761 in females
-# 1cM is 0.7816743 sex-averaged
+p_out <- p_hd/p_imp + plot_annotation(tag_levels = "A")
+p_out 
+ggsave("figs/Sup_imp_vs_hd.jpg", p_out, width = 5.5, height = 4.6)
 
-length_dist <- data.frame(g = c(1, 2,2^2, 2^3, 2^4,2^5,2^6,2^7,2^8,2^9,2^10,2^11,2^12,2^13)) %>%
-        mutate(ROH_length_cM = 100 / (2*g)) %>% 
-        mutate(ROH_length_Mb = ROH_length_cM * 0.7816743)
-
-prop_IBD_df <- roh_lengths %>%
-        mutate(length_Mb = KB/1000) %>%
-        mutate(class = case_when(length_Mb >= 39.083715000 ~ 1,
-                                 length_Mb < 39.083715000 & length_Mb >= 19.541857500 ~ 2,
-                                 length_Mb < 19.541857500 & length_Mb >= 9.770928750 ~ 4,
-                                 #length_Mb < 9.770928750 & length_Mb >= 6.513952500 ~ 6,
-                                 length_Mb < 9.770928750& length_Mb >= 4.885464375 ~ 8,
-                                 # length_Mb < 4.885464375 & length_Mb >= 3.908371500 ~ 10,
-                                 length_Mb < 4.885464375 & length_Mb >= 2.442732188 ~ 16,
-                                 length_Mb < 2.442732188 & length_Mb >= 1.221366094 ~ 32,
-                                 length_Mb < 1.221366094 & length_Mb >= 0.6 ~ 64)) %>% 
-        #length_Mb < 0.610683047 & length_Mb >= 0.30 ~ 128)) %>% # 0.610683047
-        mutate(length_class = case_when(
-                class == 1 ~ ">39 (1G)",
-                class == 2 ~ ">19.5-39 (>1-2G)",
-                class == 4 ~ ">9.8-19.5 (>2-4G)",
-                # class == 6 ~ "6.5-9.7 (6G)",
-                class == 8 ~ ">4.9-6.5 (>4-8G)",
-                # class == 10 ~ "3.9-4.9 (10G",
-                class == 16 ~ ">2.4-4.9 (>8-16G)",
-                class == 32 ~ ">1.2-2.4 (>16-32G)",
-                class == 64 ~ ">0.6-1.2 (>32-64G)"
-                # class == 128 ~ "0.6-0.3 (128G)"
-        )) %>% 
-        mutate(length_class = fct_reorder(length_class, class)) %>% 
-        mutate(IID = as.character(IID)) %>% 
-        group_by(IID, class, length_class) %>%
-        dplyr::summarise(prop_IBD = sum(length_Mb / (autosomal_genome_size/1000))) #%>% 
-# add IBD of non-ROH snps if wanted
-#  bind_rows(homs) 
-
-prop_IBD_df_with_0 <- prop_IBD_df %>% 
-        # add missing length classes as 0
-        ungroup() %>% 
-        tidyr::complete(length_class, nesting(IID)) %>% 
-        mutate(class = ifelse(is.na(class), length_class, class)) %>% 
-        mutate(prop_IBD = ifelse(is.na(prop_IBD), 0, prop_IBD))
-
-# ROH class distribution across individuals
-col_pal <- rev(c(brewer.pal(7, "YlGnBu"))) ##A42820
-col_pal <- viridis(7)
-prop_IBD_df
-set.seed(17)
-library(gghalves)
-
-# ROH classes summary
-prop_IBD_df_with_0 %>% group_by(length_class) %>% summarise(mean(prop_IBD), sd(prop_IBD))
-prop_IBD_df_with_0 %>% group_by(length_class) %>% summarise(prop = sum(prop_IBD > 0) / n() )
-
-# plot
-p_roh_classes <- prop_IBD_df_with_0 %>% 
-        mutate(prop_IBD = prop_IBD * 100) %>% 
-        ggplot(aes(length_class, prop_IBD, fill = length_class)) +
-        geom_half_point(side = "l", shape = 21, alpha = 0.5, stroke = 0.1, size =2,
-                        transformation_params = list(height = 0, width = 1.3, seed = 1)) +
-        geom_half_boxplot(side = "r", outlier.color = NA,
-                          width = 0.6, lwd = 0.3, color = "black",
-                          alpha = 0.8) +
-        theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_size = 13) +
-        ylab("% genome") +
-        scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
-        scale_fill_manual(values = col_pal, name = "ROH class (Mb)") +
-        theme(legend.position = "none",
-              #axis.ticks.x = element_blank(),
-              axis.title=element_text(size = rel(1.1)), 
-              axis.text = element_text(color = "black")) + 
-        xlab("ROH classes in Mb") 
-
-ggsave("figs/fig1a_roh_classes_boxplots.jpg", p_roh_classes, width = 7, height = 3)
-
-
-#ggsave("figs/roh_classes_subset_inds.jpg", p_roh2, width = 15, height = 5)
 
 #~~ ROH for some indiividuals --------------------------------------------------
 all_roh <- roh_lengths %>% 
@@ -235,17 +187,17 @@ df <- roh_lengths %>%
         mutate(POS1 = POS1 / 1e+6,
                POS2 = POS2 / 1e+6,
                MB = KB / 1000)
+
 df <- df %>% filter(IID %in% extreme_roh$IID) %>% 
         mutate(IID = factor(IID, levels = extreme_roh$IID))
+
 yax <- data.frame(IID = fct_inorder(levels(df$IID))) %>%
         mutate(yax = seq(from = 2,
                          to = 2*length(unique(df$IID)),
                          by = 2)) 
+
 df <- left_join(df, yax, by = "IID")
 
-library(ghibli)
-# col <- wes_palette("Darjeeling2")[c(1,2)]
-# col <- viridis(2, begin = 0.1, end = 0.9)
 shade <- df %>%
         group_by(CHR) %>%
         summarise(min = min(POS1), max = max(POS2)) %>%
@@ -258,13 +210,8 @@ shade <- df %>%
                                        CHR == 22 | CHR == 24 | CHR == 26 ~ 0,
                                TRUE ~ max))
 
-#png(file="figs/ROH_map.png", units = "in", res = 300, height=4, width=7)
-
-col <- c("#3690c0", "#a6bddb")
+#col <- c("#3690c0", "#a6bddb")
 col <- c("#4c566a", "#d8dee9")
-#col <- c("#eceff4", "#d8dee9")
-#col <- viridis(2)
-#col <- viridis(6, option = "D")[c(2,6)]
 chr_names <- as.character(1:26)
 names(chr_names) <- as.character(1:26)
 chr_names[c(11, 13, 15, 17, 19, 21, 23, 25)] <- ""
@@ -320,13 +267,7 @@ ROH_per_ind_grob <- as.ggplot(pg)
 #p1 / p_roh_classes + plot_layout(heights = c(1, 0.8))
 
 #~~~ ROH density ---------------------------------------------------------------
-# do not use pruned data here as this will bias ROH densities
-#hom_sum <- fread("output/ROH/roh_nofilt_ram_pruned.hom.summary")
-hom_sum <- fread("output/ROH/roh_ram.hom.summary")
-#hom_sum <- fread("output/ROH/ROH_surv_subset/roh_nofilt_ram_pruned.hom.summary")
-# snps that can have roh
-# snps_pos <- read_delim("output/snps_that_can_have_roh_190k", " ")
-# hom_sum <- hom_sum %>% filter(snps_pos$snps_ok == "yes")
+hom_sum <- fread("output/ROH/roh.hom.summary")
 
 hom_sum <- hom_sum %>%
         mutate(MB = BP / 1000000,
@@ -347,7 +288,9 @@ running_roh %>%
         filter(UNAFF_n > 0) -> running_roh_p
 
 cor(running_roh$UNAFF_mean, running_roh$UNAFF_n, use = "complete.obs")
-#filter(CHR == 1) %>% 
+plot(running_roh$UNAFF_mean, running_roh$UNAFF_n)
+
+# remove windows without snps
 running_roh %>% 
         mutate(UNAFF_mean = UNAFF_mean/5952) %>% 
         filter(UNAFF_n > 0) -> running_roh_p
@@ -408,49 +351,35 @@ p2 <- ggplot(running_roh_p, aes(UNAFF_mean, "test", fill = ..x..)) +
 #axis.ticks.x = element_line(size = 1)) 
 
 p2
-layout <- c(
-        patchwork::area(t = 1, l = 1, b = 5, r = 5),
-        patchwork::area(t = 4, l = 3, b = 4, r = 4)
-)
-p_final <- p1 + p2 + plot_layout(design = layout)
-p_final
-ggsave("figs/roh_genome_398K.jpg", p1, width = 8, height = 6)
-ggsave("figs/roh_genome_legend_398K.jpg", p2, width = 5, height = 3)
-
-
+# layout <- c(
+#         patchwork::area(t = 1, l = 1, b = 5, r = 5),
+#         patchwork::area(t = 4, l = 3, b = 4, r = 4)
+# )
+# p_final <- p1 + p2 + plot_layout(design = layout)
+# p_final
+# ggsave("figs/roh_genome_398K.jpg", p1, width = 8, height = 6)
+ggsave("figs/roh_genome_legend.jpg", p2, width = 5, height = 2.5)
 
 # try simple combined plot
 p_roh_comb_simple <- plot_grid(ROH_per_ind_grob, p1, nrow = 2, 
                                rel_heights = c(0.658, 1), label_size = 15, 
                                labels = c("A", "B"), align = "v")
 p_roh_comb_simple
-ggsave("figs/roh_patterns_simple3.jpg", p_roh_comb_simple, width = 7, height = 6.5)
+ggsave("figs/roh_patterns_simple.jpg", p_roh_comb_simple, width = 7, height = 6.5)
 
 
 
-
-
-#ggdraw(p_roh_comb_simple) + draw_plot(p2, x = 0.1, y = -0.2, scale = 0.47)
-
-
-p_roh_comb <- plot_grid(p_roh_classes, ROH_per_ind, nrow = 2, rel_heights = c(2.2,3, 5.2))
-p_roh_comb
-#ggsave("figs/roh_comb.jpg", p_roh_comb, width = 8, height = 6)
-
-
-fitness_data
 
 # ROH ISLANDS AND DESERTS
 
 #~~~ ROH density
-hom_sum <- fread("output/ROH/roh_ram_long.hom.summary") # ROH_surv_subset/
+hom_sum <- fread("output/ROH/roh.hom.summary") # ROH_surv_subset/
 head(hom_sum)
 
 hom_sum <- hom_sum %>%
         mutate(MB = BP / 1000000,
                KB = BP / 1000,
                index = 1:nrow(.))# %>% 
-# filter(UNAFF > 0) 
 
 # non of the SNPs where UNAFF = 0 can actually have an roh (see script snps_that_can_have_roh.R)
 # hom_sum_filt
@@ -459,7 +388,6 @@ hom_sum %>%
         mutate(prop_roh = UNAFF/5952) %>% 
         arrange(prop_roh) %>% 
         .[1:50, ]
-
 
 hom_sum %>% 
         filter(UNAFF > 0) %>% 
@@ -479,25 +407,20 @@ head(running_roh)
 plot(running_roh$UNAFF_mean, running_roh$UNAFF_n)
 cor(running_roh$UNAFF_mean, running_roh$UNAFF_n, use = "complete")
 
-#running_roh <- winScan(x = hom_sum,
-#                       groups = "CHR",
-#                       #position = "KB",
-#                       values = "UNAFF",
-#                       win_size = 5,
-#                       win_step = 3,
-#                       funs = c("mean", "var"))
-
 # check dist
 hist(running_roh$UNAFF_mean, xlim = c(0,6000), breaks = 1000)
 
 library(gt)
 # roh desert
+# filter windows with too few snps
+quantile(running_roh$UNAFF_n, probs = c(0.01))
+
 roh_deserts <- running_roh %>% 
-        filter(UNAFF_n > 10) %>% 
+        filter(UNAFF_n > 35) %>% 
         mutate(prop_roh = UNAFF_mean/5952) %>%  # 7691 5952
         arrange(prop_roh) %>% 
         # top 0.5% of windows
-        .[1:26, ]
+        .[1:24, ]
 mean(roh_deserts$prop_roh)
 
 # make table for supplementary
@@ -517,7 +440,7 @@ roh_islands <- running_roh %>%
         filter(UNAFF_n > 10) %>% 
         mutate(prop_roh = UNAFF_mean/5952) %>%  # 7691 5952
         arrange(desc(prop_roh)) %>% 
-        .[1:26, ]
+        .[1:24, ]
 
 mean(roh_islands$prop_roh)
 
@@ -538,11 +461,49 @@ roh_islands %>%
 quants <- quantile(running_roh$UNAFF_mean, na.rm = TRUE, probs= c(0.01, 0.99))
 
 
-#
+# check that genome assembly is ok where deserts and islands are ---------------
 
+# load linkage map
+lmap <- read_delim("data/Oar3.1_Interpolated.txt", "\t") %>% 
+        setNames(c("chr", "snp_name", "bp", "cM")) %>% 
+        mutate(mb_pos = bp/1000000,
+               kb_pos = bp/1000)
 
+win_area <- function(win_mid, CHR, ...) {
+        diffs <- lmap %>% 
+                filter(chr == CHR) %>% 
+                mutate(diff = abs(win_mid - kb_pos)) %>% 
+                arrange(diff) %>% 
+                top_n(-200)
+}
 
+# deserts
+all_des <- pmap(roh_deserts, win_area) %>% 
+                map(as_tibble) %>% 
+                bind_rows(.id = "desert_num")
 
+all_des$win_start <- rep(roh_deserts$win_start, each = 200)
+all_des$win_end <- rep(roh_deserts$win_end, each = 200)
+
+ggplot(all_des, aes(mb_pos, cM)) +
+        geom_point() +
+        facet_wrap(~desert_num, scales = "free") +
+        geom_vline(aes(xintercept = win_start/1000)) +
+        geom_vline(aes(xintercept = win_end/1000))
+
+# islands
+all_isl <- pmap(roh_islands, win_area) %>% 
+        map(as_tibble) %>% 
+        bind_rows(.id = "desert_num")
+
+all_isl$win_start <- rep(roh_islands$win_start, each = 200)
+all_isl$win_end <- rep(roh_islands$win_end, each = 200)
+
+ggplot(all_isl, aes(mb_pos, cM)) +
+        geom_point() +
+        facet_wrap(~desert_num, scales = "free") +
+        geom_vline(aes(xintercept = win_start/1000)) +
+        geom_vline(aes(xintercept = win_end/1000))
 
 
 
