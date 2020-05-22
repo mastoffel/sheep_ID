@@ -67,7 +67,7 @@ num_ind_per_age <- unlist(map(ids_per_age, length))
 
 #saveRDS(ids_per_age, file = "output/ids_per_age.rds")
 # load ROH info
-file_path <- "output/ROH/roh_ram.hom"
+file_path <- "output/ROH/roh.hom"
 roh_lengths <- fread(file_path) 
 
 # FROH across age cohorts 
@@ -115,7 +115,7 @@ roh_plot2 %>%
                             point_alpha = 1, point_color = "#4c566a", 
                             alpha = 0.9, bandwidth = 0.006) +
         theme_simple(axis_lines = FALSE, base_size = 14) +
-        scale_x_continuous(limits = c(0.199, 0.55)) +
+        #scale_x_continuous(limits = c(0.199, 0.55)) +
         ylab("Age") + 
         scale_y_discrete(expand = expand_scale(add = c(0.2, 1.01))) +
         xlab(expression(F[ROH]~across~age~cohorts)) +
@@ -135,7 +135,7 @@ p_froh_across_ages
 
 
 # Plot B: effect sizes ---------------------------------------------------------
-mod_inla <- readRDS("output/AS_mod_INLA_398k.rds")
+mod_inla <- readRDS("output/AS_mod_oar.rds")
 
 set.seed(144)
 trans_link_to_dat <- function(pred, mod_inla) {
@@ -153,6 +153,7 @@ fix_eff <- map_df(names(mod_inla$marginals.fixed), trans_link_to_dat, mod_inla) 
         mutate(pred = factor(pred, levels = rev(pred)))
 names(fix_eff) <- c("Predictor", "mean", "lower_CI", "upper_CI")
 
+# decrease in odds of survival with 10% increase in FROH
 1-fix_eff
 
 p_surv_mod <- ggplot(fix_eff, aes(mean, Predictor, xmax = upper_CI, xmin = lower_CI)) +
@@ -194,7 +195,7 @@ fun <- function(...) {
         return (list(one))
 }
 
-fun_link <- function(...) {
+fun_nolink <- function(...) {
         one <- Intercept + 
                                df1$x1 * froh_all10_cent + 
                                df1$x2 * age_cent + 
@@ -302,7 +303,7 @@ fix_eff2 <- fix_eff %>%
 raneff <- get_raneff(mod_inla, scales = "sd") %>% 
                 mutate(across(is.numeric, round, 2)) %>% 
                 mutate(term = c("Birth year", "Capture year", "Individual", "Add. genetic")) %>% 
-                mutate(add_info = c("n = 44", "n = 44", "n = 5952", "Pedigree-based")) %>% 
+                mutate(add_info = c("n = 40", "n = 40", "n = 5952", "Pedigree-based")) %>% 
                 mutate(standardisation = "")
                 #mutate(groups = c(44, 44, 5952, ""))
 

@@ -72,7 +72,7 @@ plot(froh$KBSUM, num_roh_per_ind$n)
 # ROH length and abundance in the least and most inbred individuals 
 num_roh_per_ind %>% 
         left_join(froh) %>% 
-        top_frac(0.01, FROH) %>% 
+        top_frac(-0.01, FROH) %>% 
         #top_frac(0.005, desc(FROH)) %>% 
         # arrange(desc(FROH)) %>% 
         summarise(mean(n), mean(KBAVG))
@@ -370,7 +370,7 @@ ggsave("figs/roh_patterns_simple.jpg", p_roh_comb_simple, width = 7, height = 6.
 
 
 
-# ROH ISLANDS AND DESERTS
+# ROH ISLANDS AND DESERTS ------------------------------------------------------
 
 #~~~ ROH density
 hom_sum <- fread("output/ROH/roh.hom.summary") # ROH_surv_subset/
@@ -417,6 +417,7 @@ quantile(running_roh$UNAFF_n, probs = c(0.01))
 
 roh_deserts <- running_roh %>% 
         filter(UNAFF_n > 35) %>% 
+        as_tibble() %>% 
         mutate(prop_roh = UNAFF_mean/5952) %>%  # 7691 5952
         arrange(prop_roh) %>% 
         # top 0.5% of windows
@@ -437,7 +438,7 @@ roh_deserts %>%
         gtsave(filename = "figs/tables/roh_desert.png")
 
 roh_islands <- running_roh %>% 
-        filter(UNAFF_n > 10) %>% 
+        filter(UNAFF_n > 35) %>% 
         mutate(prop_roh = UNAFF_mean/5952) %>%  # 7691 5952
         arrange(desc(prop_roh)) %>% 
         .[1:24, ]
@@ -474,173 +475,134 @@ win_area <- function(win_mid, CHR, ...) {
                 filter(chr == CHR) %>% 
                 mutate(diff = abs(win_mid - kb_pos)) %>% 
                 arrange(diff) %>% 
-                top_n(-200)
+                top_n(-500)
 }
 
 # deserts
 all_des <- pmap(roh_deserts, win_area) %>% 
                 map(as_tibble) %>% 
-                bind_rows(.id = "desert_num")
+                bind_rows(.id = "desert_num") %>% 
+                mutate(desert = paste0(desert_num, " | Chr. ", chr),
+                       desert = fct_inorder(desert))
+ 
+all_des$win_start <- rep(roh_deserts$win_start, each = 500)
+all_des$win_end <- rep(roh_deserts$win_end, each = 500)
 
-all_des$win_start <- rep(roh_deserts$win_start, each = 200)
-all_des$win_end <- rep(roh_deserts$win_end, each = 200)
-
-ggplot(all_des, aes(mb_pos, cM)) +
-        geom_point() +
-        facet_wrap(~desert_num, scales = "free") +
+p_des_rec <- ggplot(all_des, aes(mb_pos, cM)) +
+        geom_point(shape = 21, fill = "eceff4", stroke = 0.05, size = 2) +
+        facet_wrap(~desert, scales = "free") +
+        scale_x_continuous( breaks = scales::pretty_breaks(3)) +
+        scale_y_continuous( breaks = scales::pretty_breaks(3)) +
         geom_vline(aes(xintercept = win_start/1000)) +
-        geom_vline(aes(xintercept = win_end/1000))
-
+        geom_vline(aes(xintercept = win_end/1000)) +
+        theme_simple(grid_lines = FALSE, axis_lines = TRUE) +
+        xlab("Mb") +
+        ggtitle("Genetic vs. physical SNP positions in regions with ROH deserts")
+p_des_rec 
+ggsave("figs/pot_sup_ROH_des_rec.jpg", width = 8, height = 7)
 # islands
 all_isl <- pmap(roh_islands, win_area) %>% 
         map(as_tibble) %>% 
-        bind_rows(.id = "desert_num")
+        bind_rows(.id = "island_num") %>% 
+        mutate(island = paste0(island_num, " | Chr. ", chr),
+               island = fct_inorder(island))
 
-all_isl$win_start <- rep(roh_islands$win_start, each = 200)
-all_isl$win_end <- rep(roh_islands$win_end, each = 200)
+all_isl$win_start <- rep(roh_islands$win_start, each = 500)
+all_isl$win_end <- rep(roh_islands$win_end, each = 500)
 
 ggplot(all_isl, aes(mb_pos, cM)) +
-        geom_point() +
-        facet_wrap(~desert_num, scales = "free") +
+        geom_point(shape = 21, fill = "eceff4", stroke = 0.05, size = 2) +
+        facet_wrap(~island, scales = "free") +
+        scale_x_continuous( breaks = scales::pretty_breaks(3)) +
+        scale_y_continuous( breaks = scales::pretty_breaks(3)) +
         geom_vline(aes(xintercept = win_start/1000)) +
-        geom_vline(aes(xintercept = win_end/1000))
+        geom_vline(aes(xintercept = win_end/1000)) +
+        theme_simple(grid_lines = FALSE, axis_lines = TRUE) +
+        xlab("Mb") +
+        ggtitle("Genetic vs. physical SNP positions in regions with ROH islands")
 
 
+# ROH and recombination --------------------------------------------------------
+snp_roh <- fread("output/ROH/roh.hom.summary")
+lmap <- read_delim("../sheep_ID_paper/comments/susie/7_20200504_Full_Linkage_Map.txt", "\t") %>% 
+        rename(SNP = SNP.Name)
 
+snp_df <- snp_roh %>% 
+        inner_join(lmap, by = "SNP") %>% 
+        mutate(KB = BP/1000)
 
+ggplot(snp_df, aes(r, cMdiff)) +
+        geom_point() +
+        geom_smooth(method = "lm") +
+        facet_wrap(~CHR)
 
+running_snp <- winScan(x = snp_df,
+                       groups = "CHR",
+                       position = "KB",
+                       values = c("UNAFF", "r"),
+                       win_size = 500,
+                       win_step = 500,
+                       funs = c("median", "sum"),
+                       cores = 8)
 
+running_snp %>% 
+        mutate(prop_ROH = (UNAFF_median/5952) * 100) %>% 
+        ggplot(aes(r_sum, prop_ROH)) +
+        geom_point(shape = 21, fill = "#eceff4", stroke = 0.1, alpha = 1) +
+        ylab("% of sheep with ROH") +
+        xlab("Recombination rate") +
+        theme_simple(axis_lines = TRUE, grid_lines = FALSE) +
+        geom_smooth(method = "lm", se = FALSE, color = "#5e81ac", size = 1) +
+        scale_x_continuous( breaks = scales::pretty_breaks(2)) +
+        scale_y_continuous( breaks = scales::pretty_breaks(4)) +
+        theme(axis.title = element_text(size = 16)) +
+        facet_wrap(~CHR, scales = "free") -> p_rec
+p_rec
+ggsave("figs/Sup_ROH_Rec.jpg", width = 8, height = 7)
+plot(running_snp$r_mean, running_snp$UNAFF_mean)
+
+running_snp
+
+# model
+library(lme4)
+running_snp <- running_snp %>% 
+                left_join(chr_sizes) %>% 
+                mutate(size_MB = size_KB/1000) %>% 
+                mutate(r_sum_std = scale(r_sum),
+                       size_MB_std = scale(size_MB),
+                       ROH_prop = UNAFF_median/5952)
+
+mod <- lmer(ROH_prop ~ r_sum_std + size_MB_std + (1|CHR), data = running_snp)
+summary(mod)
+sum_mod <- tidy(mod, conf.int = TRUE, conf.method = "boot")
+sum_mod[4, "std.error"] <- (sum_mod[4, "conf.high"] - sum_mod[4, "conf.low"])/4
+sum_mod[5, "std.error"] <- (sum_mod[5, "conf.high"] - sum_mod[5, "conf.low"])/4
+# make table
+sum_mod %>% 
+        mutate(Term = c("Intercept", "Recombination rate", "Chromosome size (Mb)", "Chromosome", "Residual")) %>% 
+        mutate(effect = c(rep("Fixed effects", 3), 
+                          rep("Random effects (variances)", 2))) %>% 
+        select(c(1,9,4,5,7,8,9)) %>% 
+        setNames(c("effect", "Term", "Estimate", "Std.Error", "CI (2.5%)", "CI (97.5%)")) %>% 
+        mutate(Standardization = c("", "(x-mean(x))/sd(x)", "(x-mean(x))/sd(x)", "", ""),
+               Info = c("", "continuous", "continuous", "n = 26", "")) %>% 
+        mutate(across(is.numeric, round, 3)) %>% 
+        gt(
+                rowname_col = "term",
+                groupname_col = "effect"
+        ) %>% 
+        tab_style(
+                style = cell_text( weight = "bold"),
+                locations = cells_column_labels(columns = TRUE)
+        ) %>% 
+        fmt_markdown(columns = TRUE) %>% 
+        gtsave("Rec_model_table.png", path = "figs/tables/")
 #
 
 
 
 
-# manhattan plot ROH distribution
-hom_sum <- fread("output/ROH/roh_nofilt_ram.hom.summary") %>% 
-        rename(snp.name = SNP, roh_count = UNAFF, chromosome = CHR,
-               position = BP) %>% 
-        dplyr::select(snp.name, roh_count, position, chromosome) 
 
 
-chr_info <- read_delim("../sheep/data/sheep_genome/chromosome_info_ram.txt", "\t") %>% 
-        .[-1, ] %>% 
-        rename(chromosome = Part) %>% 
-        mutate(chromosome = str_replace(chromosome, "Chromosome ", "")) %>% 
-        mutate(chromosome = as.integer(chromosome)) %>% 
-        filter(!is.na(chromosome))
-
-chr_labels <- c(c(1:18),"","20","",  "22","", "24","", "26")
-cols <- c("#336B87", "#2A3132")
-
-# get cumsums
-chr_info %<>% 
-        mutate(tot=cumsum(Length)-Length) %>% 
-        dplyr::select(chromosome, tot)
-
-gwas_p <- hom_sum  %>% 
-        left_join(chr_info) %>% 
-        # Add a cumulative position of each SNP
-        arrange(chromosome, position) %>%
-        mutate(pos_cum = position + tot) 
-
-axisdf <- gwas_p %>% group_by(chromosome) %>% 
-        summarize(center = (max(pos_cum) + min(pos_cum)) / 2 )
-
-cols <- c("#4393c3", "#2A3132")
-gwas_p <- gwas_p %>% mutate(roh_prop = roh_count / 7691)
-gwas_p %>% 
-        sample_frac(0.1) %>% 
-        ggplot(aes(x=pos_cum, y=roh_prop)) +
-        # Show all points
-        geom_point(aes(fill = chromosome %%2 == 0),#shape = roh_prevalence  #fill = chromosome %%2 == 0
-                   size = 2, shape = 21, stroke = 0.05) + # alpha = 1, 
-        scale_x_continuous(labels = chr_labels, breaks= axisdf$center ) +
-        scale_y_continuous(expand = c(0, 0), limits = c(0, 1)) +
-        xlab("Chromosome") + 
-        ylab("Proportion ROH") + ## y label from qqman::qq
-        scale_fill_manual(values = alpha(cols, 0.2)) +##values = cols
-        theme_simple() +
-        theme(axis.text.x = element_text(size = 10),
-              axis.ticks = element_line(size = 0.1)) +
-        geom_hline(yintercept = 0.9, size = 0.1, linetype = "dashed") +
-        geom_hline(yintercept = 0.1, size = 0.1, linetype = "dashed") +
-        geom_hline(yintercept = 0.32, size = 0.1, linetype = "dashed") +
-        #geom_hline(yintercept =1, size = 0.1, linetype = "dashed") +
-        guides(fill=FALSE) 
-
-pgwas
-ggsave("figs/roh_prop_genome_manhattan.jpg", width = 10, height = 3)
 
 
-# per chr
-
-# Show all points
-hom_sum %>% 
-        filter(chromosome %in% c(1,2,3,4,5,6)) %>% 
-        ggplot(aes(position, roh_count)) +
-        geom_point(aes(fill = chromosome %%2 == 0),#shape = roh_prevalence  #fill = chromosome %%2 == 0
-                   size = 2, shape = 21, stroke = 0.05) + # alpha = 1, 
-        #scale_x_continuous(labels = chr_labels) +
-        #scale_y_continuous(expand = c(0, 0), limits = c(0, 1)) +
-        xlab("Chromosome") + 
-        ylab("Proportion ROH") + ## y label from qqman::qq
-        scale_fill_manual(values = alpha(cols, 0.2)) +##values = cols
-        theme_simple(base_size = 5) +
-        theme(axis.text.x = element_text(size = 10),
-              axis.ticks = element_line(size = 0.1)) +
-        geom_hline(yintercept = 0.9, size = 0.1, linetype = "dashed") +
-        geom_hline(yintercept = 0.1, size = 0.1, linetype = "dashed") +
-        geom_hline(yintercept = 0.32, size = 0.1, linetype = "dashed") +
-        #geom_hline(yintercept =1, size = 0.1, linetype = "dashed") +
-        guides(fill=FALSE) +
-        facet_wrap(~chromosome, nrow = 26)
-
-# correlation of ROH across classes plot
-ROH_classes_pairs <- prop_IBD_df_with_0 %>% 
-        split(prop_IBD_df_with_0$length_class) %>% 
-        reduce(left_join, by = "IID") %>% 
-        dplyr::select(contains("prop_IBD")) %>% 
-        rename_all(~ levels(prop_IBD_df_with_0$length_class)) %>% 
-        # sample_frac(0.01) %>% 
-        # mutate_all(funs(ifelse(. == 0, NA, .)))
-        replace_with_na_all(condition = ~.x == 0) %>% 
-        ggscatmat(alpha = 0.3) +
-        geom_smooth(method = "lm") +
-        theme_simple() +
-        theme(axis.text = element_blank()) +
-        xlab("FROH") +
-        ylab("FROH")
-
-ROH_classes_pairs 
-#ggsave("figs/SUP1_roh_classes_pairs.jpg", ROH_classes_pairs, width = 8, height = 7)
-
-# ROH per individual plot
-prop_IBD_df %>% 
-        ungroup() %>% 
-        mutate(IID = as.character(IID)) %>% 
-        filter(IID %chin% sample(as.character(unique(prop_IBD_df$IID)), 
-                                 100, replace = FALSE)) -> plot_ibd_df
-
-col_pal <- rev(c(brewer.pal(7, "YlGnBu"),  "firebrick1")) ##A42820
-#col_pal <- rev(c(brewer.pal(6, "YlGnBu"), "goldenrod", "firebrick1")) 
-set.seed(153)
-prop_IBD_df %>% 
-        ungroup() %>% 
-        # filter(class %in% c(1,2,4)) %>% 
-        filter(IID %chin% sample(as.character(unique(prop_IBD_df$IID)), 500, replace = FALSE)) %>% 
-        mutate(prop_IBD = prop_IBD * 100) %>% 
-        ggplot(aes(x=IID, y=prop_IBD, fill=length_class)) +
-        geom_bar(stat="identity") +
-        # scale_fill_brewer(palette = "YlGnBu", name = "ROH class (Mb)", direction = -1) +
-        scale_fill_manual(values = col_pal, name = "ROH length class \nin Mb (Generations)") +
-        #facet_grid(.~ pop, space = 'free_x', scales = 'free_x', switch = 'x') +
-        theme_simple(axis_lines = TRUE) +
-        theme(axis.text.x = element_blank()) +
-        #ylab("Proportion of genome in ROH") + 
-        ylab("% genome") +
-        xlab("Individuals") + 
-        scale_x_discrete(expand = c(0, 0)) + 
-        scale_y_continuous(expand = c(0, 0)) +
-        theme(legend.position = "right",
-              axis.ticks.x = element_blank()) -> p_roh2
-p_roh2

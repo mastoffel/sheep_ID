@@ -5,6 +5,7 @@ source("theme_simple.R")
 library(snpStats)
 library(viridis)
 library(gt)
+
 # prepare data -----------------------------------------------------------------
 chr_info <- read_delim("../sheep/data/sheep_genome/chromosome_info_oar31.txt", "\t") %>% 
         .[-1, ] %>% 
@@ -53,12 +54,6 @@ gwas_full <- gwas_res %>%
 # extract roh
 gwas_roh <- gwas_full %>% filter(groups == "roh") 
 
-# add roh info
-# manhattan plots
-#chr_labels <- c(c(1:18),"","20","",  "22","", "24","", "26")
-#chr_labels_full <- as.character(1:26)
-#cols <- c("#336B87", "#2A3132")
-
 # get cumsums
 chr_info2 <- chr_info %>% 
         mutate(tot=cumsum(Length)-Length) %>% 
@@ -74,7 +69,7 @@ axisdf <- gwas_p %>% group_by(chromosome) %>%
         summarize(center = (max(positive_cum) + min(positive_cum)) / 2 )
 
 # roh info
-hom_sum <- fread("output/ROH/roh_ram.hom.summary") %>% 
+hom_sum <- fread("output/ROH/roh.hom.summary") %>% 
         rename(snp.name = SNP, roh_count = UNAFF) %>% 
         dplyr::select(snp.name, roh_count) 
 
@@ -85,12 +80,8 @@ hom_sum <- hom_sum %>% mutate(roh_prevalence = case_when(
         TRUE ~ "in between")
 )
 gwas_plot <- gwas_p %>% left_join(hom_sum)
-
 gwas_plot %>% arrange(p.value)
 
-# check MAF in region
-#geno_sub <- as(full_sample$genotypes[, df_plot$snp.name], "numeric")
-#maf <- col.summary(full_sample$genotypes[, df_plot$snp.name])$maf
 
 # plot 1: Regional estimates, log10p and ROH counts ---------------------------- 
 get_genome_region <- function(chr, pos) {
@@ -104,13 +95,47 @@ get_genome_region <- function(chr, pos) {
                              cols = c("log_p", "roh_count", "estimate"))
         
 }
-plusminus <- 1.5# Mb
+plusminus <- 3# Mb
 
-top_snps <- gwas_plot %>% filter(-log10(p.value) > -log10(0.05/39149)) %>%  # -log10(0.05/39149)
+top_snps <- gwas_plot %>% filter(-log10(p.value) > -log10(0.05/39184)) %>%  # -log10(0.05/39149)
         group_by(chromosome) %>% 
         top_n(-1, wt = p.value)
 
-# produce table for supplementary
+# check MAF of top snps
+maf <- col.summary(full_sample$genotypes[, top_snps$snp.name])$maf
+
+# check that GWAS hits are legit using linkage map -----------------------------
+lmap <- read_delim("data/Oar3.1_Interpolated.txt", "\t") %>% 
+        setNames(c("chr", "snp_name", "bp", "cM")) %>% 
+        mutate(mb_pos = bp/1000000,
+               kb_pos = bp/1000)
+
+win_area <- function(position, chromosome, ...) {
+        diffs <- lmap %>% 
+                filter(chr == chromosome) %>% 
+                mutate(diff = abs(position/1000 - kb_pos)) %>% 
+                arrange(diff) %>% 
+                top_n(-1000)
+}
+
+all_top <- pmap(top_snps, win_area) %>% 
+        map(as_tibble) %>% 
+        bind_rows(.id = "top_snps") %>% 
+        mutate(top_snps2 = case_when(
+                top_snps == 1 ~ "DU289160_204.1, Chr 3, 177.23Mb",
+                top_snps == 2 ~ "oar3_OAR10_85579446, Chr 10, 85.59Mb",
+                top_snps == 3 ~ "s23340.1, Chr 23, 36.16Mb"
+        )) %>% 
+        mutate(Mb_pos = kb_pos / 1000)
+all_top$top_snp <- rep(top_snps$position, each = 1000)
+ggplot(all_top, aes(Mb_pos, cM)) +
+        geom_point() +
+        theme_simple(grid_lines = FALSE) +
+        facet_wrap(~top_snps2, scales = "free") +
+        geom_vline(aes(xintercept = top_snp/1e06)) 
+
+
+# produce table for supplementary ----------------------------------------------
 top_snps %>% select(snp.name, chromosome, position, estimate, p.value,   allele.1, allele.2) %>% 
         mutate(estimate = round(estimate, 2)) %>% 
         setNames(c("SNP","Chromosome",  "Position (Bp)", "Estimate (log-odds)", "p-value",  "Allele1", "Allele2")) %>% 
@@ -137,8 +162,11 @@ snp_stats <- c(estimate = "Estimate\n(log-odds)", log_p = "-log10(p-value)", # o
 
 #levels(df_plot$var) <- c("Estimate~(log-odds)", "-log[10]p-value", "%~sheep~with~ROH")
 
-chrs <- c(`1` = "Chr. 1", `2` = "Chr. 2", `10` = "Chr. 10", `14` = "Chr. 14", `23` = "Chr. 23")
-hlines <- data.frame(y_val = c(NA, NA, 1682/5952 * 100), var = c("estimate", "log_p", "roh_count"))
+
+chrs <- c(`3` = "Chr. 3", `10` = "Chr. 10", `23` = "Chr. 23")
+# mean ROH
+mean(hom_sum$roh_count)
+hlines <- data.frame(y_val = c(NA, NA, 1397/5952 * 100), var = c("estimate", "log_p", "roh_count"))
 
 
 top_snps_regions_p <- ggplot(df_plot) +
@@ -167,7 +195,6 @@ top_snps_regions_p
 #ggsave("figs/top_snps_regions.jpg", plot = top_snps_regions_p,
 #       width = 6, height = 3.5)
 
-
 # get heterozygosity
 snps <- unique(df_plot$snp.name)
 geno_sub <- as(full_sample$genotypes[, snps ], "numeric")
@@ -179,9 +206,9 @@ het2 <- het %>%
         left_join(df_plot) 
 
 # smoothing across 30 SNPs
-span <- 25
+span <- 100
 het$heterozygosity <- ksmooth(1:nrow(het), het$het, kernel = "normal", bandwidth = span)$y
-hlines <- data.frame(y_val = c(NA, -log10(0.05/39149), 1679/5952 * 100, 0.3086), var = c("estimate", "log_p", "roh_count", "heterozygosity"))
+hlines <- data.frame(y_val = c(NA, -log10(0.05/39184), 1397/5952 * 100, 0.3083), var = c("estimate", "log_p", "roh_count", "heterozygosity"))
 
 df_plot2 <- df_plot %>% 
                 pivot_wider(names_from = var, values_from = vals) %>% 
@@ -229,7 +256,7 @@ p_final <- ggplot(df_plot2) +
               panel.border = element_rect(size = 0.2, fill = NA),
               legend.position = "none")
 p_final
-ggsave("figs/gwas_and_diversity_oar_long.jpg", p_final, width = 6, height = 5)
+ggsave("figs/Sup_gwas_and_diversity_oar_long.jpg", p_final, width = 6, height = 5)
 
 
 
@@ -356,7 +383,7 @@ get_genome_region_roh <- function(x) {
         ) 
 }
 #plusminus <- 2# Mb
-
+roh <- fread("output/ROH/roh.hom")
 roh <- as_tibble(roh)
 all_roh_regional <- map_dfr(1:nrow(top_snps), get_genome_region_roh, .id = "snp") %>% 
         mutate(POS1 = POS1/1000000,
@@ -364,7 +391,7 @@ all_roh_regional <- map_dfr(1:nrow(top_snps), get_genome_region_roh, .id = "snp"
 
 top_snp_pos <- top_snps %>% 
         ungroup() %>% 
-        mutate(snp = c(1:4)) %>% 
+        mutate(snp = c(1:3)) %>% 
         mutate(pos_Mb = position/1000000)
 
 all_roh_regional %>% 

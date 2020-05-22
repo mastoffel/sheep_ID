@@ -9,7 +9,7 @@ load("data/survival_mods_data.RData")
 load("data/sheep_ped.RData")
 
 # roh data
-file_path <- "output/ROH/roh_ram.hom"
+file_path <- "output/ROH/roh.hom"
 roh_lengths <- fread(file_path) 
 
 ped <- sheep_ped[, c(1,3,2)]
@@ -62,7 +62,6 @@ annual_survival %>% group_by(id) %>% tally()
 annual_survival %>% group_by(id) %>% summarise(age = max(age)) %>% summarise(mean_age = mean(age))
 # num observations
 nrow(annual_survival)
-
 
 # annual survival plot
 p_age_df <- annual_survival %>% group_by(age, sex) %>% tally()

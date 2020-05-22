@@ -147,13 +147,19 @@ ggplot(inla_plot, aes(age, mean)) +
         geom_errorbar(aes(ymin = `0.025quant`, ymax = `0.975quant`),  width = 0.5) +
         geom_point(size = 3, shape = 21, col = "#4c566a", fill = "#eceff4", # "grey69"
                    alpha = 1, stroke = 0.7) +
-        geom_text(aes(y = `0.975quant` + 0.2, label = n), size = 3) + 
+        geom_text(aes(y = `0.975quant` + 0.3, label = n), size = 3) + 
         xlab("Age class") + 
         ylab(expression(beta[F[ROH]])) +
         geom_hline(yintercept = 0, linetype='dashed', colour =  "#4c566a", size = 0.3) +
         theme_simple(grid_lines = FALSE, axis_lines = TRUE) -> p_froh_across_life
 p_froh_across_life
-ggsave("figs/sup_froh_across_life.jpg", width = 5, height = 3.5)
+ggsave("figs/sup_froh_across_life.jpg", width = 5, height = 3)
+
+
+
+
+
+
 
 
 

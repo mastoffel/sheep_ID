@@ -83,12 +83,12 @@ system(paste0("/usr/local/bin/plink --bfile data/sheep_geno_imputed_oar_filt --s
               "--homozyg-window-het 2"))
 
 # calculate very long ROH only
-# system(paste0("/usr/local/bin/plink --bfile data/sheep_geno_imputed_oar_filt --sheep --out output/ROH/roh_ram_long5Mb ",
-#               # "--keep output/ROH/ids_surv.txt ",
-#               "--homozyg --homozyg-window-snp 50 --homozyg-snp 50 --homozyg-kb 5000 ",
-#               "--homozyg-gap 500 --homozyg-density 200 --homozyg-window-missing 2 ",
-#               "--homozyg-het 2 ",
-#               "--homozyg-window-het 2"))
+system(paste0("/usr/local/bin/plink --bfile data/sheep_geno_imputed_oar_filt --sheep --out output/ROH/roh_ram_long5Mb ",
+              # "--keep output/ROH/ids_surv.txt ",
+              "--homozyg --homozyg-window-snp 50 --homozyg-snp 50 --homozyg-kb 5000 ",
+              "--homozyg-gap 500 --homozyg-density 200 --homozyg-window-missing 2 ",
+              "--homozyg-het 2 ",
+              "--homozyg-window-het 2"))
 
 
 
@@ -200,7 +200,7 @@ sum(ind_missing_snps > (0.05*400637)) # 392 individuals
 # genotype file for simpleM
 
 # which ids are HD
-plink_geno_path <- "../sheep/data/SNP_chip/Plates_1-2_HD_QC2"
+plink_geno_path <- "../sheep/data/SNP_chip/oar31_mapping/Plates_1-2_HD_QC2"
 # read merged plink data
 sheep_bed <- paste0(plink_geno_path, ".bed")
 sheep_bim <- paste0(plink_geno_path, ".bim")
@@ -209,14 +209,13 @@ hd_sample <- read.plink(sheep_bed, sheep_bim, sheep_fam)
 write_delim(data.frame(id = hd_sample$fam$member), path = "data/hd_ids.txt", " ")
 
 id <- hd_sample$fam$member
-plink_geno_path <- "output/plink_files/"
 # plink name
 #sheep_plink_name <- "sheep_geno_imputed_ram_27092019_pruned"
-sheep_plink_name <- "sheep_geno_imputed_ram_pruned"
+sheep_plink_name <- "data/sheep_geno_imputed_oar_filt"
 # read merged plink data
-sheep_bed <- paste0(plink_geno_path, sheep_plink_name, ".bed")
-sheep_bim <- paste0(plink_geno_path, sheep_plink_name, ".bim")
-sheep_fam <- paste0(plink_geno_path, sheep_plink_name, ".fam")
+sheep_bed <- paste0(sheep_plink_name, ".bed")
+sheep_bim <- paste0(sheep_plink_name, ".bim")
+sheep_fam <- paste0(sheep_plink_name, ".fam")
 full_sample <- read.plink(sheep_bed, sheep_bim, sheep_fam)
 
 hd_inds <- which(full_sample$fam$member %in% id)
@@ -226,4 +225,4 @@ genos_hd <- as(full_sample$genotypes[hd_inds, ], Class = "numeric")
 library(imputeTS)
 genos_hd <- na_mean(genos_hd)
 #genos_hd[is.na(genos_hd)] <- sample(c(0,1,2), replace=TRUE, sum(is.na(genos_hd)))
-fwrite(data.table::transpose(as.data.table(genos_hd)), "data/geno_mat_simpleM_allchr_190k.txt")
+fwrite(data.table::transpose(as.data.table(genos_hd)), "data/geno_mat_simpleM_allchr_oar.txt")

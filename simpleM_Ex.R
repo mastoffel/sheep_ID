@@ -72,9 +72,9 @@ PCA_cutoff <- 0.995
 
 #============================================================================
 # fix length, simpleM
-fn_In <- "data/geno_mat_simpleM_allchr_400k.txt"				# <---- change path here!!!
+fn_In <- "data/geno_mat_simpleM_allchr_oar.txt"				# <---- change path here!!!
 mySNP_nonmissing <- as.matrix(fread(fn_In, select = 1:188)) # take only HD individuals because unrelated and good genotypes
-fn_In <- "data/geno_mat_simpleM_allchr_190k.txt"
+fn_In <- "data/geno_mat_simpleM_allchr_oar.txt"
 mySNP_nonmissing <- as.matrix(fread(fn_In))
 monomorph <- apply(mySNP_nonmissing, 1, function(x) length(table(x)))
 mySNP_nonmissing <- mySNP_nonmissing[!(monomorph == 1), ]
