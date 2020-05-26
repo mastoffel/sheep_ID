@@ -1,4 +1,5 @@
-# Run survival models 
+# Modelling inbreeding depression in survival
+
 library(lme4)
 library(tidyverse)
 library(broom.mixed)

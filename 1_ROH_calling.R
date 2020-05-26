@@ -1,11 +1,8 @@
-# ROH calling 
+# Filtering the imputed data set, calling ROH and calculating 
+# relatedness PCs for GWAS
 library(tidyverse)
 library(data.table)
 library(snpStats)
-
-# terminology:
-# _filt for files where individuals were filtered
-# _pruned for files where SNPs were LD pruned
 
 # imputation based on Oar 3.1 mapping
 # retain individuals with survival data
@@ -83,7 +80,7 @@ system(paste0("/usr/local/bin/plink --bfile data/sheep_geno_imputed_oar_filt --s
               "--homozyg-window-het 2"))
 
 # calculate very long ROH only
-system(paste0("/usr/local/bin/plink --bfile data/sheep_geno_imputed_oar_filt --sheep --out output/ROH/roh_ram_long5Mb ",
+system(paste0("/usr/local/bin/plink --bfile data/sheep_geno_imputed_oar_filt --sheep --out output/ROH/roh_long5Mb ",
               # "--keep output/ROH/ids_surv.txt ",
               "--homozyg --homozyg-window-snp 50 --homozyg-snp 50 --homozyg-kb 5000 ",
               "--homozyg-gap 500 --homozyg-density 200 --homozyg-window-missing 2 ",
@@ -100,31 +97,7 @@ system(paste0("/usr/local/bin/plink --bfile data/sheep_geno_imputed_oar_filt --s
 
 
 
-
-
-# inferred ROH output ==========================================================
-# without pruning
-# file_path <- "output/ROH/roh_nofilt_ram.hom"
-# with pruning
-file_path <- "output/ROH/roh.hom"
-roh_lengths <- fread(file_path)
-
-# distribution
-hist(roh_lengths$KB)
-
-# some transformation
-froh <- roh_lengths %>%
-        dplyr::group_by(IID) %>%
-        dplyr::summarise(KBAVG = mean(KB), KBSUM = sum(KB)) %>%
-        mutate(FROH = KBSUM/2400000)
-
-# roh stats
-roh_lengths %>% 
-        group_by(IID) %>% 
-        tally() -> roh_nums
-range(roh_nums$n)
-roh_lengths[which.max(roh_lengths$KB), ]
-
+# unused content
 #~~~~~~~~~~~~~~ calculate homozygosity in the rest of the genome ~~~~~~~~~~~~~~# 
 #~~~~~~~~~~~~~~ not used at the moment ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 

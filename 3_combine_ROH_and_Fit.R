@@ -1,8 +1,13 @@
+# Combine annual fitness measures and FROH 
+# Output: data.frame for modeling
+#         ordered pedigree
+
 library(tidyverse)
 library(MasterBayes)
 library(data.table)
 library(rlang)
 library(snpStats)
+
 # annual measures of traits and fitness
 fitness_path <- "../sheep/data/1_Annual_Fitness_Measures_April_20190501.txt"
 annual_fitness <- read_delim(fitness_path, delim = "\t")

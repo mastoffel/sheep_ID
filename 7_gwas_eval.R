@@ -1,3 +1,5 @@
+# Evaluate and plot GWAS output
+
 library(tidyverse)
 library(snpStats)
 source("theme_simple.R")
@@ -15,9 +17,9 @@ chr_info <- read_delim("../sheep/data/sheep_genome/chromosome_info_oar31.txt", "
                 mutate(chromosome = as.integer(chromosome)) %>% 
                 filter(!is.na(chromosome))
 
-#gwas_files <- list.files("output/gwas_full_pca_with_f", pattern = "*.rds", full.names = TRUE)
+# GWAS results are models tidied by broom.mixed::tidy() and saved as .rds
+# Results from script 6_alt_gwas_annual_survival.R
 gwas_files <- list.files("output/gwas_new/", pattern = "*.rds", full.names = TRUE) # oar31_roh_long/
-#gwas_files <- list.files("output/gwas_survival_gaussian/", pattern = "*.rds", full.names = TRUE)
 
 # extract results
 all_gwas <- purrr::map(gwas_files, readRDS) %>% 

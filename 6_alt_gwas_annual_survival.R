@@ -1,4 +1,7 @@
-# # run on server
+# ROH GWAS. 
+# Needs to be run on a cluster, every model takes appr. 40 sec to run,
+# 417K models overall.
+
 library(lme4)
 library(tidyverse)
 library(broom.mixed)
@@ -28,7 +31,7 @@ pcs <- read_delim("data/ann_surv_pca.txt", " ", col_names = TRUE) %>%
         mutate(id = as.character(id))
 
 # roh data
-file_path <- "data/roh_ram.hom"
+file_path <- "data/roh.hom"
 roh_lengths <- fread(file_path)
 
 # plink name
@@ -85,10 +88,6 @@ roh_ind <- map(1:nrow(snps_map_sub), roh_id_per_snp)
 roh_df <- as.data.frame(do.call(cbind, roh_ind))
 names(roh_df) <- paste0("roh_", snps_map_sub$snp.name)
 roh_df$id <- as.character(unique(roh_lengths$IID))
-
-
-#library(SparseM)
-#image(as.matrix.csr(roh_df[1:1000, 1:1000]))
 
 
 # make some space

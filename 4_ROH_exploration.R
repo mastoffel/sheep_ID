@@ -1,4 +1,5 @@
-# Exploring ROH through plots
+# Patterns of ROH analysis
+
 library(data.table)
 library(RColorBrewer)
 library(wesanderson)
@@ -16,9 +17,6 @@ library(gt)
 library(grid)
 library(ggplotify)
 options(scipen=999)
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-#          Full data           #   
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 # Chr lengths
 chr_data <- read_delim("../sheep/data/sheep_genome/chromosome_info_oar31.txt", delim = "\t") %>% 
@@ -44,7 +42,7 @@ num_roh_per_ind <- roh_lengths %>% group_by(IID) %>% tally()
 summary(num_roh_per_ind$n)
 sd(num_roh_per_ind$n)
 
-# GENOME SIZE NEEDS fixing (only autosomes)
+# inbreeding coefficients
 froh <- roh_lengths %>%
         dplyr::group_by(IID) %>%
         dplyr::summarise(KBAVG = mean(KB), KBSUM = sum(KB)) %>%
@@ -66,10 +64,9 @@ roh_lengths %>%
         left_join(chr_sizes, by = "CHR") %>% 
         mutate(prop_chr = KB / size_KB) %>% 
         arrange(desc(prop_chr))
+#plot(froh$KBSUM, num_roh_per_ind$n)
 
-plot(froh$KBSUM, num_roh_per_ind$n)
-
-# ROH length and abundance in the least and most inbred individuals 
+# ROH length and abundance in the 1% least and most inbred individuals 
 num_roh_per_ind %>% 
         left_join(froh) %>% 
         top_frac(-0.01, FROH) %>% 
@@ -166,7 +163,6 @@ p_hd <- froh_plot %>%
 p_out <- p_hd/p_imp + plot_annotation(tag_levels = "A")
 p_out 
 ggsave("figs/Sup_imp_vs_hd.jpg", p_out, width = 5.5, height = 4.6)
-
 
 #~~ ROH for some indiividuals --------------------------------------------------
 all_roh <- roh_lengths %>% 
@@ -368,8 +364,6 @@ p_roh_comb_simple
 ggsave("figs/roh_patterns_simple.jpg", p_roh_comb_simple, width = 7, height = 6.5)
 
 
-
-
 # ROH ISLANDS AND DESERTS ------------------------------------------------------
 
 #~~~ ROH density
@@ -510,7 +504,7 @@ all_isl <- pmap(roh_islands, win_area) %>%
 all_isl$win_start <- rep(roh_islands$win_start, each = 500)
 all_isl$win_end <- rep(roh_islands$win_end, each = 500)
 
-ggplot(all_isl, aes(mb_pos, cM)) +
+p_isl <- ggplot(all_isl, aes(mb_pos, cM)) +
         geom_point(shape = 21, fill = "eceff4", stroke = 0.05, size = 2) +
         facet_wrap(~island, scales = "free") +
         scale_x_continuous( breaks = scales::pretty_breaks(3)) +
@@ -520,7 +514,7 @@ ggplot(all_isl, aes(mb_pos, cM)) +
         theme_simple(grid_lines = FALSE, axis_lines = TRUE) +
         xlab("Mb") +
         ggtitle("Genetic vs. physical SNP positions in regions with ROH islands")
-
+ggsave("figs/pot_sup_ROH_isl_rec.jpg", width = 8, height = 7)
 
 # ROH and recombination --------------------------------------------------------
 snp_roh <- fread("output/ROH/roh.hom.summary")

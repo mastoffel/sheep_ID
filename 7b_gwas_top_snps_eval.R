@@ -1,3 +1,6 @@
+# This script is to plot genetic diversity and model estimates
+# in regions around GWAS peaks. 
+
 library(tidyverse)
 library(windowscanr)
 library(data.table)
@@ -128,13 +131,13 @@ all_top <- pmap(top_snps, win_area) %>%
         )) %>% 
         mutate(Mb_pos = kb_pos / 1000)
 all_top$top_snp <- rep(top_snps$position, each = 1000)
-ggplot(all_top, aes(Mb_pos, cM)) +
-        geom_point() +
+p_top <- ggplot(all_top, aes(Mb_pos, cM)) +
+        geom_point(shape = 21, size = 2, fill = "#eceff4", stroke = 0.1) +
         theme_simple(grid_lines = FALSE) +
         facet_wrap(~top_snps2, scales = "free") +
         geom_vline(aes(xintercept = top_snp/1e06)) 
 
-
+ggsave("figs/gwas_snps_vs_cM.jpg", p_top, width = 9.5, height = 3)
 # produce table for supplementary ----------------------------------------------
 top_snps %>% select(snp.name, chromosome, position, estimate, p.value,   allele.1, allele.2) %>% 
         mutate(estimate = round(estimate, 2)) %>% 
