@@ -6,7 +6,8 @@ library(lme4)
 library(tidyverse)
 library(broom.mixed)
 source("theme_simple.R")
-library(INLA)
+library(INLA) # Downloaded from http://www.r-inla.org/download
+library(AnimalINLA) # Downloaded from http://www.r-inla.org/related-projects/animalinla
 library(MCMCglmm)
 library(sjPlot)
 library(brinla)

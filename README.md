@@ -25,6 +25,19 @@ All analysis scripts (4-7b) can be run with data provided in example_data and ex
 
 Complete data will be uploaded upon publication.  
 
+#### Versions and dependencies
+All R package dependencies and their versions to run the code are stored in the `renv.lock` file. You can either install packages yourself while running the code, or you can use the `renv` package to setup everything for you. To do so, download or clone this repository somewhere onto your computer. Then install `renv` with:
+
+```r
+if (!requireNamespace("remotes"))
+  install.packages("remotes")
+
+remotes::install_github("rstudio/renv")
+```
+
+You can then simply run `renv::init()` from the directory. This will find the `renv.lock` file and create an renv folder. The folder will contain a private R library containing all the packages used in these scripts. This might take a while as there are a lot of packages to download and install. More info here: [https://rstudio.github.io/renv/](https://rstudio.github.io/renv/)
+
+
 #### Related repositories
 The scripts for some of the data preprocessing are stored in the following repositories:
 1) [SNP chip merging and LD decay](https://github.com/mastoffel/sheep)

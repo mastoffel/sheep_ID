@@ -8,6 +8,7 @@ library(data.table)
 library(snpStats)
 
 # imputation based on Oar 3.1 mapping
+# PLINK v1.90b6.12 
 # retain individuals with survival data
 system(paste0("/usr/local/bin/plink --bfile ../sheep/data/SNP_chip/oar31_mapping/sheep_geno_imputed_oar31_17052020 ",
               "--sheep --keep output/ROH/ids_surv.txt ",
