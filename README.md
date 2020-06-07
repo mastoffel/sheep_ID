@@ -1,4 +1,4 @@
-![alt text](https://github.com/mastoffel/uncarved_blog/tree/master/public/images)
+![alt text](https://github.com/mastoffel/uncarved_blog/tree/master/public/images/mum_lamb.jpg)
 
 
 ### Genetic architecture and lifetime dynamics of inbreeding depression in a wild mammal
