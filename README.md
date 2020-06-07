@@ -21,7 +21,7 @@ This repository contains the analysis code for our paper, in order 1-7.
 **99_make_pcs_for_gwas:** Get PCs in the right format for use in GWAS.  
 
 ### Data
-All analysis scripts (4-7b) can be run with data provided in example_data and example_output. For a smooth experience with running these scripts, download the complete repository and change the names of example_data and example_output to data and output, respectively. Examples are based on a random subset of 100 individuals, so results will be different from those reported in the paper.
+All analysis scripts (4-7b) can be run with data provided in folders `example_data` and `example_output`. For a smooth experience with running these scripts, download the complete repository and change the names of example_data and example_output to data and output, respectively. Examples are based on a random subset of 100 individuals, so results will be different from those reported in the paper.
 
 Complete data will be uploaded upon publication.  
 
