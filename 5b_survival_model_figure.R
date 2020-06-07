@@ -1,4 +1,4 @@
-# Plotting survival models
+# Plotting survival models (Figure 2)
 
 library(ghibli)
 library(tidyverse)
@@ -18,6 +18,7 @@ library(patchwork)
 library(inlafuns)
 library(ggridges)
 library(gt)
+
 # data
 # annual measures of traits and fitness
 load("data/survival_mods_data.RData")
@@ -36,6 +37,7 @@ annual_survival <- fitness_data %>%
                lamb_cent = lamb - mean(lamb, na.rm = TRUE),
                lamb = as.factor(lamb)) %>% 
         as.data.frame() 
+
 # Plot A: froh across age classes ----------------------------------------------
 # number of individuals in each age class
 max_age_df <- fitness_data %>% 
@@ -135,11 +137,10 @@ p_froh_across_ages
 # ggsave("figs/FROH_across_ages_col.jpg", plot = p_froh_across_ages, width = 4.5, height = 5.5)
 
 
-
 # Plot B: effect sizes ---------------------------------------------------------
 mod_inla <- readRDS("output/AS_mod_oar.rds")
 
-set.seed(144)
+set.seed(145)
 trans_link_to_dat <- function(pred, mod_inla) {
        trans_pred <-  inla.rmarginal(n = 10000, marginal = mod_inla$marginals.fixed[[pred]]) %>% 
                 exp() 
@@ -166,7 +167,7 @@ p_surv_mod <- ggplot(fix_eff, aes(mean, Predictor, xmax = upper_CI, xmin = lower
                    alpha = 1, stroke = 0.7) + 
         # when only showing roh related effs
         scale_x_log10(breaks = c(0.1, 0.3, 1, 2, 5), limits = c(0.1, 5), labels = c( "0.1", "0.3", "1", "2", "5")) +
-        scale_y_discrete(labels = rev(c(expression(F[ROH]), expression(F[ROH]:Age), expression(F[ROH]:Lamb)))) +
+        scale_y_discrete(labels = rev(c(expression(F[ROH]), expression(F[ROH]~'*'~Age), expression(F[ROH]~'*'~Lamb)))) +
         theme_simple(axis_lines = TRUE, base_size = 14) +
         theme(
                 panel.grid.major = element_blank(),
@@ -178,13 +179,18 @@ p_surv_mod <- ggplot(fix_eff, aes(mean, Predictor, xmax = upper_CI, xmin = lower
                 axis.title.x = element_text(margin=margin(t=8))
         ) +
         xlab(expression(beta~and~95*"%"*~CI~(odds~of~survival))) -> p_forest
-
+p_forest
 
 # Plot C marginal effects ------------------------------------------------------
 #mod_inla <- readRDS("output/AS_mod_INLA_400k.rds")
 
+# plotting marginal effects (predictions) from INLA models is not 
+# entirely straightforward. This solution is based on an answer by H. Rue from
+# the INLA google group.
+
 # plot INLA marginal effects
 fun <- function(...) {
+        # plogis = inverse logit
         one <-  plogis(Intercept + 
                                  df1$x1 * froh_all10_cent + 
                                  df1$x2 * age_cent + 
@@ -210,22 +216,19 @@ fun_nolink <- function(...) {
         return (list(one))
 }
 
-#invlogit <- function(x) exp(x)/(1+exp(x))
-
+# values here look odd, because variables have been centered around the mean
+# for easier modeling
 froh <- seq(from = min(annual_survival$froh_all10_cent), to = (max(annual_survival$froh_all10_cent)), by = 0.1)
 age <- c(-2.4, -1.4, 1.6, 4.6)
-#age <- c(-2.4, -1.4, 0.6, 3.6)
-#age <- c(-2.4, -0.4, 1.6, 3.6)
 combined_df <- expand_grid(froh, age) %>% 
         mutate(lamb = ifelse(age == -2.4, 1, 0),
-              # twin = 0.15,
-              # sex = 0.4,
                twin = 0,
                sex = 1,
                frohxlamb = froh*lamb,
                frohxage = froh*age) 
 names(combined_df) <- paste0("x", 1:7)
 
+set.seed(144)
 xx <- inla.posterior.sample(1000, mod_inla)
 
 marg_means <- purrr::map(1:nrow(combined_df), function(x) {
@@ -259,13 +262,8 @@ p_marginal_effs <- ggplot(inla_preds, aes(froh, prediction)) +
         geom_line(aes(color = age), size = 1) +
         geom_ribbon(aes(x=froh, ymin = ci_lower, ymax = ci_upper, fill = age, color = age),
                     alpha = 0.1, linetype = 2, size = 0.2) +
-        #geom_ribbon(aes(x=froh, ymin = ci_lower, ymax = ci_upper, fill = age, color = age),
-        #            alpha = 0.05, linetype = 2, size = 0.1) +
         scale_color_viridis_d("Age", labels = c(0, 1, 4, 7)) +
         scale_fill_viridis_d("Age", labels = c(0, 1, 4, 7)) +
-        #scale_y_continuous(expand = c(0, 0), breaks = seq(from = 0, to = 100, by = 25),
-        #                   limits = c(0,100)) +
-       # scale_x_continuous(limits = c(0.2, 0.55)) +
         theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_size = 14) +
         theme(axis.line.y = element_blank(),
               legend.position = "top",
@@ -280,7 +278,7 @@ library(cowplot)
 p_final <- cowplot::plot_grid(p_froh_across_ages, 
                               cowplot::plot_grid(p_forest, p_marginal_effs, label_size = 16, nrow = 2, rel_heights = c(1,1.5), labels = c('B', 'C')),
                               labels = c('A', ''), rel_widths = c(1, 0.9), label_size = 16)
-ggsave("figs/Fig2_inla.jpg", height = 6, width = 8)
+ggsave("figs/Fig2_inla2.jpg", height = 6, width = 8)
 
 
 

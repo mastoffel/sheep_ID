@@ -1,18 +1,18 @@
-# ROH GWAS. 
+# ROH GWAS. This script runs a modified GWAS which tests an
+# effect of ROH status on annual survival at every SNP, controlling
+# for a range of other variables.
 # Needs to be run on a cluster, every model takes appr. 40 sec to run,
 # 417K models overall.
 
 library(lme4)
 library(tidyverse)
 library(broom.mixed)
-#source("theme_clean.R")
 library(snpStats)
 library(data.table)
 library(furrr)
-#library(caret)
 
-# for running on server
-
+# for running on server, this allows to run an array job for splitting
+# the GWAS up in parts
 part_inp  <- commandArgs(trailingOnly=TRUE)
 if (!(length(part_inp) == 0)) {
         part <- as.numeric(part_inp[[1]])
@@ -21,12 +21,11 @@ if (!(length(part_inp) == 0)) {
         part <- 415
 }
 
-# data
+# fitness and pedigree data
 load("data/survival_mods_data.RData")
 load("data/sheep_ped.RData")
-#IDs_lots_missing <- read_delim("data/ids_more_than_5perc_missing.txt", delim = " ")
 
-# pcs 
+# GRM PCs from plink
 pcs <- read_delim("data/ann_surv_pca.txt", " ", col_names = TRUE) %>% 
         mutate(id = as.character(id))
 

@@ -1,4 +1,7 @@
-# Filtering the imputed data set, calling ROH and calculating 
+# (1) filtering the imputed data set for low call rate individuals
+# (2) run plink pca on genotypes to get PCs for GWAS
+# (3) calling ROH 
+
 # relatedness PCs for GWAS
 library(tidyverse)
 library(data.table)
@@ -6,7 +9,8 @@ library(snpStats)
 
 # imputation based on Oar 3.1 mapping
 # retain individuals with survival data
-system(paste0("/usr/local/bin/plink --bfile ../sheep/data/SNP_chip/oar31_mapping/sheep_geno_imputed_oar31_17052020 --sheep --keep output/ROH/ids_surv.txt ",
+system(paste0("/usr/local/bin/plink --bfile ../sheep/data/SNP_chip/oar31_mapping/sheep_geno_imputed_oar31_17052020 ",
+              "--sheep --keep output/ROH/ids_surv.txt ",
               "--make-bed --out data/sheep_geno_imputed_oar_indfilt"))
 
 # check SNP call rates ---------------------------------------------------------
@@ -50,9 +54,6 @@ snp_sum <- col.summary(full_sample$genotypes)
 summary(snp_sum) 
 
 # PCA for GWAS =================================================================
-# for pruned data
-# system(paste0("/usr/local/bin/plink --bfile output/plink_files/sheep_geno_imputed_ram_pruned --sheep ",
-#               "--pca --out output/sheep_pca")) # sheep_pca
 
 # for 400k PCA we need to prune data as unpruned data fails for some reason
 system(paste0("/usr/local/bin/plink --bfile data/sheep_geno_imputed_oar_filt --sheep ",
@@ -63,14 +64,6 @@ system(paste0("/usr/local/bin/plink --bfile data/sheep_geno_imputed_oar_filt --s
               "--pca --exclude data/sheep_geno_imputed_oar_filt_pruned.prune.out ",
               "--out output/sheep_pca_oar")) # sheep_pca
 
-# calculate ROH unpruned =======================================================
-# system(paste0("/usr/local/bin/plink --bfile data/sheep_geno_imputed_oar_filt --sheep --out output/ROH/roh_ram ",
-#               # "--keep output/ROH/ids_surv.txt ",
-#               "--homozyg --homozyg-window-snp 30 --homozyg-snp 30 --homozyg-kb 600 ",
-#               "--homozyg-gap 500 --homozyg-density 50 --homozyg-window-missing 2 ",
-#               "--homozyg-het 1 ",
-#               "--homozyg-window-het 1"))
-
 # calculate ROH 
 system(paste0("/usr/local/bin/plink --bfile data/sheep_geno_imputed_oar_filt --sheep --out output/ROH/roh ",
               # "--keep output/ROH/ids_surv.txt ",
@@ -79,13 +72,13 @@ system(paste0("/usr/local/bin/plink --bfile data/sheep_geno_imputed_oar_filt --s
               "--homozyg-het 2 ",
               "--homozyg-window-het 2"))
 
-# calculate very long ROH only
-system(paste0("/usr/local/bin/plink --bfile data/sheep_geno_imputed_oar_filt --sheep --out output/ROH/roh_long5Mb ",
-              # "--keep output/ROH/ids_surv.txt ",
-              "--homozyg --homozyg-window-snp 50 --homozyg-snp 50 --homozyg-kb 5000 ",
-              "--homozyg-gap 500 --homozyg-density 200 --homozyg-window-missing 2 ",
-              "--homozyg-het 2 ",
-              "--homozyg-window-het 2"))
+
+
+
+
+
+
+
 
 
 

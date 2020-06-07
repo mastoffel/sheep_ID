@@ -1,0 +1,30 @@
+Part	Length	Scaffolds
+All	2619037772	5697
+Chromosome 1	275612895	1
+Chromosome 2	248993846	1
+Chromosome 3	224283230	1
+Chromosome 4	119255633	1
+Chromosome 5	107901688	1
+Chromosome 6	117031472	1
+Chromosome 7	100079507	1
+Chromosome 8	90695168	1
+Chromosome 9	94726778	1
+Chromosome 10	86447213	1
+Chromosome 11	62248096	1
+Chromosome 12	79100223	1
+Chromosome 13	83079144	1
+Chromosome 14	62722625	1
+Chromosome 15	80923592	1
+Chromosome 16	71719816	1
+Chromosome 17	72286588	1
+Chromosome 18	68604602	1
+Chromosome 19	60464314	1
+Chromosome 20	51176841	1
+Chromosome 21	50073674	1
+Chromosome 22	50832532	1
+Chromosome 23	62330649	1
+Chromosome 24	42034648	1
+Chromosome 25	45367442	1
+Chromosome 26	44077779	1
+Chromosome X	135437088	1
+unplaced	31530689	5670

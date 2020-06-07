@@ -1,6 +1,7 @@
-# Combine annual fitness measures and FROH 
-# Output: data.frame for modeling
-#         ordered pedigree
+# another data processing script:
+# combine annual fitness measures and ROH based inbreeding coefficients FROH 
+# Output: 1) data.frame for modeling
+#         2) ordered pedigree
 
 library(tidyverse)
 library(MasterBayes)
@@ -9,7 +10,7 @@ library(rlang)
 library(snpStats)
 
 # annual measures of traits and fitness
-fitness_path <- "../sheep/data/1_Annual_Fitness_Measures_April_20190501.txt"
+fitness_path <- "data/1_Annual_Fitness_Measures_April_20190501.txt"
 annual_fitness <- read_delim(fitness_path, delim = "\t")
 names(annual_fitness)
 

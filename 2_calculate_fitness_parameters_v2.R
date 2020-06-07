@@ -5,6 +5,8 @@
 # Feb 2019
 #
 
+# This scripts processes files from the sheep database into annual fitness data
+
 library(ggplot2)
 library(plyr)
 library(beepr)

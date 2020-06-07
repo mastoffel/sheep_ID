@@ -1,0 +1,36 @@
+PLINK v1.90b6.12 64-bit (28 Oct 2019)
+Options in effect:
+  --bfile data/sheep_geno_imputed_oar_filt
+  --homozyg
+  --homozyg-density 200
+  --homozyg-gap 300
+  --homozyg-het 2
+  --homozyg-kb 1200
+  --homozyg-snp 50
+  --homozyg-window-het 2
+  --homozyg-window-missing 2
+  --homozyg-window-snp 50
+  --keep example_data/example_ids_plink.txt
+  --out example_output/ROH/roh
+  --sheep
+
+Hostname: sce-bio-c05292
+Working directory: /Users/mstoffel/Dropbox/projects/current/sheep_ID
+Start time: Sun Jun  7 09:34:39 2020
+
+Random number seed: 1591518879
+16384 MB RAM detected; reserving 8192 MB for main workspace.
+417373 variants loaded from .bim file.
+5952 sheep (3057 males, 2895 females) loaded from .fam.
+--keep: 100 sheep remaining.
+Using 1 thread (no multithreaded calculations invoked).
+Before main variant filters, 6 founders and 94 nonfounders present.
+Calculating allele frequencies... done.
+Total genotyping rate in remaining samples is 0.994414.
+417373 variants and 100 sheep pass filters and QC.
+Note: No phenotypes present.
+--homozyg: Scan complete, found 19330 ROH.
+Results saved to example_output/ROH/roh.hom + example_output/ROH/roh.hom.indiv
++ example_output/ROH/roh.hom.summary .
+
+End time: Sun Jun  7 09:34:41 2020

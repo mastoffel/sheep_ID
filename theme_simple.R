@@ -1,3 +1,5 @@
+# theme for most plots
+
 theme_simple <- function(grid_lines = TRUE, axis_lines = FALSE, base_size = 12,
                         base_family='Lato', line_size = 0.2) {
         
