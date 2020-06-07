@@ -1,4 +1,4 @@
-## Genetic architecture and lifetime dynamics of inbreeding depression in a wild mammal
+### Genetic architecture and lifetime dynamics of inbreeding depression in a wild mammal
 Stoffel, M.A, Johnston, S.E., Pilkington, J.G., Pemberton, J.M  
 *bioRxiv* [https://doi.org/10.1101/2020.05.27.118877](https://doi.org/10.1101/2020.05.27.118877)  
 
