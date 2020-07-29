@@ -520,7 +520,8 @@ snp_roh <- fread("output/ROH/roh.hom.summary")
 # linkage map from Johnston et al. (2016)
 lmap <- read_delim("data/7_20200504_Full_Linkage_Map.txt", "\t") %>% 
         rename(SNP = SNP.Name)
-
+# lmap <- read_delim("data/linkage_map_2020.txt", "\t") %>% 
+#         rename(SNP = SNP.Name)
 snp_df <- snp_roh %>% 
         inner_join(lmap, by = "SNP") %>% 
         mutate(KB = BP/1000)
@@ -540,6 +541,7 @@ running_snp <- winScan(x = snp_df,
                        win_step = 500,
                        funs = c("median", "sum"),
                        cores = 8)
+
 # supplementary plot
 running_snp %>% 
         mutate(prop_ROH = (UNAFF_median/5952) * 100) %>% 
@@ -597,9 +599,113 @@ sum_mod %>%
 #
 
 
+#all in one plot
+p_roh_rec <- running_snp %>% 
+      #  filter(UNAFF_n > 35) %>% 
+        mutate(prop_ROH = (UNAFF_median/5952) * 100) %>% 
+        ggplot(aes(r_sum, prop_ROH)) +
+        geom_point(shape = 21, fill = "#eceff4", stroke = 0.1, alpha = 0.5, size = 2.5) +
+        ylab("% of sheep with ROH") +
+        xlab("Recombination rate") +
+        theme_simple(axis_lines = TRUE, grid_lines = FALSE) +
+        geom_smooth(method = "lm", se = FALSE, color = "#2e3440", size = 1) 
+ggsave("figs/roh_rec.jpg", plot = p_roh_rec, width = 5, height = 3.7)
+
+#geom_boxplot(outlier.shape = NA)
 
 
+# recombination rate, heterozygosity and roh -----------------------------------
+# plink name
+sheep_plink_name <- "data/sheep_geno_imputed_oar_filt"
+# read merged plink data
+sheep_bed <- paste0(sheep_plink_name, ".bed")
+sheep_bim <- paste0(sheep_plink_name, ".bim")
+sheep_fam <- paste0(sheep_plink_name, ".fam")
+full_sample <- read.plink(sheep_bed, sheep_bim, sheep_fam)
+
+snps_stats <- col.summary(full_sample$genotypes)
+snps_stats <- snps_stats %>% as_tibble(rownames = "snp_name")
+snps_stats_full <- full_sample$map %>% 
+        mutate(KB = position / 1000) %>% 
+        as_tibble(rownames = "snp_name") %>% 
+        left_join(snps_stats, by = "snp_name") %>% 
+        rename(het = P.AB)
 
 
+running_snp_het <- winScan(x = snps_stats_full,
+                       groups = "chromosome",
+                       position = "KB",
+                       values = c("het"),
+                       win_size = 500,
+                       win_step = 500,
+                       funs = c("median", "sum"),
+                       cores = 8)
+
+snp_full <- running_snp %>% 
+        left_join(running_snp_het)
+
+ggplot(snp_full, aes(r_sum, het_median)) +
+        geom_point() +
+        geom_smooth(method = "lm") +
+        facet_wrap(~CHR, scales = "free_x")
+
+p1 <- ggplot(snp_full %>% filter(CHR %in% 1:3), aes(win_mid, het_median)) +
+        geom_smooth() +
+        facet_wrap(~CHR, nrow = 1, scales = "free_x")
+p2 <- ggplot(snp_full %>% filter(CHR %in% 1:3), aes(win_mid, UNAFF_median)) +
+        geom_smooth()+
+        facet_wrap(~CHR, nrow = 1, scales = "free_x")
+
+p1/p2
+
+snp_sub <- snp_full %>% filter(CHR == 1)
+cor(snp_sub$het_median, snp_sub$UNAFF_median, use = "complete.obs")
+
+p1 <- snp_full %>% 
+        mutate(win_num = 1:nrow(.)) %>% 
+        ggplot( aes(win_num, het_median)) +
+       # geom_smooth(n = 4)+
+        stat_smooth(n = 10)
+
+p2 <- snp_full %>% 
+        mutate(win_num = 1:nrow(.)) %>% 
+        ggplot( aes(win_num, UNAFF_median)) +
+        stat_smooth(n = 10)
+
+p1/p2
+
+snps_stats_full %>% 
+        filter(chromosome == 1) %>% 
+        mutate(snp_num = 1:nrow(.)) %>% 
+        ggplot(aes(snp_num, het)) + 
+                geom_line(size = 0.01)
+
+roh_d <- roh_deserts %>% 
+        rename(chromosome = CHR) %>% 
+        left_join(running_snp_het)
+        
+roh_i <- roh_islands %>% 
+        rename(chromosome = CHR) %>% 
+        left_join(running_snp_het)
+
+roh_extremes <- bind_rows(roh_d, roh_i, .id = "extremes")
+
+ggplot(roh_extremes, aes(extremes, het_median)) +
+        geom_boxplot() 
 
 
+running_snp %>% 
+        rename(chromosome = CHR) %>% 
+        left_join(roh_extremes, by = c("chromosome", "win_start")) %>% 
+        mutate(extreme = case_when(
+                (extremes == 1) ~ "island",
+                (extremes == 2) ~ "desert"
+        )) %>% 
+        mutate(prop_ROH = (UNAFF_median/5952) * 100) %>% 
+        ggplot(aes(r_sum, prop_ROH, fill = extreme)) +
+        geom_point(shape = 21,  stroke = 0.1, alpha = 0.5, size = 2.5) +
+        ylab("% of sheep with ROH") +
+        xlab("Recombination rate") +
+        theme_simple(axis_lines = TRUE, grid_lines = FALSE) +
+        geom_smooth(method = "lm", se = FALSE, color = "#2e3440", size = 1) 
+      
