@@ -11,7 +11,7 @@ library(viridis)
 library(gt)
 
 # prepare data -----------------------------------------------------------------
-chr_info <- read_delim("data/sheep_genome/chromosome_info_oar31.txt", "\t") %>% 
+chr_info <- read_delim("data/chromosome_info_oar31.txt", "\t") %>% 
         .[-1, ] %>% 
         rename(chromosome = Part) %>% 
         mutate(chromosome = str_replace(chromosome, "Chromosome ", "")) %>% 
