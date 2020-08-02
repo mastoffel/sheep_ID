@@ -108,18 +108,9 @@ snp_names <- snps_map_sub$snp.name
 #snp_names <- top_snps %>% group_by(chromosome) %>% top_n(-2, p.value) %>% .$snp.name
 for (i in snp_names) {
         # dummy coding
-        #annual_survival_gwas[[paste0("roh_", i, "_0")]] <- as.numeric((annual_survival_gwas[[i]] == 0) & (annual_survival_gwas[[paste0("roh_", i)]] == 1))
-        #annual_survival_gwas[[paste0("roh_", i, "_2")]] <- as.numeric((annual_survival_gwas[[i]] == 2) & (annual_survival_gwas[[paste0("roh_", i)]] == 1))
-       
-        # factor coding
-         snp_fac <- paste0("roh_fac_", i)
-        # make a factor
-        annual_survival_gwas[snp_fac] <- case_when(
-                (annual_survival_gwas[[paste0("roh_", i)]] == 0) ~ 0, # (annual_survival_gwas[[i]] == 1) & 
-                (annual_survival_gwas[[i]] == 0) & (annual_survival_gwas[[paste0("roh_", i)]] == 1) ~ 1,
-                (annual_survival_gwas[[i]] == 2) & (annual_survival_gwas[[paste0("roh_", i)]] == 1) ~ 2
-        ) %>% 
-                as.factor()
+        annual_survival_gwas[[paste0("roh_0_", i)]] <- as.numeric((annual_survival_gwas[[i]] == 0) & (annual_survival_gwas[[paste0("roh_", i)]] == 1))
+        annual_survival_gwas[[paste0("roh_2_", i)]] <- as.numeric((annual_survival_gwas[[i]] == 2) & (annual_survival_gwas[[paste0("roh_", i)]] == 1))
+        annual_survival_gwas[[paste0("roh_", i)]] <- NULL
 }
 
 # time saver function for modeling
@@ -144,7 +135,7 @@ run_gwas <- function(snp, data) {
                                          froh_no_chr, " + ",
                                          "pc1 + pc2 + pc3 + pc4 + pc5 + pc6 + pc7 + ",
                                          #"pc1 + pc2 + pc3 + pc4 +",
-                                         snp, "+ ", paste0("roh_fac_", snp), "+ (1|birth_year) + (1|sheep_year) + (1|id)"))
+                                         snp, "+ ", paste0("roh_0_", snp), "+",  paste0("roh_2_", snp), "+ (1|birth_year) + (1|sheep_year) + (1|id)"))
         #snp, "+ ", paste0("roh_", snp), " + (1|sheep_year) + (1|id)"))
         mod <- glmer(formula = formula_snp,
                      data = data, family = "binomial",
@@ -161,11 +152,12 @@ snps_sub <- snps_map_sub$snp.name
 # split into pieces of 50 SNPs 
 num_parts <- round(length(seq_along(snps_sub )) / 50)
 snps_pieces <- split(snps_sub, cut(seq_along(snps_sub), num_parts, labels = FALSE))
-roh_pieces <- map(snps_pieces, function(x) paste0("roh_fac_", x)) #### to change here
+roh_pieces_0 <- map(snps_pieces, function(x) paste0("roh_0_", x)) #### to change here
+roh_pieces_2 <- map(snps_pieces, function(x) paste0("roh_2_", x)) 
 
 annual_survival_gwas_pieces <- 
-        map2(snps_pieces, roh_pieces, function(snps_piece, roh_piece) {
-                annual_survival_gwas %>% dplyr::select(id:pc7, one_of(c(snps_piece, roh_piece)))   
+        pmap(list(snps_pieces, roh_pieces_0, roh_pieces_2), function(snps_piece, roh_piece_0, roh_piece_2) {
+                annual_survival_gwas %>% dplyr::select(id:pc7, one_of(c(snps_piece, roh_piece_0, roh_piece_2 )))   
         })
 
 # clean up
@@ -183,7 +175,7 @@ all_out <- future_map2(snps_pieces, annual_survival_gwas_pieces, function(snps, 
 })
 
 all_out_simple <- purrr::flatten(all_out)
-saveRDS(all_out_simple, file = paste0("output/GWAS_roh_fac_part", "_", part, ".rds"))
+saveRDS(all_out_simple, file = paste0("output/GWAS_roh_sep_part", "_", part, ".rds"))
 
 
 ### testing
