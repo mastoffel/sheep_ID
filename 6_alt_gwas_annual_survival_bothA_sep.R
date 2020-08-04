@@ -162,7 +162,7 @@ annual_survival_gwas_pieces <-
 
 # clean up
 rm(annual_survival, annual_survival_gwas, fitness_data, geno_sub, 
-   roh_lengths, roh_pieces, sheep_ped, roh_df)
+   roh_lengths, roh_pieces_0, roh_pieces_2, sheep_ped, roh_df)
 
 # set up plan
 plan(multiprocess, workers = 6)

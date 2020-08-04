@@ -1,7 +1,14 @@
 library(data.table)
 library(tidyverse)
 source("theme_simple.R")
-
+library(snpStats)
+library(windowscanr)
+library(patchwork)
+library(gghalves)
+library(lme4)
+library(broom.mixed)
+library(partR2)
+library(DHARMa)
 # ROH and recombination rate variation analysis --------------------------------
 
 # 1) SNP statistics, heterozygosity
@@ -50,11 +57,17 @@ roh_isl_des <- read_delim(file = "output/roh_islands_deserts.txt", " ") %>%
 running_rec <- winScan(x = snp_df,
                        groups = "CHR",
                        position = "KB",
-                       values = c("r"),
+                       values = c("cMdiff", "r"),
                        win_size = 500,
                        win_step = 500,
                        funs = c("sum"),
                        cores = 8)
+
+running_rec <- running_rec %>% mutate(cM_Mb = (cMdiff_sum) / 0.5) 
+running_rec %>% 
+        ggplot(aes(r_sum, cM_Mb)) +
+        geom_point() +
+        facet_wrap(~CHR)
 
 # mean ROH in 500 Kb non-overlapping running windows
 running_roh <- winScan(x = snp_roh,
@@ -97,46 +110,72 @@ run_roh_rec_het <- running_roh %>%
 
 
 run_roh_rec_het
-library(lme4)
-library(broom.mixed)
-library(partR2)
-library(DHARMa)
+
 roh_mod <- run_roh_rec_het %>% 
                # filter(row_number() %% 5 == 1) %>% 
-                mutate(r_sum_std = as.numeric(scale(r_sum)),
+                mutate(cM_Mb_std = as.numeric(scale(cM_Mb)),
                        het_mean_std = as.numeric(scale(het_mean))) %>% 
                 drop_na()
 
-# genome-wide
-mod <- lmer(prop_ROH ~ r_sum_std + het_mean_std + (1|CHR), data = roh_mod)
+# model
+mod <- lmer(prop_ROH ~ cM_Mb_std + het_mean_std + (1|CHR), data = roh_mod)
 tidy(mod, conf.int = TRUE)
 plan(multisession, workers = 8)
-modR2 <- partR2(mod, partvars = c("r_sum_std", "het_mean_std"), data = roh_mod,
+modR2 <- partR2(mod, partvars = c(" cM_Mb_std", "het_mean_std"), data = roh_mod,
                 nboot = 1000, parallel = TRUE)
-modrpt <- rptR::rptGaussian(prop_ROH ~ r_sum_std + het_mean_std + (1|CHR), data = roh_mod,
+modrpt <- rptR::rptGaussian(prop_ROH ~ cM_Mb_std + het_mean_std + (1|CHR), data = roh_mod,
                             grname = "CHR")
 summary(modR2)
+
+sum_mod <- tidy(mod, conf.int = TRUE, conf.method = "boot")
+sum_mod[4, "std.error"] <- (sum_mod[4, "conf.high"] - sum_mod[4, "conf.low"])/4
+sum_mod[5, "std.error"] <- (sum_mod[5, "conf.high"] - sum_mod[5, "conf.low"])/4
+
+library(gt)
+# make table
+sum_mod %>% 
+        mutate(Term = c("Intercept", "Recombination rate (cM/Mb)", "Heterozygosity", "Chromosome", "Residual")) %>% 
+        mutate(effect = c(rep("Fixed effects", 3), 
+                          rep("Random effects (variances)", 2))) %>% 
+        select(c(1,9,4,5,7,8,9)) %>% 
+        setNames(c("effect", "Term", "Estimate", "Std.Error", "CI (2.5%)", "CI (97.5%)")) %>% 
+        mutate(Standardization = c("", "(x-mean(x))/sd(x)", "(x-mean(x))/sd(x)", "", ""),
+               Info = c("", "continuous", "continuous", "n = 26", ""),
+               R2 = c("", "0.04, 95%CI [0.02, 0.07]", #0.42; 95%CI [0.40, 0.44]", 
+                      "0.38, 95%CI [0.36, 0.40]", "", "")) %>% 
+        mutate(across(is.numeric, round, 3)) %>% 
+        gt(
+                rowname_col = "term",
+                groupname_col = "effect"
+        ) %>% 
+        tab_style(
+                style = cell_text( weight = "bold"),
+                locations = cells_column_labels(columns = TRUE)
+        ) %>% 
+        fmt_markdown(columns = TRUE) %>% 
+gtsave("Rec_model_table.png", path = "figs/tables/")
+
 
 # only deserts/islands
 roh_mod_extreme <- roh_mod %>% filter(extreme %in% c("island", "desert")) %>% 
                         mutate(extreme_num = ifelse(extreme == "island", 0, 1))
-mod2 <- lmer(prop_ROH ~ r_sum_std + het_mean_std + (1|CHR), data = roh_mod_extreme)
-modR22 <- partR2(mod2, partvars = c("r_sum_std", "het_mean_std"), data = roh_mod_extreme,
+mod2 <- lmer(prop_ROH ~ cM_Mb_std + het_mean_std + (1|CHR), data = roh_mod_extreme)
+modR22 <- partR2(mod2, partvars = c("cM_Mb_std", "het_mean_std"), data = roh_mod_extreme,
                 nboot = 1000)
 
 #all in one plot
-coefs <- coef(lm(prop_ROH ~ r_sum, data = run_roh_rec_het))
+coefs <- coef(lm(prop_ROH ~ cM_Mb, data = run_roh_rec_het))
 
 viridis(3)
 p_roh_rec <- run_roh_rec_het %>% 
-        ggplot(aes(r_sum, prop_ROH, fill = extreme)) +
+        ggplot(aes(cM_Mb, prop_ROH, fill = extreme)) +
         geom_point(shape = 21, stroke = 0.1, alpha = 0.7, size = 2) + #  fill = "#eceff4",
         ylab("% of sheep with ROH") +
-        xlab("Recombination rate") +
+        xlab("Recombination rate (cM/Mb)") +
         theme_simple(axis_lines = TRUE, grid_lines = FALSE) +
         scale_fill_manual("ROH", values = c("#eceff4", viridis(3)[c(3, 1)]), 
                           breaks = c( "island", "desert")) +
-        scale_x_continuous(breaks = seq(from=0, to=0.04, by = 0.01), limits = c(0, 0.044)) +
+        scale_x_continuous(breaks = seq(from=0, to=9, by = 2), limits = c(0, 8.8)) +
         geom_abline(intercept = coefs[1], slope = coefs[2], color = "#2e3440", size = 0.5) +
         theme(legend.position = "none",
               axis.title.x = element_blank(),
@@ -145,7 +184,7 @@ p_roh_rec <- run_roh_rec_het %>%
 p_roh_rec
 ggsave("figs/roh_rec.jpg", plot = p_roh_rec, width = 5, height = 3.7)
 
-coefs2 <- coef(lm(het_mean ~ prop_ROH  data = run_roh_rec_het))
+coefs2 <- coef(lm(prop_ROH ~ het_mean, data = run_roh_rec_het))
 p_roh_het <- run_roh_rec_het %>% 
         ggplot(aes(het_mean, prop_ROH,  fill = extreme)) +
         geom_point(shape = 21, stroke = 0.1, alpha = 0.7, size = 2) + #  fill = "#eceff4",
@@ -166,8 +205,8 @@ p_roh_rec / p_roh_het
 library(gghalves)
 p_ext_rec <- run_roh_rec_het %>% 
         filter(extreme != "average") %>% 
-        ggplot(aes(extreme, r_sum, fill = extreme)) +
-        geom_hline(yintercept = mean(run_roh_rec_het$r_sum, na.rm = TRUE),
+        ggplot(aes(extreme, cM_Mb, fill = extreme)) +
+        geom_hline(yintercept = mean(run_roh_rec_het$cM_Mb, na.rm = TRUE),
                    linetype = "dashed", color = "#4c566a", size = 0.5) +
         geom_half_point(side = "r", shape = 21, alpha = 0.9, stroke = 0.1, size = 2,
                         transformation_params = list(height = 0, width = 1.3, seed = 1)) +
@@ -175,10 +214,10 @@ p_ext_rec <- run_roh_rec_het %>%
                           width = 0.6, lwd = 0.3, color = "black",
                           alpha = 0.8) + 
         scale_fill_manual(values = viridis(3)[c(3, 1)]) +
-        scale_y_continuous(breaks = seq(from=0, to=0.04, by = 0.01), limits = c(0, 0.044)) +
+        scale_y_continuous(breaks = seq(from=0, to=9, by = 2), limits = c(0, 8.8)) +
         theme_simple(grid_lines = FALSE, axis_lines = TRUE) +
         xlab("ROH region") +
-        ylab("Recombination rate") +
+        ylab("Recombination rate (cM/Mb)") +
         coord_flip() +
         theme(legend.position = "none",
               axis.title.y=element_text(margin=margin(r=3)))
@@ -211,23 +250,11 @@ ggsave("figs/Fig2_roh_rec.jpg", width = 6, height = 4)
 
 
 
-
-p_roh_rec <- run_roh_rec_het %>% 
-        ggplot(aes(prop_ROH, het_mean, fill = extreme)) +
-        geom_point(shape = 21, stroke = 0.1, alpha = 0.7, size = 2) + #  fill = "#eceff4",
-        ylab("heterozygosity") +
-        xlab("ROH") +
-        theme_simple(axis_lines = TRUE, grid_lines = FALSE) +
-        scale_fill_manual("ROH", values = c("#eceff4", viridis(3)[c(3, 1)]), 
-                          breaks = c( "island", "desert")) +
-        geom_abline(intercept = coefs[1], slope = coefs[2], color = "#2e3440", size = 0.5) 
-
-
 # supplementary plot
-ggplot(run_roh_snp, aes(r_sum, prop_ROH)) +
+ggplot(run_roh_rec_het, aes(cM_Mb, prop_ROH)) +
         geom_point(shape = 21, fill = "#eceff4", stroke = 0.1, alpha = 1) +
         ylab("% of sheep with ROH") +
-        xlab("Recombination rate") +
+        xlab("Recombination rate (cM/Mb)") +
         theme_simple(axis_lines = TRUE, grid_lines = FALSE) +
         geom_smooth(method = "lm", se = FALSE, color = "#5e81ac", size = 1) +
         scale_x_continuous( breaks = scales::pretty_breaks(2)) +
