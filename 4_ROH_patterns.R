@@ -72,7 +72,7 @@ roh_lengths %>%
 num_roh_per_ind %>% 
         left_join(froh) %>% 
        # top_frac(-0.01, FROH) %>%    # top 1% least inbred individuals
-        top_frac(0.01, FROH) %>%      # top 1% most inbred individuals
+        top_n(-7, FROH) %>%      # top 1% most inbred individuals
         summarise(mean(n), mean(KBAVG))
 
 # Supplementary Figure FROH / ROH across individuals ---------------------------
@@ -211,6 +211,7 @@ shade <- df %>%
                                TRUE ~ max))
 
 col <- c("#4c566a", "#d8dee9")
+col <- c("#1E3231", "#9aadbf")
 chr_names <- as.character(1:26)
 names(chr_names) <- as.character(1:26)
 chr_names[c(11, 13, 15, 17, 19, 21, 23, 25)] <- ""
@@ -223,11 +224,11 @@ df %>%
                   alpha=0.5, fill = "#eceff4") + # "#f7f7f7" "#eceff4"
         geom_hline(data = yax, aes(yintercept = yax), color = "#d8dee9", size = 0.4) +
         geom_rect(aes(xmin = POS1, xmax = POS2, ymin = yax - 0.5, ymax = yax + 0.9, 
-                      fill = as.factor(CHR)),  col = "black", size = 0.1, alpha = 1) + 
+                      fill = as.factor(CHR)),  col = "grey", size = 0, alpha = 1) + 
         scale_fill_manual(values = rep(col, 18)) + 
         scale_color_manual(values = rep(col, 18)) +
         scale_y_reverse(expand = c(0, 0)) +
-        theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_size = 13) +
+        theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_size = 13, base_family = "Helvetica") +
         facet_grid(~CHR,scales = 'free_x', space = 'free_x', switch = 'x',
                    labeller = as_labeller(chr_names)) +
         theme(#strip.placement = 'outside',
@@ -235,7 +236,7 @@ df %>%
                 axis.ticks.x = element_blank(),
                 axis.ticks.y = element_blank(),
                 panel.spacing = unit(0, "lines"),
-                plot.margin = margin(r = 0.5, b = 0.5, t = 0.5, unit = "cm"),
+                plot.margin = margin(r = 0.5, l = 0.1, b = 0.1, t = 0.1, unit = "cm"),
                 axis.line.x = element_blank(),
                 legend.position="none",
                 axis.title.x = element_text(margin=margin(t=0)),
@@ -256,10 +257,92 @@ for(i in which(grepl("strip-b", pg$layout$name))){
 }
 
 ROH_per_ind_grob <- as.ggplot(pg)
+ggsave("figs/Fig1A.pdf", ROH_per_ind_grob, width = 6, height = 2.5)
 #ggsave("figs/fig1b_roh_per_ind_5Mb.jpg", ROH_per_ind_grob, width = 6, height = 3.5)
 
 #p1 / p_roh_classes + plot_layout(heights = c(1, 0.8))
 
+# ROH classes ------------------------------------------------------------------
+
+# expected ROH length using cM/Mb from Johnston et al (2016)
+length_dist <- data.frame(g = c(1, 2,2^2, 2^3, 2^4,2^5,2^6,2^7,2^8,2^9,2^10,2^11,2^12,2^13)) %>%
+        mutate(ROH_length_cM = 100 / (2*g)) %>% 
+        mutate(ROH_length_Mb = ROH_length_cM * 0.7816743)
+
+prop_IBD_df <- roh_lengths %>%
+        mutate(length_Mb = KB/1000) %>%
+        mutate(class = case_when(length_Mb >= 39.083715000 ~ 1,
+                                 length_Mb < 39.083715000 & length_Mb >= 19.541857500 ~ 2,
+                                 length_Mb < 19.541857500 & length_Mb >= 9.770928750 ~ 4,
+                                 #length_Mb < 9.770928750 & length_Mb >= 6.513952500 ~ 6,
+                                 length_Mb < 9.770928750& length_Mb >= 4.885464375 ~ 8,
+                                 # length_Mb < 4.885464375 & length_Mb >= 3.908371500 ~ 10,
+                                 length_Mb < 4.885464375 & length_Mb >= 2.442732188 ~ 16,
+                                 length_Mb < 2.442732188 & length_Mb >= 1.2 ~ 32)) %>% # 0.610683047 1.221366094
+        mutate(length_class = case_when(
+                class == 1 ~ ">39 (1G)",
+                class == 2 ~ ">19.5-39 (>1-2G)",
+                class == 4 ~ ">9.8-19.5 (>2-4G)",
+                #class == 6 ~ "6.5-9.7 (6G)",
+                class == 8 ~ ">4.9-9.8 (>4-8G)",
+                # class == 10 ~ "3.9-4.9 (10G",
+                class == 16 ~ ">2.4-4.9 (>8-16G)",
+                class == 32 ~ ">1.2-2.4 (>16-32G)"
+                # class == 128 ~ "0.6-0.3 (128G)"
+        )) %>% 
+        mutate(length_class = fct_reorder(length_class, class)) %>% 
+        mutate(IID = as.character(IID)) %>% 
+        group_by(IID, class, length_class) %>%
+        dplyr::summarise(prop_IBD = sum(length_Mb / (autosomal_genome_size/1000))) #%>% 
+
+# add IBD of non-ROH snps if wanted
+#  bind_rows(homs) 
+
+prop_IBD_df_with_0 <- prop_IBD_df %>% 
+        # add missing length classes as 0
+        ungroup() %>% 
+        tidyr::complete(length_class, nesting(IID)) %>% 
+        mutate(class = ifelse(is.na(class), length_class, class)) %>% 
+        mutate(prop_IBD = ifelse(is.na(prop_IBD), 0, prop_IBD))
+
+prop_IBD_df_with_0 %>% 
+        group_by(length_class) %>% 
+        summarise(mean(prop_IBD))
+
+prop_IBD_df_with_0 %>% 
+        group_by(length_class) %>% 
+        #summarise(sum(prop_IBD > 0)/ 5925)
+        filter(prop_IBD > 0) %>% 
+        summarise(mean(prop_IBD))
+
+library(viridis)
+library(gghalves)
+col_pal <- plasma(6)
+col_pal <- paste0("#", (c("21295c","204683","1763a1","0a96d6","65bee2","BAE2F2")))
+col_pal <- paste0("#", (c("01161e","124559","598392","84a3a1","aec3b0","eff6e0")))
+col_pal <- paste0("#", c("432371","714674","9f6976","cc8b79","e39d7a","faae7b"))
+p_roh_length <- prop_IBD_df_with_0 %>% 
+        mutate(prop_IBD = prop_IBD * 100) %>% 
+        ggplot(aes(length_class, prop_IBD, fill = length_class)) +
+        geom_half_point(side = "l", shape = 21, alpha = 0.3, stroke = 0.1, size =2, color = "#4c566a",
+                        transformation_params = list(height = 0, width = 1.3, seed = 1)) +
+        geom_half_boxplot(side = "r", outlier.color = NA,
+                          width = 0.6, lwd = 0.3, color = "black",
+                          alpha = 0.8) +
+        theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_size = 13,
+                        base_family = "Helvetica") +
+        ylab("% genome") +
+        scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
+        scale_fill_manual(values = col_pal, name = "ROH class (Mb)") +
+        theme(legend.position = "none",
+              plot.margin = margin(r = 0.5, l = 0.1, b = 0.1, t = 0.1, unit = "cm"),
+              #axis.ticks.x = element_blank(),
+              axis.title=element_text(size = rel(1.1)), 
+              axis.text = element_text(color = "black")) + 
+        xlab("ROH length class in Mb (~ generations to MRCA)") 
+p_roh_length
+
+ggsave("figs/Fig1B.pdf", p_roh_length, width = 6.3, height = 2.65)
 #~~~ ROH density ---------------------------------------------------------------
 hom_sum <- fread("output/ROH/roh.hom.summary")
 
@@ -300,8 +383,9 @@ qn <- scales::rescale(quantile(running_roh_p$UNAFF_mean,
                                probs=seq(0, 1, length.out=length(fill_cols))))
 
 p1 <- ggplot(running_roh_p, aes(x = win_start, y = 0.5, fill = UNAFF_mean)) + 
-        geom_tile(color = "black", size = 0) +
-        theme_simple(base_size = 13, grid_lines = FALSE) + 
+        #geom_tile(color = "grey", size = 0) +
+        geom_tile() +
+        theme_simple(base_size = 13, grid_lines = FALSE, base_family = "Helvetica") + 
         scale_y_continuous(expand = c(0,0))+
         scale_x_continuous(expand = c(0,0), 
                            breaks = seq(0, 300000, by = 50000),
@@ -313,7 +397,6 @@ p1 <- ggplot(running_roh_p, aes(x = win_start, y = 0.5, fill = UNAFF_mean)) +
                              labels = c(10, 30, 50 , 70, 90)) +
         facet_grid(CHR~., switch="both") +
         xlab("Position in Mb") +
-
         theme(panel.spacing.y=unit(0.1, "lines"),
               axis.title.x = element_text(margin=margin(t=5)),
               axis.title.y = element_text(margin=margin(r=5)),
@@ -321,7 +404,7 @@ p1 <- ggplot(running_roh_p, aes(x = win_start, y = 0.5, fill = UNAFF_mean)) +
               axis.text.x = element_text(color = "black"),
               axis.ticks.x = element_line(size = 0.3),
               #axis.title.y = element_blank(),
-              plot.margin = margin(r = 0.5, b = 0.5, unit = "cm"),
+              plot.margin = margin(r = 0.5, l = 0.1, b = 0.5, unit = "cm"),
               axis.line.y = element_blank(),
               axis.ticks.y = element_blank(),
               legend.position = c(0.805,0.13),
@@ -332,15 +415,38 @@ p1 <- ggplot(running_roh_p, aes(x = win_start, y = 0.5, fill = UNAFF_mean)) +
         guides(fill = guide_colourbar(title.position = "bottom" ,
                                       barwidth = 10.95, barheight = 0.5))
 p1
-p2 <- ggplot(running_roh_p, aes(UNAFF_mean, "test", fill = ..x..)) +
-        geom_density_ridges_gradient(scale = 2.5, lwd = 0.1) +
-        scale_x_continuous(breaks = c(0.2, 0.5, 0.8)) +
-        theme_void() +
-        scale_fill_gradientn("Proportion of Sheep with ROH",
+ggsave("figs/Fig1C_main.pdf", p1, width = 6, height = 5)
+
+x <- running_roh_p$UNAFF_mean
+y <- density(x, n = 2^12)
+p2 <- ggplot(data.frame(x = y$x, y = y$y), aes(x, y)) + 
+        geom_line() + 
+        geom_segment(aes(xend = x, yend = 0, color = x)) +
+        scale_x_continuous(expand = c(0, 0), breaks = c(0.2, 0.5, 0.8)) +
+        theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_family = "Helvetica") +
+        scale_color_gradientn("Proportion of Sheep with ROH",
                              colors = rev(fill_cols), values = qn,
                              breaks = c(0.1,0.3, 0.5, 0.7, 0.9)) +
         theme(legend.position = "none",
-              plot.margin = margin(1, 1, 1, 1, unit = "cm"))
+              plot.margin = margin(1, 1, 1, 1, unit = "cm"),
+              axis.line.x = element_blank(),
+              axis.ticks.x = element_blank(),
+              axis.title.x = element_blank(),
+              axis.text.x = element_blank()) + 
+        scale_y_continuous(expand = c(0, 0), breaks = c(1, 3, 5)) +
+        ylab("Density")
+        
+p2
+ggsave("figs/Fig1C_legend.jpg", p2, width = 4, height = 2)
+# ggplot(running_roh_p, aes(UNAFF_mean, "test", fill = ..x..)) +
+#         geom_density_ridges_gradient(scale = 2.5, lwd = 0.1) +
+#         scale_x_continuous(breaks = c(0.2, 0.5, 0.8)) +
+#        # theme_simple() +
+#         scale_fill_gradientn("Proportion of Sheep with ROH",
+#                              colors = rev(fill_cols), values = qn,
+#                              breaks = c(0.1,0.3, 0.5, 0.7, 0.9)) +
+#         theme(legend.position = "none",
+#               plot.margin = margin(1, 1, 1, 1, unit = "cm"))
 
 p2
 ggsave("figs/roh_genome_legend.jpg", p2, width = 5, height = 2.5)
@@ -353,6 +459,15 @@ p_roh_comb_simple
 ggsave("figs/roh_patterns_simple.jpg", p_roh_comb_simple, width = 7, height = 6.5)
 
 # combine legend density and plot in keynote or somewhere else for full plot.
+
+# save all
+p_roh_length
+grid1 <- plot_grid(ROH_per_ind_grob, p_roh_length, nrow = 2, 
+          rel_heights = c(1,0.658), label_size = 15, 
+          labels = c("A", "B"), align = "v")
+grid2 <- plot_grid(grid1, p1, nrow = 1)
+grid2
+ROH_per_ind_grob
 
 # ROH ISLANDS AND DESERTS ------------------------------------------------------
 

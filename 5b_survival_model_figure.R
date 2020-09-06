@@ -233,7 +233,7 @@ xx <- inla.posterior.sample(1000, mod_inla)
 
 marg_means <- purrr::map(1:nrow(combined_df), function(x) {
         df1 <<- combined_df[x, ]
-        out <- inla.posterior.sample.eval(fun, xx)
+        out <- inla.posterior.sample.eval(fun_nolink, xx)
 }) 
 rm(df1)
 

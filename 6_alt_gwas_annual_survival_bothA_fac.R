@@ -112,7 +112,7 @@ for (i in snp_names) {
         #annual_survival_gwas[[paste0("roh_", i, "_2")]] <- as.numeric((annual_survival_gwas[[i]] == 2) & (annual_survival_gwas[[paste0("roh_", i)]] == 1))
        
         # factor coding
-         snp_fac <- paste0("roh_fac_", i)
+        snp_fac <- paste0("roh_fac_", i)
         # make a factor
         annual_survival_gwas[snp_fac] <- case_when(
                 (annual_survival_gwas[[paste0("roh_", i)]] == 0) ~ 0, # (annual_survival_gwas[[i]] == 1) & 

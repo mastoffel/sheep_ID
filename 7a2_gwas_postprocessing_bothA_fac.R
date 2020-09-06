@@ -15,36 +15,54 @@ library(data.table)
 # convert GWAS results into tidy data.frame ------------------------------------
 # GWAS results are models tidied by broom.mixed::tidy() and saved as .rds
 # Results from script 6_alt_gwas_annual_survival.R
-gwas_files <- list.files("output/gwas_2allele_roh//", pattern = "*.rds", full.names = TRUE) # oar31_roh_long/
+gwas_files <- list.files("output/gwas_bothA_fac/", pattern = "*.rds", full.names = TRUE) # oar31_roh_long/
 
 # extract results
 all_gwas <- purrr::map(gwas_files, readRDS) %>% 
         purrr::flatten() %>% 
         purrr::flatten() %>% 
         .[seq(1,length(.),by=2)] #%>% 
-# remove snps that didnt work
-# purrr::compact()
 
 # get roh/add pval
 not_working <- map(all_gwas, is.null)
-which(unlist(not_working))
+length(which(unlist(not_working)))
 
 # remove models which did not work
 all_gwas <- all_gwas[-which(unlist(not_working))]
 
 # extract additive and roh
-plan(multiprocess, workers = 8)
-gwas_res <- future_map_dfr(all_gwas, function(x) x %>% filter(str_detect(term, "^roh")) %>% 
-                                  # mutate(snp = str_sub(term, end = -1)) %>% 
-                                   dplyr::select(term, estimate, p.value, snp))
-saveRDS(gwas_res, file = "output/gwas_res_oar_2alleles.rds")
+gwas_res <- bind_rows(all_gwas)
+gwas_res <- gwas_res %>% 
+                filter(!str_detect(term, "age")) %>% 
+                filter(!str_detect(term, "pc")) %>% 
+                filter(!str_detect(term, "Intercept")) %>% 
+                filter(!str_detect(term, "sex")) %>% 
+                filter(!str_detect(term, "twin")) %>% 
+                filter(!str_detect(term, "froh_no")) 
+
+#saveRDS(gwas_res, file = "output/gwas_res_oar_2alleles_fac.rds")
+
+snp_add <- gwas_res %>% filter(!str_detect(term, "roh"))
+snp_roh_0 <- gwas_res %>% 
+                filter(str_detect(term, "roh") & (str_sub(term, -1) == "1")) %>% 
+                separate(term, sep = -1, into = c("snp", "allele")) %>% 
+                mutate(snp = str_remove(snp, "roh_fac_"))
+snp_roh_2 <- gwas_res %>% 
+        filter(str_detect(term, "roh") & (str_sub(term, -1) == "2")) %>% 
+        separate(term, sep = -1, into = c("snp", "allele")) %>% 
+        mutate(snp = str_remove(snp, "roh_fac_"))
+
+snp_full <- snp_add %>% 
+                bind_rows(snp_roh_0, .id = "roh_allele") %>% 
+                bind_rows(snp_roh_2, .id = "roh_allele") %>% 
+                mutate(snp = ifelse(is.na(snp), term, snp)) %>% 
+                mutate(allele = ifelse(is.na(allele), "add", allele)) %>% 
+                select(snp, allele, estimate, p.value)
+
+length(unique(snp_add$term))
 
 # 
-gwas_res2 <- gwas_res %>% 
-        select(term, estimate, p.value) %>% 
-        separate(term, sep = -1, into = c("snp", "allele"))
-
-gwas_res2 %>% 
+snp_full %>% 
         #
         pivot_wider(names_from = allele, values_from = c("estimate", "p.value")) %>% 
         mutate(interesting = ifelse((p.value_1 < 0.000005) | (p.value_2 < 0.000005), 1, 0)) %>% 
@@ -55,12 +73,10 @@ gwas_res2 %>%
         geom_point() +
         geom_smooth(method = "lm")
 
-gwas_res2 %>% 
+snp_full %>% 
         arrange(p.value)
 # save
-#saveRDS(gwas_res, file = "output/gwas_res_oar_long.rds")
-
-
+saveRDS(snp_full, file = "output/gwas_res_oar_roh_fac.rds")
 
 # start here when running example data -----------------------------------------
 # get SNP map
@@ -81,15 +97,12 @@ chr_info <- read_delim("data/chromosome_info_oar31.txt", "\t") %>%
         mutate(chromosome = as.integer(chromosome)) %>% 
         filter(!is.na(chromosome))
 
-# load gwas results 
-gwas_res <- read_rds("output/gwas_res_oar_long.rds")
-
 # put into df
-gwas_full <- gwas_res2 %>%
+gwas_full <- snp_full %>%
         rename(snp.name = snp) %>%
-        mutate(snp.name = str_replace(snp.name, "roh_fac_", "")) %>%
         left_join(snps_map) 
 
+#saveRDS(gwas_full, file = "output/gwas_res_oar_roh_fac_full.rds")
 # how many negative and positive effects? --------------------------------------
 roh_neg_pos <- gwas_full %>%
         mutate(eff = ifelse(estimate <0, "neg", "pos")) %>% 
@@ -147,8 +160,8 @@ p1 <- gwas_roh %>%
         theme_simple(axis_lines = TRUE, grid_lines = FALSE) +
         theme(axis.line.y = element_blank()) +
         scale_fill_manual("Direction of\neffect on survival", values = cols) +
-        scale_x_log10(breaks = c(0.001, 0.01, 0.1, 1), labels = c(0.001, 0.01, 0.1, 1),
-                      limits = c(0.00005, 1.1)) +
+        scale_x_log10(breaks = c(0.001, 0.01, 0.1, 1, 5, 10), labels = c(0.001, 0.01, 0.1, 1, 5, 10),
+                      limits = c(0.00005, 10)) +
         scale_y_continuous(expand = c(0,0)) +
         xlab("Estimate (log-odds of survival)") +
         ylab("SNPs")
@@ -269,27 +282,34 @@ p_rohvsgwas
 #cols <- c("#4393c3", "#2A3132")
 cols <- viridis(2)
 gwas_plot <- gwas_plot %>% 
-        mutate(direction = ifelse(estimate < 0, "negative", "positive"))
+        mutate(direction = ifelse(estimate < 0, "negative", "positive")) %>% 
+        mutate(type = ifelse(allele == "add", "add", "roh")) 
 
-pgwas <- ggplot(gwas_plot, aes(x=positive_cum, y=-log10(p.value))) +
-        geom_hline(yintercept = -log10(0.05/39149), linetype="dashed", color = "grey") +
-        geom_point(data = gwas_plot %>% filter(-log10(p.value) <= -log10(0.05/39184)),
+gwas_plot_roh <- gwas_plot %>% filter(type == "roh")
+
+pgwas <- ggplot(gwas_plot_roh, aes(x=positive_cum, y=-log10(p.value))) +
+        geom_hline(yintercept = -log10(0.05/(39149*2)), linetype="dashed", color = "grey") +
+        geom_point(data = gwas_plot_roh %>% filter(-log10(p.value) <= -log10(0.05/(39149*2))),
                    aes(fill = chromosome %%2 == 0),#shape = roh_prevalence  #fill = chromosome %%2 == 0
                    size = 2, shape = 21, alpha = 1, stroke = 0, color = "black") +
-        geom_point(data = gwas_plot %>% filter(-log10(p.value) > -log10(0.05/39184)), # aes(fill = direction),  0.00001
-                   fill=alpha(cols[[1]], 0.8), size = 2.5, shape = 21, stroke = 0.1, color = "black") + # "#d8dee9"
+        # geom_point(data = gwas_plot %>% filter(-log10(p.value) > -log10(0.05/(39149*2))), # aes(fill = direction),  0.00001
+        #            fill=alpha(cols[[1]], 0.8), size = 2.5, shape = 21, stroke = 0.1, color = "black") + # "#d8dee9
+        geom_point(data = gwas_plot_roh %>% filter(-log10(p.value) > -log10(0.05/(39149*2))), aes(fill = direction), # aes(fill = direction),  0.00001
+                   size = 2.5, shape = 21, stroke = 0.1, color = "black") + # "#d8dee9"
         scale_x_continuous(labels = chr_labels, breaks= axisdf$center) +
         scale_y_continuous(expand = c(0, 0), limits = c(0,9), labels = as.character(0:8), breaks = 0:8) +
         xlab("Chromosome") + 
         ylab(expression(-log[10](italic(p)))) + ## y label from qqman::qq
-        scale_fill_manual(values = c("#d8dee9","#ECEFF4")) + 
+        scale_fill_manual(values = c("#ECEFF4", cols[[1]], cols[[2]],"#d8dee9")) + 
         theme_simple(axis_lines = TRUE, grid_lines = FALSE) +
         theme(axis.text.x = element_text(size = 8),
               axis.ticks = element_line(size = 0.1)) +
         guides(fill=FALSE) 
 
 pgwas
-#ggsave( "figs/survival_gwas_oar_shortnew.jpg",pgwas, height = 3, width = 15)
+ggsave( "figs/survival_gwas_oar_roh_fac.jpg",pgwas, height = 3, width = 15)
+
+p1 / p2
 
 # simple plot without subplots
 p_gwas_simple <- (p1 + p3) / pgwas +

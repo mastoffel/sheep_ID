@@ -30,6 +30,7 @@ table(full_sample$map$chromosome, useNA = "always")
 
 # fitness data
 load("data/survival_mods_data.RData")
+
 # survival data preprocessing
 annual_survival <- fitness_data %>% 
         # filter na rows
@@ -47,7 +48,7 @@ annual_survival <- fitness_data %>%
         as.data.frame() 
 
 # detailed look at significant regions -----------------------------------------
-gwas_res <- read_rds("output/gwas_res_oar_long.rds")
+gwas_res <- read_rds("output/gwas_res_oar_roh.rds")
 
 # put into df
 gwas_full <- gwas_res %>%
@@ -56,6 +57,14 @@ gwas_full <- gwas_res %>%
         mutate(groups = ifelse(str_detect(snp.name, "roh"), "roh", "add")) %>% 
         mutate(snp.name = str_replace(snp.name, "roh_", "")) %>%
         left_join(snps_map) 
+
+# alternative
+gwas_full <- readRDS("output/gwas_res_oar_roh_fac.rds")
+gwas_roh <- gwas_full %>% 
+                filter(allele != "add") %>% 
+                rename(snp.name=snp) %>% 
+                left_join(snps_map)
+### 
 
 # extract roh
 gwas_roh <- gwas_full %>% filter(groups == "roh") 
