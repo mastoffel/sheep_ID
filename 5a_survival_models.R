@@ -68,7 +68,7 @@ annual_survival <- annual_survival %>%
 # set prior
 prec_prior <- list(prior = "loggamma", param = c(0.5, 0.5))
 # model
-formula_surv <- as.formula(paste('survival ~ froh_all10_cent * age_cent + froh_all10_cent * lamb + sex + twin + 1', 
+formula_surv <- as.formula(paste('survival ~ froh_all10_cent * age_cent + froh_all10_cent * lamb_cent + sex + twin + 1', 
                                  'f(birth_year, model = "iid", hyper = list(prec = prec_prior))',
                                  'f(sheep_year, model = "iid", hyper = list(prec = prec_prior))',
                                  'f(IndexA2, model = "iid", hyper = list(prec = prec_prior))',

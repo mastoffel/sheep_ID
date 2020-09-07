@@ -220,12 +220,16 @@ fun_nolink <- function(...) {
 # for easier modeling
 froh <- seq(from = min(annual_survival$froh_all10_cent), to = (max(annual_survival$froh_all10_cent)), by = 0.1)
 age <- c(-2.4, -1.4, 1.6, 4.6)
+age <- c(-2.4, -1.4, -0.4, 0.6, 1.6, 2.6, 3.6, 4.6, 5.6, 6.6)
 combined_df <- expand_grid(froh, age) %>% 
         mutate(lamb = ifelse(age == -2.4, 1, 0),
-               twin = 0,
-               sex = 1,
+               #twin = 0,
+               #sex = 1,
+                #twin =  0.5,
+                #sex = 0.5,
                frohxlamb = froh*lamb,
                frohxage = froh*age) 
+
 names(combined_df) <- paste0("x", 1:7)
 
 set.seed(144)
@@ -233,7 +237,7 @@ xx <- inla.posterior.sample(1000, mod_inla)
 
 marg_means <- purrr::map(1:nrow(combined_df), function(x) {
         df1 <<- combined_df[x, ]
-        out <- inla.posterior.sample.eval(fun_nolink, xx)
+        out <- inla.posterior.sample.eval(fun, xx)
 }) 
 rm(df1)
 
@@ -280,7 +284,22 @@ p_final <- cowplot::plot_grid(p_froh_across_ages,
                               labels = c('A', ''), rel_widths = c(1, 0.9), label_size = 16)
 ggsave("figs/Fig2_inla2.jpg", height = 6, width = 8)
 
+# predictions on original scale
+inla_preds <- d
 
+p_marginal_effs_logit <- ggplot(inla_preds, aes(froh, prediction)) +
+        geom_line(aes(color = age), size = 1) +
+        geom_ribbon(aes(x=froh, ymin = ci_lower, ymax = ci_upper, fill = age, color = age),
+                    alpha = 0.1, linetype = 2, size = 0.2) +
+        scale_color_viridis_d("Age", labels = c(0, 1, 4, 7)) +
+        scale_fill_viridis_d("Age", labels = c(0, 1, 4, 7)) +
+        theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_size = 14) +
+        theme(axis.line.y = element_blank(),
+              legend.position = "top",
+              axis.text = element_text(size = 13)) +
+        xlab(expression(F[ROH])) +
+        ylab("log-odds(survival)")
+ggsave("figs/Fig2_survival_logodd.jpg", height = 3.5, width = 3.5)
 
 #mod_inla <- readRDS("output/AS_mod_INLA_397k.rds")
 
@@ -328,15 +347,98 @@ mod_tab %>% gt(
 
 
 
+# supplementary figure like 2C but with all age classes and log-odds
+age <- c(-2.4, -1.4, -0.4, 0.6, 1.6, 2.6, 3.6, 4.6, 5.6, 6.6)
 
+combined_df <- expand_grid(froh, age) %>% 
+        mutate(lamb = ifelse(age == -2.4, 1, 0),
+               twin = 0,
+               sex = 1,
+               #twin =  0.5,
+               #sex = 0.5,
+               frohxlamb = froh*lamb,
+               frohxage = froh*age) 
 
+names(combined_df) <- paste0("x", 1:7)
 
+set.seed(144)
+xx <- inla.posterior.sample(1000, mod_inla)
 
+marg_means <- purrr::map(1:nrow(combined_df), function(x) {
+        df1 <<- combined_df[x, ]
+        out <- inla.posterior.sample.eval(fun, xx)
+}) 
+marg_means_link <- purrr::map(1:nrow(combined_df), function(x) {
+        df1 <<- combined_df[x, ]
+        out <- inla.posterior.sample.eval(fun_nolink, xx)
+})
+rm(df1)
 
+d <- marg_means %>% 
+        map(as_tibble) %>% 
+        bind_rows() %>% 
+        pmap_df(function(...) {
+                samp <- as.numeric(unlist(list(...)))
+                c(mean = mean(samp), quantile(samp, probs = c(0.025, 0.975)))
+        }) %>% 
+        bind_cols(combined_df) %>% 
+        .[, 1:5] %>% 
+        setNames(c("prediction", "ci_lower", "ci_upper", "froh", "age")) %>% 
+        mutate(age = as.factor(round(age + mean(annual_survival$age), 0)),
+               froh = (froh + mean(annual_survival$froh_all10))/10)
 
+d_link <- marg_means_link %>% 
+        map(as_tibble) %>% 
+        bind_rows() %>% 
+        pmap_df(function(...) {
+                samp <- as.numeric(unlist(list(...)))
+                c(mean = mean(samp), quantile(samp, probs = c(0.025, 0.975)))
+        }) %>% 
+        bind_cols(combined_df) %>% 
+        .[, 1:5] %>% 
+        setNames(c("prediction", "ci_lower", "ci_upper", "froh", "age")) %>% 
+        mutate(age = as.factor(round(age + mean(annual_survival$age), 0)),
+               froh = (froh + mean(annual_survival$froh_all10))/10)
 
+inla_preds <- d %>% 
+        mutate(prediction = prediction * 100,
+               ci_lower = ci_lower * 100,
+               ci_upper = ci_upper * 100)
+inla_preds_link <- d_link
 
+p_marginal_effs <- ggplot(inla_preds, aes(froh, prediction)) +
+        geom_line(aes(color = age), size = 0.5) +
+        geom_ribbon(aes(x=froh, ymin = ci_lower, ymax = ci_upper, fill = age, color = age),
+                    alpha = 0.01, linetype = 2, size = 0.2) +
+        scale_color_viridis_d("Age", labels = 0:9) +
+        scale_fill_viridis_d("Age", labels = 0:9) +
+        theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_size = 14) +
+        theme(axis.line.y = element_blank(),
+              legend.position = "top",
+              axis.text = element_text(size = 13)) +
+        xlab(expression(F[ROH])) +
+        ylab("Predicted\nsurvival probability %") +
+        theme(legend.position = "top")
 
+p_marginal_effs_link <- ggplot(inla_preds_link, aes(froh, prediction)) +
+        geom_line(aes(color = age), size = 0.5) +
+        geom_ribbon(aes(x=froh, ymin = ci_lower, ymax = ci_upper, fill = age, color = age),
+                    alpha = 0.01, linetype = 2, size = 0.2) +
+        scale_color_viridis_d("Age", labels = 0:9) +
+        scale_fill_viridis_d("Age", labels = 0:9) +
+        theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_size = 14) +
+        theme(axis.line.y = element_blank(),
+              legend.position = "top",
+              axis.text = element_text(size = 13)) +
+        xlab(expression(F[ROH])) +
+        ylab("Predicted\n survival (log-odds scale)") +
+        theme(legend.position = "top")
+
+p_effs <- p_marginal_effs + p_marginal_effs_link + 
+        plot_annotation(tag_levels = 'A') +
+        plot_layout(guides = 'collect') & theme(legend.position = 'right')
+
+ggsave("figs/Sup_model_pred_surv.jpg", p_effs, height = 4, width = 9)
 
 
 # lme4
