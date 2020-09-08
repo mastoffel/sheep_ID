@@ -57,9 +57,9 @@ gwas_out <- gwas_res %>%
 
 # plot 1: Regional estimates, log10p and ROH counts ---------------------------- 
 
-
 # filter top snp from every peak
 top_snps <- gwas_out %>% 
+        filter(state != "add") %>% 
         filter(-log10(p.value) > -log10(0.05/(2*39184))) %>%  # -log10(0.05/39149)
         mutate(peak = ifelse((chromosome == 3) & (position > 13000000 & position < 14000000), "3a", chromosome)) %>% 
         mutate(peak = ifelse((chromosome == 3) & (position > 170000000 & position < 180000000), "3b", chromosome)) %>% 
@@ -71,6 +71,8 @@ top_snps <- gwas_out %>%
 
 # check MAF of top snps
 maf <- col.summary(full_sample$genotypes[, top_snps$snp])$MAF
+
+
 
 # check that GWAS hits are legit using linkage map -----------------------------
 lmap <- read_delim("data/Oar3.1_Interpolated.txt", "\t") %>% 
@@ -105,16 +107,22 @@ p_top <- ggplot(all_top, aes(Mb_pos, cM)) +
         geom_vline(aes(xintercept = top_snp/1e06)) 
 
 # produce table for supplementary ----------------------------------------------
-top_snps %>% select(snp, chromosome, position, estimate, p.value,   allele.1, allele.2) %>% 
+top_snps %>% 
+        ungroup() %>% 
+        dplyr::select(snp, chromosome, position, state, estimate, p.value,  allele.1, allele.2) %>% 
         mutate(estimate = round(estimate, 2)) %>% 
-        setNames(c("SNP","Chromosome",  "Position (Bp)", "Estimate (log-odds)", "p-value",  "Allele1", "Allele2")) %>% 
+        mutate(state = case_when(
+                state == "roh_2" ~ paste0(allele.1, allele.1),
+                state == "roh_0" ~ paste0(allele.2, allele.2))) %>% 
+        setNames(c("SNP","Chromosome",  "Position (Bp)", "ROH status", "Estimate (log-odds)", "p-value", "Allele1", "Allele2")) %>% 
         ungroup() %>% 
         gt() %>% 
+        cols_align(
+                align = "center") %>% 
         fmt_scientific(
                 columns = vars(`p-value`),
-                decimals = 2
-        ) #%>% 
-        #gtsave("figs/tables/top_hits_gwas.png")
+                decimals = 2) %>% 
+        gtsave("figs/tables/top_hits_gwas.png")
 
 hom_sum <- fread("output/ROH/roh.hom.summary") %>% 
         rename(snp = SNP, roh_count = UNAFF) %>% 
