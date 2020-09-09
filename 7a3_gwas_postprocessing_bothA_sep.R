@@ -73,7 +73,7 @@ full_sample <- read.plink(sheep_bed, sheep_bim, sheep_fam)
 snps_map <- full_sample$map %>% as_tibble()
 snps_stats <- col.summary(full_sample$genotypes)
 plot(snps_stats$P.AA, snps_stats$P.BB)
-#snps_stats <- snps_stats %>% as_tibble(rownames = "snp.name")
+snps_stats <- snps_stats %>% as_tibble(rownames = "snp.name")
 snps_map <- snps_map %>% 
         left_join(snps_stats, by = "snp.name")
 table(full_sample$map$chromosome, useNA = "always")
@@ -140,13 +140,18 @@ gwas_full %>%
         mutate(eff = factor(eff, levels = c("pos", "neg"))) -> gwas_roh_mod
 gwas_roh_mod
 
-mod1 <- glm(eff ~ p_log + state, data = gwas_roh_mod,
+
+mod1 <- glm(eff ~ p.value , data = gwas_roh_mod,
             family = "binomial")
 tidy(mod1, conf.int = TRUE)
 
 mod2 <- glm(eff ~ abs(estimate), data = gwas_roh_mod,
             family = "binomial")
 tidy(mod2, conf.int = TRUE)
+
+mod1 <- glm(eff ~ p.value + abs(estimate) , data = gwas_roh_mod,
+            family = "binomial")
+tidy(mod1, conf.int = TRUE)
 
 # manhattan plot ---------------------------------------------------------------
 ## computing new x axis
@@ -163,7 +168,7 @@ p1 <- gwas_roh %>%
         mutate(estimate = abs(estimate)) %>% 
         ggplot(aes(estimate, fill = direction)) +
         geom_histogram(bins = 500, position="identity") +
-        theme_simple(axis_lines = TRUE, grid_lines = FALSE) +
+        theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_family = "Lato") +
         theme(axis.line.y = element_blank()) +
         scale_fill_manual("Direction of\neffect on survival", values = cols) +
         #scale_x_log10(breaks = c(0.001, 0.01, 0.1, 1), labels = c(0.001, 0.01, 0.1, 1),
@@ -197,7 +202,7 @@ p3 <- gwas_roh %>%
         mutate(direction = ifelse(estimate < 0, "negative", "positive")) %>% 
         ggplot(aes(p.value, fill = direction)) +
         geom_histogram(bins = 400, position="identity") +
-        theme_simple(axis_lines = TRUE, grid_lines = FALSE) +
+        theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_family = "Lato") +
         scale_fill_manual("Direction of\neffect on survival", values = cols) +
         theme(axis.line.y = element_blank()) +
         scale_x_continuous(limits = c(0, 1),  expand = c(0,0)) +
@@ -283,7 +288,7 @@ pgwas <- ggplot(gwas_plot_roh, aes(x=positive_cum, y=-log10(p.value))) +
         xlab("Chromosome") + 
         ylab(expression(-log[10](italic(p)))) + ## y label from qqman::qq
         scale_fill_manual(values = c("#ECEFF4", cols[[1]], cols[[2]],"#d8dee9")) + 
-        theme_simple(axis_lines = TRUE, grid_lines = FALSE) +
+        theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_family = "Lato") +
         theme(axis.text.x = element_text(size = 8),
               axis.ticks = element_line(size = 0.1)) +
         guides(fill=FALSE) 
@@ -318,7 +323,8 @@ p_gwas_simple
 
 ggsave(filename = "figs/gwas_plot_viridis_sep.jpg", 
        p_gwas_simple, width = 8, height = 3.7)
-
+ggsave(filename = "figs/gwas_plot_viridis_sep.pdf", 
+       p_gwas_simple, width = 8, height = 3.7)
 
 
 

@@ -316,3 +316,11 @@ all_roh_regional %>%
         tally() %>% 
         mutate(prop_roh = n/5952)
 
+# average ROH length
+mean(roh$KB)
+# average ROH length top snps
+all_roh_regional %>% 
+        filter(!(snp %in% c(2,6))) %>% 
+        group_by(snp) %>% 
+        summarise(KB = mean(KB))
+        
