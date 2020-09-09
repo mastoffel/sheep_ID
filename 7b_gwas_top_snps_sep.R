@@ -114,6 +114,7 @@ top_snps %>%
         mutate(state = case_when(
                 state == "roh_2" ~ paste0(allele.1, allele.1),
                 state == "roh_0" ~ paste0(allele.2, allele.2))) %>% 
+        arrange(chromosome) %>% 
         setNames(c("SNP","Chromosome",  "Position (Bp)", "ROH status", "Estimate (log-odds)", "p-value", "Allele1", "Allele2")) %>% 
         ungroup() %>% 
         gt() %>% 
@@ -133,14 +134,21 @@ get_genome_region <- function(chr, pos) {
                 (chromosome == chr) & (position >= (pos - plusminus  * 1000000)) & (position <= (pos +  plusminus * 1000000))
         )
         out <- gwas_tbl %>% left_join(hom_sum) %>%
-                mutate(log_p = -log10(p.value), estimate = abs(estimate),
+                mutate(direction = case_when(
+                        estimate < 0 ~ "negative",
+                        estimate >= 0 ~ "positive"
+                )) %>% 
+                mutate(direction = ifelse(p.value > (0.05/(2*39184)), "non_sig", direction)) %>% 
+             #   mutate(direction = ifelse((estimate < 0 & p.value < 0.05/(2*39184)), "negative", "positive")) %>% 
+                mutate(log_p = -log10(p.value), estimate = abs(estimate),                #abs(estimate),
                        roh_count = roh_count/5952 * 100) %>%
+                #filter(p.value < 0.05) %>% 
                 pivot_longer(names_to = "var", values_to = "vals",
                              cols = c("log_p", "roh_count", "estimate"))
         
 }
-plusminus <- 5# Mb
-
+plusminus <- 1# Mb
+top_snps <- arrange(top_snps, chromosome)
 top_snps_region <- map2_df(top_snps$chromosome, top_snps$position, get_genome_region, .id = "peak")
 
 df_plot <- top_snps_region %>% 
@@ -158,35 +166,36 @@ snp_stats <- c(estimate = "Estimate\n(log-odds)", log_p = "-log10(p-value)", # o
 
 #levels(df_plot$var) <- c("Estimate~(log-odds)", "-log[10]p-value", "%~sheep~with~ROH")
 
-chrs <- c(`3` = "Chr. 3", `10` = "Chr. 10", `23` = "Chr. 23", `14` = "Chr. 14", `18` = "Chr. 18", `19` = "Chr. 19")
+chrs <- c(`1` = "Chr. 3", `2` = "Chr. 3", `3` = "Chr. 10", `4` = "Chr. 14", `5` = "Chr. 18", `6` = "Chr. 19",
+          `7` = "Chr. 23")
 # mean ROH
 mean(hom_sum$roh_count)
 hlines <- data.frame(y_val = c(NA, NA, 1397/5952 * 100), var = c("estimate", "log_p", "roh_count"))
 
 
-top_snps_regions_p <- ggplot(df_plot) +
-        geom_line(data= df_plot, aes(pos_Mb, y = vals), size =0.05, color = "#4C566A") +
-        geom_point(data= df_plot, aes(pos_Mb, y = vals), size =0.2, color = "#D8DEE9") +
-        geom_point(data=df_plot %>% filter(top_snp == 1), 
-                   aes(pos_Mb, y = vals), shape = 21, fill = viridis(1), size = 1, # viridis(7)[7]
-                   stroke = 0.2) +
-        geom_hline(data = hlines, aes(yintercept = y_val), size = 0.08,
-                   linetype = "dashed") +
-        #facet_wrap(var~chromosome, scales = "free", nrow = 3,ncol = 5) +
-        facet_grid(var~peak, scales = "free", switch = "y",
-                   labeller = labeller(.rows = snp_stats,     #snp_stats,
-                                       .cols = chrs)) +
-        #labeller = L) +
-        scale_x_continuous(breaks = scales::pretty_breaks(3)) +
-        scale_y_continuous(position = "right", breaks = scales::pretty_breaks(4)) + # breaks = breaks_fun, 
-        # scale_color_manual(values = viridis(2)) +
-        #facet_wrap(~var, nrow = 3, scales = "free") + 
-        ylab("") +
-        xlab("Position in Mb") +
-        theme_simple(grid_lines = FALSE, axis_lines = TRUE) + 
-        theme(axis.line.x=element_line(),
-              panel.border = element_rect(size = 0.2, fill = NA))
-top_snps_regions_p
+# top_snps_regions_p <- ggplot(df_plot) +
+#         geom_line(data= df_plot, aes(pos_Mb, y = vals), size =0.05, color = "#4C566A") +
+#         geom_point(data= df_plot, aes(pos_Mb, y = vals), size =0.2, color = "#D8DEE9") +
+#         geom_point(data=df_plot %>% filter(top_snp == 1), 
+#                    aes(pos_Mb, y = vals), shape = 21, fill = viridis(1), size = 1, # viridis(7)[7]
+#                    stroke = 0.2) +
+#         geom_hline(data = hlines, aes(yintercept = y_val), size = 0.08,
+#                    linetype = "dashed") +
+#         #facet_wrap(var~chromosome, scales = "free", nrow = 3,ncol = 5) +
+#         facet_grid(var~peak, scales = "free", switch = "y",
+#                    labeller = labeller(.rows = snp_stats,     #snp_stats,
+#                                        .cols = chrs)) +
+#         #labeller = L) +
+#         scale_x_continuous(breaks = scales::pretty_breaks(3)) +
+#         scale_y_continuous(position = "right", breaks = scales::pretty_breaks(4)) + # breaks = breaks_fun, 
+#         # scale_color_manual(values = viridis(2)) +
+#         #facet_wrap(~var, nrow = 3, scales = "free") + 
+#         ylab("") +
+#         xlab("Position in Mb") +
+#         theme_simple(grid_lines = FALSE, axis_lines = TRUE) + 
+#         theme(axis.line.x=element_line(),
+#               panel.border = element_rect(size = 0.2, fill = NA))
+# top_snps_regions_p
 #ggsave("figs/top_snps_regions.jpg", plot = top_snps_regions_p,
 #       width = 6, height = 3.5)
 
@@ -213,35 +222,42 @@ df_plot2 <- df_plot %>%
                      cols = c("log_p", "roh_count", "estimate", "heterozygosity")) %>% 
         mutate(var = factor(var, levels = c("estimate", "log_p", "roh_count", "heterozygosity")))
 
-snp_stats <- c(estimate = "Estimate\n(log-odds)", log_p = "-log10(p-value)", # og_p = "-log10(p-value)", 
+snp_stats <- c(estimate = "|Estimate|\n(log-odds)", log_p = "-log10(p-value)", # og_p = "-log10(p-value)", 
                roh_count = "% of sheep\n with ROH", heterozygosity = "SNP\nheterozygosity")
 df_plot2 <- df_plot2 %>% 
         mutate(type = ifelse(var %in% c("estimate", "log_p"), "gwas", "diversity")) %>% 
         mutate(type = as.factor(type))
 
+df_plot2 <- df_plot2 %>% 
+        mutate(direction = ifelse(type == "diversity", "non_sig", direction)) 
+
+cols <- c(viridis(2)[1], "#d8dee9", viridis(2)[2])
 p_final <- ggplot(df_plot2) +
         geom_hline(data = hlines, aes(yintercept = y_val), size = 0.08,
-                   linetype = "dashed") +
-        geom_line(data= df_plot2, aes(pos_Mb, y = vals, color = type), size =0.05) + #  color = "#4C566A"
-        geom_point(data= df_plot2, aes(pos_Mb, y = vals, color = type), alpha = 0.5, size =0.3) + # "#D8DEE9"
-        geom_point(data=df_plot2 %>% filter(top_snp == 1), 
-                   aes(pos_Mb, y = vals), # fill = type 
-                   shape = 21, 
-                   #fill = "green",
-                   #fill = viridis(2)[2], 
-                   #fill = viridis(10)[10],
-                   fill = "white",
-                   #color = "white",
-                   size = 1.5, # viridis(7)[7]
-                   stroke = 0.6) +
+            linetype = "dashed") +
+        geom_line(data= df_plot2, aes(pos_Mb, y = vals, color = direction), size =0.05) + #  color = "#4C566A"
+        geom_point(data= df_plot2, aes(pos_Mb, y = vals, color = direction, size = direction), alpha = 0.5) + # "#D8DEE9"
+        # geom_point(data=df_plot2 %>% filter(top_snp == 1), 
+        #            aes(pos_Mb, y = vals), # fill = type 
+        #            shape = 21, 
+        #            #fill = "green",
+        #            #fill = viridis(2)[2], 
+        #            #fill = viridis(10)[10],
+        #            fill = "white",
+        #            #color = "white",
+        #            size = 1, # viridis(7)[7]
+        #            stroke = 0.6) +
         #facet_wrap(var~chromosome, scales = "free", nrow = 3,ncol = 5) +
         facet_grid(var~peak, scales = "free", switch = "y",
                    labeller = labeller(.rows = snp_stats,     #snp_stats,
                                        .cols = chrs)) +
+        #facet_wrap(var~peak, scales = "free") +
         #labeller = L) +
-        scale_x_continuous(breaks = scales::pretty_breaks(3)) +
+        scale_x_continuous(breaks = scales::pretty_breaks(2)) +
         scale_y_continuous(position = "right", breaks = scales::pretty_breaks(4)) + # breaks = breaks_fun, 
-        scale_color_manual(values = c("#404788FF", "#238A8DFF")) +
+        #scale_fill_manual(values = cols) + #c("#404788FF", "#238A8DFF")
+        scale_color_manual(values = cols) +
+        scale_size_manual(values = c(1.5, 0.1, 1.5)) +
         #scale_fill_manual(values = rev(viridis(2))) +
         # scale_color_manual(values = viridis(2)) +
         #facet_wrap(~var, nrow = 3, scales = "free") + 
@@ -252,7 +268,7 @@ p_final <- ggplot(df_plot2) +
               panel.border = element_rect(size = 0.2, fill = NA),
               legend.position = "none")
 p_final
-ggsave("figs/Sup_gwas_and_diversity_oar_long.jpg", p_final, width = 6, height = 5)
+ggsave("figs/Sup_gwas_and_diversity_oar_long.jpg", p_final, width = 8, height = 5)
 
 
 # plot 3: ROH for every hit across all individuals -----------------------------
