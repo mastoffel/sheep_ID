@@ -71,7 +71,7 @@ top_snps <- gwas_out %>%
 
 # check MAF of top snps
 maf <- col.summary(full_sample$genotypes[, top_snps$snp])$MAF
-
+#write_delim(bind_cols(top_snps, maf) %>% rename(maf = `...11`), path = "data/top_snps_maf.txt")
 
 # rerun models for positive effects
 file_path <- "output/ROH/roh.hom"

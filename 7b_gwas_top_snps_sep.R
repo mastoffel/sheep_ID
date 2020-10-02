@@ -231,12 +231,12 @@ df_plot2 <- df_plot2 %>%
 df_plot2 <- df_plot2 %>% 
         mutate(direction = ifelse(type == "diversity", "non_sig", direction)) 
 
-cols <- c(viridis(2)[1], "#d8dee9", viridis(2)[2])
+cols <- c(viridis(2)[1], "#D8DEE9", viridis(2)[2])
 p_final <- ggplot(df_plot2) +
         geom_hline(data = hlines, aes(yintercept = y_val), size = 0.08,
             linetype = "dashed") +
         geom_line(data= df_plot2, aes(pos_Mb, y = vals, color = direction), size =0.05) + #  color = "#4C566A"
-        geom_point(data= df_plot2, aes(pos_Mb, y = vals, color = direction, size = direction), alpha = 0.5) + # "#D8DEE9"
+        geom_point(data= df_plot2, aes(pos_Mb, y = vals, color = direction, size = direction), alpha = 0.7) + # "#D8DEE9"
         # geom_point(data=df_plot2 %>% filter(top_snp == 1), 
         #            aes(pos_Mb, y = vals), # fill = type 
         #            shape = 21, 

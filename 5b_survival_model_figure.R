@@ -220,9 +220,9 @@ fun_nolink <- function(...) {
 # values here look odd, because variables have been centered around the mean
 # for easier modeling
 froh <- seq(from = min(annual_survival$froh_all10_cent), to = (max(annual_survival$froh_all10_cent)), by = 0.1)
-#age <- c(-2.4, -1.4, 1.6, 4.6)
+age <- c(-2.4, -1.4, 1.6, 4.6)
 #age <- c(-2.4, -1.4, 0.6, 3.6, 6.6)
-age <- c(-2.4, -1.4, -0.4, 0.6, 1.6, 2.6, 3.6, 4.6, 5.6, 6.6)
+#age <- c(-2.4, -1.4, -0.4, 0.6, 1.6, 2.6, 3.6, 4.6, 5.6, 6.6)
 combined_df <- expand_grid(froh, age) %>% 
         mutate(lamb = ifelse(age == -2.4, 1, 0),
                twin = 0,
@@ -265,7 +265,7 @@ inla_preds <- d %>%
                ci_upper = ci_upper * 100)
 
 p_marginal_effs <- ggplot(inla_preds, aes(froh, prediction)) +
-        geom_line(aes(color = age), size = 1) +
+        geom_line(aes(color = age), size = 0.8) +
         geom_ribbon(aes(x=froh, ymin = ci_lower, ymax = ci_upper, fill = age, color = age),
                     alpha = 0.1, linetype = 2, size = 0.2) +
         scale_color_viridis_d("Age", labels = c(0, 1, 4, 7)) +
@@ -277,23 +277,23 @@ p_marginal_effs <- ggplot(inla_preds, aes(froh, prediction)) +
         xlab(expression(F[ROH])) +
         ylab("Predicted\nsurvival probability %")
 
-p_marginal_effs <- ggplot(inla_preds, aes(froh, prediction)) +
-        geom_line(aes(color = age), size = 0.5) +
-        geom_ribbon(aes(x=froh, ymin = ci_lower, ymax = ci_upper, fill = age, color = age),
-                    alpha = 0.01, linetype = 2, size = 0.2) +
-        scale_color_viridis_d("Age", labels = 0:9) +
-        scale_fill_viridis_d("Age", labels = 0:9) +
-        theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_size = 14) +
-        theme(axis.line.y = element_blank(),
-              legend.position = "top",
-              axis.text = element_text(size = 13)) +
-        xlab(expression(F[ROH])) +
-        ylab("Predicted\nsurvival probability %") +
-        theme(legend.position = "top",
-              legend.box.margin=margin(t = 10, b = -10),
-              legend.margin=margin(0,0,0,0),
-             # legend.text = element_text(size =7),
-              legend.justification = c(-2, 0))
+# p_marginal_effs <- ggplot(inla_preds, aes(froh, prediction)) +
+#         geom_line(aes(color = age), size = 0.5) +
+#         geom_ribbon(aes(x=froh, ymin = ci_lower, ymax = ci_upper, fill = age, color = age),
+#                     alpha = 0.1, linetype = 2, size = 0.2) +
+#         scale_color_viridis_d("Age", labels = 0:9) +
+#         scale_fill_viridis_d("Age", labels = 0:9) +
+#         theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_size = 14) +
+#         theme(axis.line.y = element_blank(),
+#               legend.position = "top",
+#               axis.text = element_text(size = 13)) +
+#         xlab(expression(F[ROH])) +
+#         ylab("Predicted\nsurvival probability %") +
+#         theme(legend.position = "top",
+#               legend.box.margin=margin(t = 10, b = -10),
+#               legend.margin=margin(0,0,0,0),
+#              # legend.text = element_text(size =7),
+#               legend.justification = c(-2, 0))
 
 p_froh_across_ages + (p_forest / p_marginal_effs)
 

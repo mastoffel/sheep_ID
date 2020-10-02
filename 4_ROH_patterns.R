@@ -99,7 +99,7 @@ p_roh
 
 p_roh_dist <- p_froh + p_roh + plot_annotation(tag_levels = 'A')
 p_roh_dist
-ggsave("figs/Sup_ROH_dist.jpg", p_roh_dist, width = 7, height = 2.5)
+#ggsave("figs/Sup_ROH_dist.jpg", p_roh_dist, width = 7, height = 2.5)
 
 # Supplementary Figure HD vs. imputed individuals ------------------------------
 # this plot does not really work with example data, so please skip
@@ -271,8 +271,9 @@ length_dist <- data.frame(g = c(1, 2,2^2, 2^3, 2^4,2^5,2^6,2^7,2^8,2^9,2^10,2^11
 
 prop_IBD_df <- roh_lengths %>%
         mutate(length_Mb = KB/1000) %>%
-        mutate(class = case_when(length_Mb >= 39.083715000 ~ 1,
-                                 length_Mb < 39.083715000 & length_Mb >= 19.541857500 ~ 2,
+        mutate(class = case_when(#length_Mb >= 39.083715000 ~ 1,
+                                # length_Mb < 39.083715000 & length_Mb >= 19.541857500 ~ 2,
+                                 length_Mb >= 19.541857500 ~ 2,
                                  length_Mb < 19.541857500 & length_Mb >= 9.770928750 ~ 4,
                                  #length_Mb < 9.770928750 & length_Mb >= 6.513952500 ~ 6,
                                  length_Mb < 9.770928750& length_Mb >= 4.885464375 ~ 8,
@@ -280,14 +281,15 @@ prop_IBD_df <- roh_lengths %>%
                                  length_Mb < 4.885464375 & length_Mb >= 2.442732188 ~ 16,
                                  length_Mb < 2.442732188 & length_Mb >= 1.2 ~ 32)) %>% # 0.610683047 1.221366094
         mutate(length_class = case_when(
-                class == 1 ~ ">39 (1G)",
-                class == 2 ~ ">19.5-39 (>1-2G)",
-                class == 4 ~ ">9.8-19.5 (>2-4G)",
+                #class == 1 ~ ">39 (1G)",
+                #class == 2 ~ ">19.5-39 (2g)",
+                class == 2 ~ ">19.5 (2g)",
+                class == 4 ~ "9.8-19.5 (2-4g)",
                 #class == 6 ~ "6.5-9.7 (6G)",
-                class == 8 ~ ">4.9-9.8 (>4-8G)",
+                class == 8 ~ "4.9-9.8 (4-8g)",
                 # class == 10 ~ "3.9-4.9 (10G",
-                class == 16 ~ ">2.4-4.9 (>8-16G)",
-                class == 32 ~ ">1.2-2.4 (>16-32G)"
+                class == 16 ~ "2.4-4.9 (8-16g)",
+                class == 32 ~ "1.2-2.4 (16-32g)"
                 # class == 128 ~ "0.6-0.3 (128G)"
         )) %>% 
         mutate(length_class = fct_reorder(length_class, class)) %>% 
@@ -311,7 +313,7 @@ prop_IBD_df_with_0 %>%
 
 prop_IBD_df_with_0 %>% 
         group_by(length_class) %>% 
-        #summarise(sum(prop_IBD > 0)/ 5925)
+       #summarise(sum(prop_IBD > 0)/ 5925)
         filter(prop_IBD > 0) %>% 
         summarise(mean(prop_IBD))
 
@@ -320,7 +322,7 @@ library(gghalves)
 col_pal <- plasma(6)
 col_pal <- paste0("#", (c("21295c","204683","1763a1","0a96d6","65bee2","BAE2F2")))
 col_pal <- paste0("#", (c("01161e","124559","598392","84a3a1","aec3b0","eff6e0")))
-col_pal <- paste0("#", c("432371","714674","9f6976","cc8b79","e39d7a","faae7b"))
+#col_pal <- paste0("#", c("432371","714674","9f6976","cc8b79","e39d7a","faae7b"))
 p_roh_length <- prop_IBD_df_with_0 %>% 
         mutate(prop_IBD = prop_IBD * 100) %>% 
         ggplot(aes(length_class, prop_IBD, fill = length_class)) +
@@ -342,7 +344,8 @@ p_roh_length <- prop_IBD_df_with_0 %>%
         xlab("ROH length class in Mb (~ generations to MRCA)") 
 p_roh_length
 
-ggsave("figs/Fig1B.pdf", p_roh_length, width = 6.3, height = 2.65)
+ggsave("figs/Fig1B.jpg", p_roh_length, width = 6.3, height = 2.65)
+
 #~~~ ROH density ---------------------------------------------------------------
 hom_sum <- fread("output/ROH/roh.hom.summary")
 
