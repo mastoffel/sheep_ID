@@ -253,7 +253,7 @@ cols <- c("#336B87", "#2A3132")
 
 # get cumsums
 chr_info2 <- chr_info %>% 
-        mutate(tot=cumsum(Length)-Length) %>% 
+        mutate(tot=cumsum(Length)-Length + cumsum(rep(35e6, 26))) %>% 
         dplyr::select(chromosome, tot)
 
 gwas_plot <- gwas_roh %>% 
@@ -261,6 +261,7 @@ gwas_plot <- gwas_roh %>%
         # Add a cumulative position of each SNP
         arrange(chromosome, position) %>%
         mutate(positive_cum = position + tot) 
+        
 
 axisdf <- gwas_plot %>% group_by(chromosome) %>% 
         summarize(center = (max(positive_cum) + min(positive_cum)) / 2 )
@@ -278,16 +279,16 @@ pgwas <- ggplot(gwas_plot_roh, aes(x=positive_cum, y=-log10(p.value))) +
         geom_hline(yintercept = -log10(0.05/(eff_tests)), linetype="dashed", color = "grey") +
         geom_point(data = gwas_plot_roh %>% filter(-log10(p.value) <= -log10(0.05/(eff_tests))),
                    aes(fill = chromosome %%2 == 0),#shape = roh_prevalence  #fill = chromosome %%2 == 0
-                   size = 2, shape = 21, alpha = 1, stroke = 0, color = "black") +
+                   size = 1.2, shape = 21, alpha = 1, stroke = 0, color = "black") +
         # geom_point(data = gwas_plot %>% filter(-log10(p.value) > -log10(0.05/(39149*2))), # aes(fill = direction),  0.00001
         #            fill=alpha(cols[[1]], 0.8), size = 2.5, shape = 21, stroke = 0.1, color = "black") + # "#d8dee9
         geom_point(data = gwas_plot_roh %>% filter(-log10(p.value) > -log10(0.05/(eff_tests))), aes(fill = direction), # aes(fill = direction),  0.00001
-                   size = 2.5, shape = 21, stroke = 0.1, color = "black") + # "#d8dee9"
+                   size = 2, shape = 21, stroke = 0.1, color = "black") + # "#d8dee9"
         scale_x_continuous(labels = chr_labels, breaks= axisdf$center) +
         scale_y_continuous(expand = c(0, 0), limits = c(0,9), labels = as.character(0:8), breaks = 0:8) +
         xlab("Chromosome") + 
         ylab(expression(-log[10](italic(p)))) + ## y label from qqman::qq
-        scale_fill_manual(values = c("#ECEFF4", cols[[1]], cols[[2]],"#d8dee9")) + 
+        scale_fill_manual(values = c("#ECEFF4", cols[[1]], cols[[2]],"#d8dee9")) + # #dbe1eb #d1d8e5  "#ECEFF4" #d8dee9
         theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_family = "Lato") +
         theme(axis.text.x = element_text(size = 8),
               axis.ticks = element_line(size = 0.1)) +
