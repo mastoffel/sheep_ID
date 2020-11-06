@@ -74,16 +74,28 @@ formula_surv <- as.formula(paste('survival ~ froh_all10_cent * age_cent + froh_a
                                  'f(IndexA2, model = "iid", hyper = list(prec = prec_prior))',
                                 # 'f(mum_id, model="iid",  hyper = list(prec = prec_prior))', 
                                  'f(IndexA, model="generic0", hyper = list(theta = list(param = c(0.5, 0.5))),Cmatrix=Cmatrix)', sep = " + "))
+
 control.family1 = list(control.link=list(model="logit"))
 mod_inla <- inla(formula=formula_surv, family="binomial",
                  data=annual_survival, 
                  control.family = control.family1,
-                 control.compute = list(dic = TRUE, config=TRUE),
+                 control.compute = list(dic = TRUE, cpo=TRUE, waic = TRUE, po=TRUE, config=TRUE),
                  control.inla = list(correct = TRUE))
 
-saveRDS(mod_inla, file = "output/AS_mod_oar.rds")
-mod_inla <- readRDS("output/AS_mod_oar.rds")
+saveRDS(mod_inla, file = "output/AS_mod_oar_w_diagnostics.rds")
+mod_inla <- readRDS("output/AS_mod_oar_w_diagnostics.rds")
+
 mod_inla$summary.fixed
+summary(mod_inla)
+summary(mod_inla$cpo)
+pit_adj <- mod_inla$cpo$pit - 0.5 * mod_inla$cpo$cpo
+hist(pit_adj)
+## posterior predictive check
+#bri.fixed.plot(mod_inla)
+sim <- inla.posterior.sample(100, mod_inla)
+sim[[1]]$latent
+library(INLAutils)
+ggplot_inla_residuals(mod_inla, annual_survival$survival)
 
 # POISSON model for inbreeding load --------------------------------------------
 # to calculate lethal equivalents according to Nietlisbach et al 2019
@@ -321,5 +333,15 @@ ggplot() +
         theme_simple(grid_lines = FALSE, axis_lines = TRUE) 
 
 
+# model checking
 
+mod_inla <- readRDS("output/AS_mod_oar.rds")
+mod_inla$summary.fixed
+library(brinla)
 
+ppp <- vector(mode = "numeric", length = nrow(annual_survival))
+for (i in (1:nrow(annual_survival))) {
+        ppp[i] <- inla.pmarginal(q = annual_survival$survival[i], marginal = mod_inla$marginals.fitted.values[[i]])
+}
+
+hist(ppp)
