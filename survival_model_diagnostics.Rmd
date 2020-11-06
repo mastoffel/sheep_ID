@@ -140,7 +140,7 @@ accuracy
 
 We can now repeat this analysis 100 times by wrapping it in a function.
 
-```{r, cache=TRUE, warning=FALSE}
+```{r, cache=TRUE, warning=FALSE, message = FALSE}
 # prediction
 predict_accuracy <- function(rep) {
   test <- sample(1:nrow(annual_survival), round(0.2 * nrow(annual_survival)))
@@ -174,5 +174,5 @@ p1 <- ggplot(as_tibble(all_acc), aes(value*100)) +
 p1
 ```
 
-#### Overall, the prediction accuracy varies around 81%. This shows that, on average,
-the model correctly predicts the survival or death of an individual in 81% of cases.
+**Overall, the prediction accuracy varies around 81%. This shows that, on average,
+the model correctly predicts the survival or death of an individual in 81% of cases.**
