@@ -6,11 +6,11 @@ output:
     df_print: paged
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include=FALSE, cache=TRUE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-Here, we will use two different diagnostic methods to show that the survival model
+Here, we will use ifferent diagnostic methods to show that the survival model
 in Stoffel et al. (2020) fits well to the data and is appropriate to investigate
 the questions in the manuscript.
 
@@ -18,6 +18,7 @@ the questions in the manuscript.
 library(lme4)
 library(tidyverse)
 library(broom.mixed)
+library(performance)
 source("theme_simple.R")
 # data
 load("data/survival_mods_data.RData") 
@@ -95,6 +96,14 @@ ggsave("figs/ppc_survival.jpg",)
 ##### Simulated survival data from the model is very similar to the empirical survival
 data, which is a good indicator that the model fits well.
 
+## Binned residuals
+A usual model diagnostic is to plot residuals against fitted values, which is not very useful for logistic regression due to the discrete nature of the datapoints. An alternative is to divide the data into bins based on the fitted values and then plot the average residual versus the average fitted value for each bin. Here we divided the data into 100 bins of equal size. The lines are computed as 2*sqrt(p(1-p)/n) where n is the number of points per bin, in this case 14876/100 ~ 149, and represent the +-2 standard error bounds, "within one would expect 95% of the binned residuals to fall, if the model were actually true" (Gelman & Hill, 2007). 
+
+```{r, warning=FALSE, message=FALSE}
+performance::binned_residuals(mod1 ,n_bins =  100)
+```
+
+**While the result varies slightly depending on the number of bins, around 93-96% of our bins fall within the error bounds for our data, again indicating a good fit to the data.**
 
 ## Predicting survival for new observations
 
@@ -148,7 +157,7 @@ predict_accuracy <- function(rep) {
   df_train <- annual_survival[train, ]
   df_test <- annual_survival[test, ]
   mod <- glmer(survival ~ froh_all10_cent * age_cent + froh_all10_cent * lamb + 
-                 sex + twin + + (1|sheep_year) + (1|birth_year) + (1|id) + (froh_all10_cent|age),
+                 sex + twin + + (1|sheep_year) + (1|birth_year) + (1|id),
                family = binomial(link = 'logit'), data = df_train,
                control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
   

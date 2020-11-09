@@ -68,7 +68,7 @@ annual_survival <- annual_survival %>%
 # set prior
 prec_prior <- list(prior = "loggamma", param = c(0.5, 0.5))
 # model
-formula_surv <- as.formula(paste('survival ~ froh_all10_cent * age_cent + froh_all10_cent * lamb_cent + sex + twin + 1', 
+formula_surv <- as.formula(paste('survival ~ froh_all10_cent * age + froh_all10_cent * lamb + sex + twin + 1', 
                                  'f(birth_year, model = "iid", hyper = list(prec = prec_prior))',
                                  'f(sheep_year, model = "iid", hyper = list(prec = prec_prior))',
                                  'f(IndexA2, model = "iid", hyper = list(prec = prec_prior))',
@@ -82,8 +82,8 @@ mod_inla <- inla(formula=formula_surv, family="binomial",
                  control.compute = list(dic = TRUE, cpo=TRUE, waic = TRUE, po=TRUE, config=TRUE),
                  control.inla = list(correct = TRUE))
 
-saveRDS(mod_inla, file = "output/AS_mod_oar_w_diagnostics.rds")
-mod_inla <- readRDS("output/AS_mod_oar_w_diagnostics.rds")
+saveRDS(mod_inla, file = "output/AS_mod_oar2.rds")
+mod_inla <- readRDS("output/AS_mod_oar2.rds")
 
 mod_inla$summary.fixed
 summary(mod_inla)

@@ -160,10 +160,11 @@ p1 <- ggplot(sim_ratio, aes(value)) +
   geom_histogram(bins = 40, fill = "grey") +
   geom_vline(xintercept = emp_ratio, colour = "cornflowerblue") +
   xlab("Proportion of survival") +
-  ggtitle("Distribution of simulated survival (grey) and empirical
-survival (blue line)") +
+  ggtitle("Distribution of simulated survival (grey) 
+and empirical survival (blue line)") +
   theme_minimal()
 
+ggsave("figs/ppc_survival.jpg", p1, width = 4.5, height = 3)
 # prediction
 predict_accuracy <- function(rep) {
   test <- sample(1:nrow(annual_survival), round(0.2 * nrow(annual_survival)))
