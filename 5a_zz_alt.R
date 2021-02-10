@@ -11,7 +11,7 @@ library(AnimalINLA) # Downloaded from http://www.r-inla.org/related-projects/ani
 library(MCMCglmm)
 library(sjPlot)
 library(performance)
-library(brinla)
+#library(brinla)
 # data
 load("data/survival_mods_data.RData") 
 load("data/sheep_ped.RData")
@@ -205,14 +205,14 @@ nlopt <- function(par, fn, lower, upper, control) {
 }
 
 
-levels(annual_survival$sex) <- c("M", "F")
+#levels(annual_survival$sex) <- c("M", "F")
 annual_survival <- annual_survival %>% 
         mutate(life_stage = case_when(
                 age == 0 ~ "lamb",
-                age == 1 ~ "yearling",
-                age >= 2 ~ "adult"
+                age > 0 & age <= 2 ~ "juvenile",
+                age >= 3 ~ "adult"
         )) %>% 
-        mutate(life_stage = factor(life_stage, levels = c("lamb","yearling", "adult")))
+        mutate(life_stage = factor(life_stage, levels = c("juvenile", "lamb", "adult")))
 
 mod_lme4_2class <- glmer(survival ~ froh_all10 * life_stage + sex + twin +  (1|id) + (1|sheep_year),
                          family = binomial, data = annual_survival,

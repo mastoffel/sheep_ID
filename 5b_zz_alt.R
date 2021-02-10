@@ -18,7 +18,7 @@ library(patchwork)
 library(inlafuns)
 library(ggridges)
 library(gt)
-
+library(Hmisc)
 # data
 # annual measures of traits and fitness
 load("data/survival_mods_data.RData")
@@ -36,7 +36,14 @@ annual_survival <- fitness_data %>%
                lamb = ifelse(age == 0, 1, 0),
                lamb_cent = lamb - mean(lamb, na.rm = TRUE),
                lamb = as.factor(lamb)) %>% 
-        as.data.frame() 
+        as.data.frame()  %>% 
+        mutate(life_stage = case_when(
+                age == 0 ~ "lamb",
+                age > 0 & age <= 2 ~ "early_life",
+                age > 2 & age <= 4 ~ "mid_life",
+                age > 4 ~ "late_life",
+        )) %>% 
+        mutate(life_stage = factor(life_stage, levels = c( "lamb","early_life", "mid_life", "late_life")))
 
 # Plot A: froh across age classes ----------------------------------------------
 # number of individuals in each age class
@@ -98,7 +105,7 @@ roh_plot %>%
         group_by(ID, age) %>% 
         summarise(MB_mean = mean(MB),
                   MB_sum = sum(MB)) %>% 
-        mutate(FROH = MB_sum/2655) %>% ### check this
+        mutate(FROH = MB_sum/2452.07) %>% ### check this / checked
         mutate(age = str_replace(age, "_", " ")) %>% 
         mutate(age_num = as.numeric(str_replace(age, "age ", ""))) %>% 
         mutate(age_num_fct = factor(age_num, levels = as.character(0:10))) %>% 
@@ -152,7 +159,7 @@ trans_link_to_dat <- function(pred, mod_inla) {
 }
 
 fix_eff <- map_df(names(mod_inla$marginals.fixed), trans_link_to_dat, mod_inla) %>% 
-        .[c(2,7,8), ] %>% 
+        .[c(2,8:10), ] %>% 
         mutate(pred = factor(pred, levels = rev(pred)))
 names(fix_eff) <- c("Predictor", "mean", "lower_CI", "upper_CI")
 
@@ -161,13 +168,17 @@ names(fix_eff) <- c("Predictor", "mean", "lower_CI", "upper_CI")
 
 p_surv_mod <- ggplot(fix_eff, aes(mean, Predictor, xmax = upper_CI, xmin = lower_CI)) +
         geom_vline(xintercept = 1, linetype='dashed', colour =  "#4c566a", size = 0.3) +     # "#4c566a"  "#eceff4"
-        geom_errorbarh(alpha = 1, height = 0.5,
+        geom_errorbarh(alpha = 1, height = 0,
                        size = 0.5) +
         geom_point(size = 3, shape = 21, col = "#4c566a", fill = "#eceff4", # "grey69"
                    alpha = 1, stroke = 0.7) + 
         # when only showing roh related effs
         scale_x_log10(breaks = c(0.1, 0.3, 1, 2, 5), limits = c(0.1, 5), labels = c( "0.1", "0.3", "1", "2", "5")) +
-        scale_y_discrete(labels = rev(c(expression(F[ROH]), expression(F[ROH]~'*'~Lamb), expression(F[ROH]~'*'~Adult)))) +
+        scale_y_discrete(labels = rev(c(expression(F[ROH]), 
+                                        expression(F[ROH]~'*'~Early~life), 
+                                        expression(F[ROH]~'*'~Mid~life),
+                                        expression(F[ROH]~'*'~Late~life))),
+                         ) +
         theme_simple(axis_lines = TRUE, base_size = 14) +
         theme(
                 panel.grid.major = element_blank(),
@@ -175,7 +186,7 @@ p_surv_mod <- ggplot(fix_eff, aes(mean, Predictor, xmax = upper_CI, xmin = lower
                 axis.line.y = element_blank(),
                 axis.ticks.y = element_blank(),
                 axis.title.y = element_blank(),
-                axis.text = element_text(size = 13),
+                axis.text.x = element_text(size = 11),
                 axis.title.x = element_text(margin=margin(t=8))
         ) +
         xlab("Odds-ratio and 95% CI")-> p_forest
@@ -194,48 +205,40 @@ fun <- function(...) {
         # plogis = inverse logit
         one <-  plogis(Intercept + 
                                df1$x1 * froh_all10_cent + 
-                               df1$x2 * life_stagelamb + 
-                               df1$x3 * life_stageadult + 
-                               df1$x4 * sexM +  
-                               df1$x5 * twin1 +
-                               df1$x6 * `froh_all10_cent:life_stagelamb` + 
-                               df1$x7 * `froh_all10_cent:life_stageadult`)
+                               df1$x2 * life_stageearly_life + 
+                               df1$x3 * life_stagemid_life + 
+                               df1$x4 * life_stagelate_life +
+                               df1$x5 * sexM +  
+                               df1$x6 * twin1 +
+                               df1$x7 * `froh_all10_cent:life_stageearly_life` + 
+                               df1$x8 * `froh_all10_cent:life_stagemid_life` +
+                               df1$x9 * `froh_all10_cent:life_stagelate_life`)
         
         return (list(one))
 }
 
-# fun_nolink <- function(...) {
-#         one <- Intercept + 
-#                 df1$x1 * froh_all10_cent + 
-#                 df1$x2 * age_cent + 
-#                 df1$x3 * lamb1 + 
-#                 df1$x4 * twin1 + 
-#                 df1$x5 * sexM + 
-#                 df1$x6 * `froh_all10_cent:lamb1` + 
-#                 df1$x7 * `froh_all10_cent:age_cent`
-#         
-#         return (list(one))
-# }
-
 # values here look odd, because variables have been centered around the mean
 # for easier modeling
 froh <- seq(from = min(annual_survival$froh_all10_cent), to = (max(annual_survival$froh_all10_cent)), by = 0.1)
-age <- c("life_stagelamb","life_stagejuvenile", "life_stageadult")
+age <- c("life_stagelamb","life_stageearly_life", "life_stagemid_life", "life_stagelate_life")
 #age <- c(-2.4, -1.4, 0.6, 3.6, 6.6)
 #age <- c(-2.4, -1.4, -0.4, 0.6, 1.6, 2.6, 3.6, 4.6, 5.6, 6.6)
 combined_df <- expand_grid(froh, age) %>% 
         mutate(
-               lamb = ifelse(age == "life_stagelamb", 1, 0),
-               adult = ifelse(age == "life_stageadult", 1, 0),
+               # lamb = ifelse(age == "life_stagelamb", 1, 0),
+               early = ifelse(age == "life_stageearly_life", 1, 0),
+               mid = ifelse(age == "life_stagemid_life", 1, 0),
+               late = ifelse(age == "life_stagelate_life", 1, 0),
                sex = 1,
                twin = 0,
                #twin =  0.5,
                #sex = 0.5,
-               frohxlamb = froh*ifelse(age == "life_stagelamb", 1, 0),
-               frohxadult = froh*ifelse(age == "life_stageadult", 1, 0)) %>% 
+               frohxearly = froh*early,
+               frohxmid = froh*mid,
+               frohxlate = froh*late) %>% 
         select(-age)
 
-names(combined_df) <- paste0("x", 1:7)
+names(combined_df) <- paste0("x", 1:9)
 
 set.seed(144)
 xx <- inla.posterior.sample(1000, mod_inla)
@@ -251,16 +254,17 @@ d <- marg_means %>%
         bind_rows() %>% 
         pmap_df(function(...) {
                 samp <- as.numeric(unlist(list(...)))
-                c(mean = mean(samp), quantile(samp, probs = c(0.025, 0.975)))
+                c(mean = mean(samp), quantile(samp, probs = c(0.05, 0.95)))
         }) %>% 
         bind_cols(combined_df) %>% 
         mutate(life_stage = expand_grid(froh, age)$age) %>% 
         mutate(life_stage = case_when(
                 life_stage == "life_stagelamb" ~ "Lamb",
-                life_stage =="life_stagejuvenile" ~ "Early life",
-                life_stage == "life_stageadult" ~ "Late life"
+                life_stage =="life_stageearly_life" ~ "Early life",
+                life_stage == "life_stagemid_life" ~ "Mid life",
+                life_stage == "life_stagelate_life" ~ "Late life"
         )) %>% 
-        .[, c(1:4, 11)] %>% 
+        .[, c(1:4, 13)] %>% 
         setNames(c("prediction", "ci_lower", "ci_upper", "froh", "age")) %>% 
         mutate(froh = (froh + mean(annual_survival$froh_all10))/10)
 
@@ -272,44 +276,81 @@ inla_preds <- d %>%
                ci_lower = ci_lower * 100,
                ci_upper = ci_upper * 100)
 
+inla_preds <- inla_preds %>% 
+        mutate(age = factor(age, levels = c("Lamb", "Early life", "Mid life", "Late life")))
+
 p_marginal_effs <- ggplot(inla_preds, aes(froh, prediction)) +
-        geom_line(aes(color = age), size = 0.8) +
+  
         geom_ribbon(aes(x=froh, ymin = ci_lower, ymax = ci_upper, fill = age, color = age),
-                    alpha = 0.1, linetype = 2, size = 0.2) +
+                    alpha = 0.05, linetype = 2, size = 0.2) +
+        geom_line(aes(color = age), size = 0.8) +
         scale_color_viridis_d("Age", labels = c(0, 1, 4, 7)) +
         scale_fill_viridis_d("Age", labels = c(0, 1, 4, 7)) +
         theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_size = 14) +
         theme(axis.line.y = element_blank(),
-              legend.position = "top",
-              axis.text = element_text(size = 13)) +
+              legend.position = "none",
+              axis.text.x = element_text(size = 11)) +
         xlab(expression(F[ROH])) +
-        ylab("Predicted\nsurvival probability %")
+        ylab("Predicted\nsurvival probability (% per year)")
+p_marginal_effs
 
-# p_marginal_effs <- ggplot(inla_preds, aes(froh, prediction)) +
-#         geom_line(aes(color = age), size = 0.5) +
-#         geom_ribbon(aes(x=froh, ymin = ci_lower, ymax = ci_upper, fill = age, color = age),
-#                     alpha = 0.1, linetype = 2, size = 0.2) +
-#         scale_color_viridis_d("Age", labels = 0:9) +
-#         scale_fill_viridis_d("Age", labels = 0:9) +
-#         theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_size = 14) +
-#         theme(axis.line.y = element_blank(),
-#               legend.position = "top",
-#               axis.text = element_text(size = 13)) +
-#         xlab(expression(F[ROH])) +
-#         ylab("Predicted\nsurvival probability %") +
-#         theme(legend.position = "top",
-#               legend.box.margin=margin(t = 10, b = -10),
-#               legend.margin=margin(0,0,0,0),
-#              # legend.text = element_text(size =7),
-#               legend.justification = c(-2, 0))
 
-p_froh_across_ages + (p_forest / p_marginal_effs)
+# plot raw data
+surv_per_F <- function(iter) {
+        out <- annual_survival %>%
+                dplyr::mutate(binned_froh = cut2(froh_all10, cuts = c(1.8, 2, 2.2, 2.4, 2.6, 2.8, 5.1))) %>% 
+                dplyr::group_by(life_stage, binned_froh) %>% 
+               # filter(n() >= 20) %>% 
+                dplyr::sample_n(size = nrow(annual_survival), replace = TRUE) %>% 
+                dplyr::select(froh_all10, binned_froh, survival) %>% 
+                dplyr::summarise(binned_survival = mean(survival)) 
+        out
+}
 
-library(cowplot)
-p_final <- cowplot::plot_grid(p_froh_across_ages, 
-                              cowplot::plot_grid(p_forest, p_marginal_effs, label_size = 16, nrow = 2, rel_heights = c(1,1.8), labels = c('B', 'C')),
-                              labels = c('A', ''), rel_widths = c(1, 0.9), label_size = 16)
-ggsave("figs/Fig2_inla2.jpg", height = 6, width = 8.5)
+all_boot <- map_df(1:10, surv_per_F)
+
+emp <- annual_survival %>% 
+        dplyr::mutate(binned_froh = cut2(froh_all10, cuts = c(1.8, 2, 2.2, 2.4, 2.6, 2.8, 5.1))) %>% 
+        dplyr::group_by(life_stage, binned_froh) %>% 
+        dplyr::select(froh_all10, binned_froh, survival) %>% 
+        dplyr::summarise(binned_survival = mean(survival)) 
+emp
+
+p_raw <- ggplot(all_boot , aes(binned_froh, binned_survival, fill = life_stage)) +
+        geom_jitter(width = 0.05, size = 2, alpha = 0.3, shape = 21, stroke=0.2) +
+        geom_point(data = emp, shape = 21,size = 2, stroke = 0.2, color = "black")  +
+        scale_fill_viridis_d("Life Stage (age)", 
+                             labels = c("Lamb (0)", "Early life (1,2)",
+                                        "Mid life (2,3)",
+                                        "Late life (4+)"), option = "D") +
+        scale_y_continuous(breaks = seq(0.25, 1, 0.25), labels = seq(25, 100, 25),
+                           limits = c(0.25, 1)) +
+        scale_x_discrete(labels = c("[0.18,0.20)", "[0.20,0.22)", "[0.22,0.24)", 
+                                    "[0.24,0.26)", "[0.26,0.28)", "[0.28,0.51)"),
+                         guide = guide_axis(n.dodge = 2)) +
+        theme_simple(grid_lines = FALSE, axis_lines = TRUE) +
+        theme(axis.line.y = element_blank(),
+              axis.text.x = element_text(size = 9))+
+        xlab(expression(F[ROH]~class)) +
+        ylab("Survivors (% per year)")
+#geom_line(mapping = aes(group =age), size = 0.2, alpha = 1) 
+p_raw
+
+
+p_final <- p_froh_across_ages + (p_raw / p_marginal_effs) +
+        plot_layout(guides = "collect", widths = c(0.57, 0.43)) &
+        plot_annotation(tag_levels = "A") &
+        theme(axis.text.y = element_text(size = 11),
+              axis.title = element_text(size = 12),
+              legend.text = element_text(size = 11),
+              legend.title = element_text(size = 12))
+ggsave("figs/Fig2_inla2.jpg", plot = p_final, height = 6.5, width = 9.5)
+
+# library(cowplot)
+# p_final <- cowplot::plot_grid(p_froh_across_ages, 
+#                               cowplot::plot_grid(p_raw, p_marginal_effs, label_size = 16, nrow = 2, rel_heights = c(1,1.8), labels = c('B', 'C')),
+#                               labels = c('A', ''), rel_widths = c(1, 0.9), label_size = 16)
+# ggsave("figs/Fig2_inla2.jpg", height = 6, width = 8.5)
 
 # predictions on original scale
 inla_preds <- d
