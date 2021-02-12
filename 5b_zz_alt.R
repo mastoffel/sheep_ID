@@ -41,7 +41,7 @@ annual_survival <- fitness_data %>%
                 age == 0 ~ "lamb",
                 age > 0 & age <= 2 ~ "early_life",
                 age > 2 & age <= 4 ~ "mid_life",
-                age > 4 ~ "late_life",
+                age >= 5 ~ "late_life",
         )) %>% 
         mutate(life_stage = factor(life_stage, levels = c( "lamb","early_life", "mid_life", "late_life")))
 
@@ -140,7 +140,7 @@ roh_plot2 %>%
               legend.position = "none") -> p_froh_across_ages #+
 #labs(title = "Inbreeding across life in Soay sheep",
 #    subtitle = "- individuals with lots of long ROHs rarely survive their first year")
-p_froh_across_ages
+#p_froh_across_ages
 # ggsave("figs/FROH_across_ages_col.jpg", plot = p_froh_across_ages, width = 4.5, height = 5.5)
 
 
@@ -321,8 +321,8 @@ p_raw <- ggplot(all_boot , aes(binned_froh, binned_survival, fill = life_stage))
         geom_point(data = emp, shape = 21,size = 2, stroke = 0.2, color = "black")  +
         scale_fill_viridis_d("Life Stage (age)", 
                              labels = c("Lamb (0)", "Early life (1,2)",
-                                        "Mid life (2,3)",
-                                        "Late life (4+)"), option = "D") +
+                                        "Mid life (3,4)",
+                                        "Late life (5+)"), option = "D") +
         scale_y_continuous(breaks = seq(0.25, 1, 0.25), labels = seq(25, 100, 25),
                            limits = c(0.25, 1)) +
         scale_x_discrete(labels = c("[0.18,0.20)", "[0.20,0.22)", "[0.22,0.24)", 
@@ -371,6 +371,8 @@ ggsave("figs/Fig2_survival_logodd.jpg", height = 3.5, width = 3.5)
 
 #mod_inla <- readRDS("output/AS_mod_INLA_397k.rds")
 
+
+
 # make Supplementary table / figure for model
 
 fix_eff <- mod_inla$summary.fixed %>% 
@@ -378,25 +380,44 @@ fix_eff <- mod_inla$summary.fixed %>%
         select(-kld) %>% 
         setNames(c("mean", "std_err", "ci_lower", "median", "ci_upper", "mode")) %>% 
         mutate(term = rownames(mod_inla$summary.fixed)) %>% 
-        select(term, everything()) 
+        select(term, everything()) %>% 
+        mutate(mean = paste0(mean,' (', round(exp(mean),2), ')'),
+               std_err = paste0(std_err, ' (', round(exp(std_err),2), ')'),
+               ci_lower = paste0(ci_lower, ' (', round(exp(ci_lower),2), ')'),
+               median = paste0(median, ' (', round(exp(median),2), ')'),
+               ci_upper = paste0(ci_upper, ' (', round(exp(ci_upper),2), ')'),
+               mode = paste0(mode, ' (', round(exp(mode),2), ')'))
+        
 
 fix_eff2 <- fix_eff %>% 
-        mutate(add_info = c("", "continuous", "continuous", "categorical (0=no, 1=yes)",
-                            "categorical (0=female, 1=male)", "categorical (0=no, 1=yes)",
-                            "", "")) %>% 
-        mutate(standardisation = c("", "(x * 10)-mean(x * 10)", "x-mean(x)", rep("", 5))) %>% 
-        mutate(term = c("Intercept", "F<sub>ROH</sub>", "Age", "Lamb", "Sex", "Twin", "F<sub>ROH</sub> * Age", "F<sub>ROH</sub> * Lamb"))
-
+        mutate(add_info = c("", "continuous", "categorical (0=no, 1=yes)",
+                            "categorical (0=no, 1=yes)",
+                            "categorical (0=no, 1=yes)",
+                            "categorical (0=female, 1=male)", 
+                            "categorical (0=no, 1=yes)",
+                            "","","")) %>% 
+        mutate(standardisation = c("", "(x * 10)-mean(x * 10)", rep("", 8))) %>% 
+        mutate(term = c("Intercept", "F<sub>ROH</sub>", 
+                        "LifeStage: EarlyLife",
+                        "LifeStage: MidLife",
+                        "LifeStage: LateLife",
+                        "Sex", "Twin",
+                        "F<sub>ROH</sub> * (LifeStage: EarlyLife)", 
+                        "F<sub>ROH</sub> * (LifeStage: MidLife)",
+                        "F<sub>ROH</sub> * (LifeStage: LateLife)"
+                        ))
+library(inlafuns)
 raneff <- get_raneff(mod_inla, scales = "sd") %>% 
         mutate(across(is.numeric, round, 2)) %>% 
         mutate(term = c("Birth year", "Capture year", "Individual", "Add. genetic")) %>% 
         mutate(add_info = c("n = 40", "n = 40", "n = 5952", "Pedigree-based")) %>% 
-        mutate(standardisation = "")
+        mutate(standardisation = "") %>% 
+        mutate_if(is.numeric, as.character)
 #mutate(groups = c(44, 44, 5952, ""))
 
 mod_tab <- bind_rows(fix_eff2, raneff) %>% 
         select(term, mean, std_err, ci_lower, ci_upper, add_info, standardisation) %>% 
-        mutate(effect = c(rep("Fixed effects", 8), 
+        mutate(effect = c(rep("Fixed effects", 10), 
                           rep("Random effects (variances)", 4))) %>% 
         select(8, 1:5, 7, 6) %>% 
         setNames(c("effect", "Term", "Post.Mean", "Std.Error", "CI (2.5%)", "CI (97.5%)", "Standardisation", "Info"))
@@ -412,7 +433,15 @@ mod_tab %>% gt(
         fmt_markdown(columns = TRUE) %>% 
         gtsave("AS_model_table.png", path = "figs/tables/")
 
-
+# differences in inbreeding depression across life
+mod_inla2 <- readRDS("output/AS_mod_oar2_life_stage_early_ref.rds")
+fix_eff2 <- mod_inla2$summary.fixed %>% 
+  map_df(round, 2) %>% 
+  select(-kld) %>% 
+  setNames(c("mean", "std_err", "ci_lower", "median", "ci_upper", "mode")) %>% 
+  mutate(term = rownames(mod_inla2$summary.fixed)) %>% 
+  select(term, everything()) %>% 
+  mutate_if(is.numeric, exp)
 
 
 # supplementary figure like 2C but with all age classes and log-odds

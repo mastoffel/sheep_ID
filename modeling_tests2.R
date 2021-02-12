@@ -129,7 +129,7 @@ surv_per_F <- function(iter) {
                 #filter(length(unique(id)) >= 20) %>% 
                 # filter by unique individuals
                 filter(n() >= 20) %>% 
-                #dplyr::sample_frac(0.9) %>% 
+                #dplyr::sample_frac(0.8) %>% 
                 dplyr::sample_n(size = nrow(annual_survival), replace = TRUE) %>% 
                 dplyr::select(froh_all10, binned_froh, survival) %>% 
                 dplyr::summarise(binned_survival = mean(survival)) 
@@ -137,11 +137,17 @@ surv_per_F <- function(iter) {
 }
 
 all_boot <- map_df(1:10, surv_per_F)
-all_boot <- all_boot %>% 
-        mutate(life_stage1 = fct_relevel(life_stage1, "lamb", after = 0))
+
+emp <- annual_survival %>% 
+        dplyr::mutate(binned_froh = cut2(froh_all10, cuts = c(1.8, 2, 2.2, 2.4, 2.6, 2.8, 5.1))) %>% 
+        dplyr::group_by(life_stage, binned_froh) %>% 
+        dplyr::select(froh_all10, binned_froh, survival) %>% 
+        dplyr::summarise(binned_survival = mean(survival)) 
+emp
 
 p <- ggplot(all_boot , aes(binned_froh, binned_survival, fill = life_stage)) +
-        geom_jitter(width = 0.05, size = 2, alpha = 0.7, shape = 21, stroke=0.2) +
+        geom_jitter(width = 0.05, size = 2, alpha = 0.3, shape = 21, stroke=0.2) +
+        geom_point(data = emp, shape = 21,size = 2, stroke = 0.2, color = "black")  +
         scale_fill_viridis_d("Life Stage (age)", 
                              labels = c("Lamb (0)", "Early life (1,2)",
                                         "Mid life (2,3)",
@@ -155,4 +161,5 @@ p <- ggplot(all_boot , aes(binned_froh, binned_survival, fill = life_stage)) +
         ylab("% annual survivors")
         #geom_line(mapping = aes(group =age), size = 0.2, alpha = 1) 
 p
-ggsave("figs/annual_survivors.jpg", width = 6, height =3.5)
+ggsave("figs/annual_survivors.jpg", width = 5, height =3.5)
+ 

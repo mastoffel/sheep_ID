@@ -36,10 +36,11 @@ annual_survival <- fitness_data %>%
         as.data.frame() %>% 
         mutate(life_stage = case_when(
                 age == 0 ~ "lamb",
-                age > 0 & age <= 2 ~ "juvenile",
-                age >= 3 ~ "adult"
+                age > 0 & age <= 2 ~ "early_life",
+                age > 2 & age <= 4 ~ "mid_life",
+                age > 4 ~ "late_life",
         )) %>% 
-        mutate(life_stage = factor(life_stage, levels = c("juvenile", "lamb", "adult")))
+        mutate(life_stage = factor(life_stage, levels = c( "early_life","lamb", "mid_life", "late_life")))
 
 
 # INLA -------------------------------------------------------------------------
@@ -90,7 +91,7 @@ mod_inla <- inla(formula=formula_surv, family="binomial",
                  control.compute = list(dic = TRUE, cpo=TRUE, waic = TRUE, po=TRUE, config=TRUE),
                  control.inla = list(correct = TRUE))
 
-saveRDS(mod_inla, file = "output/AS_mod_oar2_life_stage.rds")
+saveRDS(mod_inla, file = "output/AS_mod_oar2_life_stage_early_ref.rds")
 #mod_inla <- readRDS("output/AS_mod_oar2.rds")
 
 mod_inla$summary.fixed
