@@ -11,7 +11,7 @@ library(AnimalINLA) # Downloaded from http://www.r-inla.org/related-projects/ani
 library(MCMCglmm)
 library(sjPlot)
 library(performance)
-library(brinla)
+#library(brinla)
 # data
 load("data/survival_mods_data.RData") 
 load("data/sheep_ped.RData")
@@ -33,7 +33,14 @@ annual_survival <- fitness_data %>%
                lamb = ifelse(age == 0, 1, 0),
                lamb_cent = lamb - mean(lamb, na.rm = TRUE),
                lamb = as.factor(lamb)) %>% 
-        as.data.frame() 
+        as.data.frame() %>% 
+        mutate(life_stage = case_when(
+                age == 0 ~ "lamb",
+                age > 0 & age <= 2 ~ "early_life",
+                age > 2 & age <= 4 ~ "mid_life",
+                age > 4 ~ "late_life",
+        )) %>% 
+        mutate(life_stage = factor(life_stage, levels = c( "early_life","lamb", "mid_life", "late_life")))
 
 
 # INLA -------------------------------------------------------------------------
@@ -48,8 +55,8 @@ sheep_ped_inla <- ped %>%
         mutate(father = ifelse(is.na(father), 0, father),
                mother = ifelse(is.na(mother), 0, mother)) %>% 
         mutate_if(is.character, list(as.numeric)) %>% 
-        as.data.frame()
-    
+        as.data.frame() 
+
 
 # compute Ainverse and map
 comp_inv <- AnimalINLA::compute.Ainverse(sheep_ped_inla)
@@ -70,11 +77,11 @@ annual_survival <- annual_survival %>%
 # set prior
 prec_prior <- list(prior = "loggamma", param = c(0.5, 0.5))
 # model
-formula_surv <- as.formula(paste('survival ~ froh_all10_cent * age + froh_all10_cent * lamb + sex + twin + 1', 
+formula_surv <- as.formula(paste('survival ~ froh_all10_cent * life_stage + sex + twin + 1', 
                                  'f(birth_year, model = "iid", hyper = list(prec = prec_prior))',
                                  'f(sheep_year, model = "iid", hyper = list(prec = prec_prior))',
                                  'f(IndexA2, model = "iid", hyper = list(prec = prec_prior))',
-                                # 'f(mum_id, model="iid",  hyper = list(prec = prec_prior))', 
+                                 # 'f(mum_id, model="iid",  hyper = list(prec = prec_prior))', 
                                  'f(IndexA, model="generic0", hyper = list(theta = list(param = c(0.5, 0.5))),Cmatrix=Cmatrix)', sep = " + "))
 
 control.family1 = list(control.link=list(model="logit"))
@@ -84,8 +91,8 @@ mod_inla <- inla(formula=formula_surv, family="binomial",
                  control.compute = list(dic = TRUE, cpo=TRUE, waic = TRUE, po=TRUE, config=TRUE),
                  control.inla = list(correct = TRUE))
 
-saveRDS(mod_inla, file = "output/AS_mod_oar2.rds")
-mod_inla <- readRDS("output/AS_mod_oar2.rds")
+saveRDS(mod_inla, file = "output/AS_mod_oar2_life_stage_early_ref.rds")
+#mod_inla <- readRDS("output/AS_mod_oar2.rds")
 
 mod_inla$summary.fixed
 summary(mod_inla)
@@ -109,8 +116,8 @@ formula_surv <- as.formula(paste('survival ~ froh_all10_cent + age_std + age_std
                                  #'f(mum_id, model="iid",  hyper = list(prec = prec_prior))', 
                                  'f(IndexA, model="generic0", hyper = list(theta = list(param = c(0.5, 0.5))),Cmatrix=Cmatrix)', sep = " + "))
 mod_inla_pois <- inla(formula=formula_surv, family="poisson",
-                       data=annual_survival, 
-                       control.compute = list(dic = TRUE, config=TRUE)
+                      data=annual_survival, 
+                      control.compute = list(dic = TRUE, config=TRUE)
 )
 
 saveRDS(mod_inla_pois, file = "output/AS_mod_INLA_oar_poisson_full.rds")
@@ -155,7 +162,7 @@ inla_plot <- map_df(all_inla_mods, function(x) as_tibble(x$summary.fixed[2, ]), 
         mutate(age = as.numeric(age) - 1) %>% 
         filter(age < 10) %>% 
         mutate(age = fct_inorder(as.factor(age))) 
-   
+
 sample_size <- annual_survival %>% group_by(age) %>% tally() %>% mutate(age = as.character(age))
 inla_plot <- inla_plot %>% left_join(sample_size, by = "age")
 
@@ -199,18 +206,18 @@ nlopt <- function(par, fn, lower, upper, control) {
 }
 
 
-levels(annual_survival$sex) <- c("M", "F")
+#levels(annual_survival$sex) <- c("M", "F")
 annual_survival <- annual_survival %>% 
-                        mutate(life_stage = case_when(
-                                age == 0 ~ "lamb",
-                                age == 1 ~ "yearling",
-                                age >= 2 ~ "adult"
-                        )) %>% 
-                        mutate(life_stage = factor(life_stage, levels = c("lamb","yearling", "adult")))
+        mutate(life_stage = case_when(
+                age == 0 ~ "lamb",
+                age > 0 & age <= 2 ~ "juvenile",
+                age >= 3 ~ "adult"
+        )) %>% 
+        mutate(life_stage = factor(life_stage, levels = c("juvenile", "lamb", "adult")))
 
 mod_lme4_2class <- glmer(survival ~ froh_all10 * life_stage + sex + twin +  (1|id) + (1|sheep_year),
-                  family = binomial, data = annual_survival,
-                  control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+                         family = binomial, data = annual_survival,
+                         control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
 
 # mod_lme42 <- glmer(survival ~ froh_all10 * age_cent + lamb + sex + twin + (1|sheep_year) + (1|id),
 #                   family = binomial, data = annual_survival,
@@ -230,7 +237,7 @@ annual_survival %>%
         select(froh_all10, binned_froh, survival) %>% 
         summarise(binned_survival = mean(survival)) %>% 
         ggplot(aes(binned_froh, binned_survival, color = life_stage)) +
-                geom_point()
+        geom_point()
 
 
 summary(mod_lme4)
@@ -264,10 +271,10 @@ ggplot() +
 library(broom.mixed)
 ageclass_inbreeding <- function(ageclass, sex1) {
         df <- annual_survival %>% mutate(sex = as.character(sex)) %>% filter(age == ageclass)# %>% 
-                #filter(sex == sex1)
+        #filter(sex == sex1)
         mod <- glmer(survival ~ froh_all10_cent + twin + sex + (1|sheep_year) + (1|birth_year) + (1|mum_id) , # + (1|birth_year) + (1|mum_id)
-                          family = binomial, data = df,
-                          control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+                     family = binomial, data = df,
+                     control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
         tidy(mod, conf.int = TRUE)
 }
 
@@ -276,13 +283,13 @@ grid_df <- expand_grid(age = 0:10, sex = c("M", "F"))
 all_mods <- pmap(grid_df, ageclass_inbreeding)
 
 b_age <- map_df(all_mods, function(x) x[x$term == "froh_all10_cent", c("term", "estimate", "conf.low", "conf.high")]) %>% 
-                cbind(grid_df)
+        cbind(grid_df)
 
 ggplot(b_age, aes(age, estimate)) +
         geom_point() +
         geom_errorbar(aes(ymin = conf.low, ymax = conf.high)) #+
-       # facet_wrap(~sex)
-        
+# facet_wrap(~sex)
+
 
 
 
