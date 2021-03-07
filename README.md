@@ -24,7 +24,8 @@ This repository contains the analysis code for our paper, in order 1-7.
 ### Data and reproducibility
 All analysis scripts (4-7b) can be run with data provided in the folders `example_data` and `example_output`. For a smooth experience with running these scripts, download the complete repository and change the names of `example_data` and `example_output` to `data` and `output`, respectively. Examples are based on a random subset of 100 individuals, so results will be different from those reported in the paper.
 
-The full data will be uploaded upon publication.  
+The full data will be uploaded upon publication to the european variant archive (EVA)
+and Zenodo.
 
 ### Versions and dependencies
 Running the code depends on a series of R packages, which mostly come from CRAN, but some are development versions on GitHub or stored on private websites. The versions of all dependencies are stored alongside the code in the `renv.lock` file. You can either install these packages yourself while running the code, or you can use the `renv` package to setup everything for you. To do so, download or clone this repository somewhere onto your computer. Then install `renv` with:
