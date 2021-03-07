@@ -6,17 +6,18 @@ Stoffel, M.A, Johnston, S.E., Pilkington, J.G., Pemberton, J.M
 This repository contains the analysis code for our paper, in order 1-7.  
 
 *Script 1-3 process data, specifically:*  
-**1_ROH_calling:** Calls ROH  
+**1_preprocessing_and_ROH_calling:** Preprocesses genotype data and calls ROH  
 **2_calculate_fitness_parameters_v2:** Transform tables from the Soay sheep database into a table with annual fitness measures  
-**3_combine_ROH_and_Fit:** Calculates FROH and combines fitness and FROH data
+**3_combine_ROH_and_fitness_data:** Calculates FROH and combines fitness and FROH data
 
 *Scripts 4-7b contain the main analyses in the paper:*  
 **4_ROH_patterns:** First part of the paper, including Figure 1  
+**4b_ROH_recombination** Running window analyses / plots for ROH density and recombination
 **5a_survival_models:** INLA animal models to quantify inbreeding depression in survival  
-**5b_survival_models_figure:** Creates Figure 2 based on INLA output  
-**6_alt_gwas_annual_survival:** ROH GWAS, needs to run on a cluster  
-**7a_gwas_postprocessing:** Takes GWAS results, checks for errors and makes a Manhattan plot    
-**7b_gwas_top_snps:** Visualises genetic diversity and GWAS estimates in the genomic vicinity of GWAS peaks  
+**5b_survival_models_figure:** Creates Figure 3 based on INLA output  
+**6_alt_gwas_annual_survival_bothA_sep:** ROH GWAS, needs to run on a cluster  
+**7a_gwas_postprocessing_bothA_sep:** Takes GWAS results, checks for errors and makes a Manhattan plot    
+**7b_gwas_top_snps_sep:** Visualises genetic diversity and GWAS estimates in the genomic vicinity of GWAS peaks  
 **99_add_suppl_figures:** Creates some additional figures for Supplementary Material  
 **99_make_pcs_for_gwas:** Get PCs in the right format for use in GWAS.  
 
@@ -26,7 +27,7 @@ All analysis scripts (4-7b) can be run with data provided in the folders `exampl
 The full data will be uploaded upon publication.  
 
 ### Versions and dependencies
-Running the code depends on a series of R packages, which mostly come from CRAN, but some are development version on GitHub or stored on private websites. The versions of all dependencies are stored alongside the code in the `renv.lock` file. You can either install these packages yourself while running the code, or you can use the `renv` package to setup everything for you. To do so, download or clone this repository somewhere onto your computer. Then install `renv` with:
+Running the code depends on a series of R packages, which mostly come from CRAN, but some are development versions on GitHub or stored on private websites. The versions of all dependencies are stored alongside the code in the `renv.lock` file. You can either install these packages yourself while running the code, or you can use the `renv` package to setup everything for you. To do so, download or clone this repository somewhere onto your computer. Then install `renv` with:
 
 ```r
 if (!requireNamespace("remotes"))
