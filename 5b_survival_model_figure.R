@@ -1,4 +1,4 @@
-# Plotting survival models (Figure 2)
+# Plotting survival model and raw data (Figure 3)
 
 library(ghibli)
 library(tidyverse)
@@ -125,11 +125,11 @@ roh_plot2 %>%
                             position = position_points_jitter(height = 0),
                             point_alpha = 1, point_color = "#4c566a", 
                             alpha = 0.9, bandwidth = 0.006) +
-        theme_simple(axis_lines = FALSE, base_size = 14) +
+        theme_simple(axis_lines = FALSE, base_size = 14, base_family = "Helvetica") +
         #scale_x_continuous(limits = c(0.199, 0.55)) +
         ylab("Age") + 
         scale_y_discrete(expand = expand_scale(add = c(0.2, 1.01))) +
-        xlab(expression(F[ROH]~across~age~cohorts)) +
+        xlab(expression(F[ROH])) + # ~across~age~cohorts
         theme(strip.background = element_blank(),
               panel.grid.major = element_line(colour = "#d8dee9", size = 0.5),
               strip.text = element_text(vjust=2),
@@ -179,7 +179,7 @@ p_surv_mod <- ggplot(fix_eff, aes(mean, Predictor, xmax = upper_CI, xmin = lower
                                         expression(F[ROH]~'*'~Mid~life),
                                         expression(F[ROH]~'*'~Late~life))),
                          ) +
-        theme_simple(axis_lines = TRUE, base_size = 14) +
+        theme_simple(axis_lines = TRUE, base_size = 14, base_family = "Helvetica") +
         theme(
                 panel.grid.major = element_blank(),
                 panel.grid.minor = element_blank(),
@@ -286,7 +286,8 @@ p_marginal_effs <- ggplot(inla_preds, aes(froh, prediction)) +
         geom_line(aes(color = age), size = 0.8) +
         scale_color_viridis_d("Age", labels = c(0, 1, 4, 7)) +
         scale_fill_viridis_d("Age", labels = c(0, 1, 4, 7)) +
-        theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_size = 14) +
+        theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_size = 14,
+                     base_family = "Helvetica") +
         theme(axis.line.y = element_blank(),
               legend.position = "none",
               axis.text.x = element_text(size = 11)) +
@@ -315,10 +316,12 @@ emp <- annual_survival %>%
         dplyr::select(froh_all10, binned_froh, survival) %>% 
         dplyr::summarise(binned_survival = mean(survival)) 
 emp
+# make source data for nat comms
+write_xlsx(emp, path = "output/source_data_figure3b.xlsx")
 
-p_raw <- ggplot(all_boot , aes(binned_froh, binned_survival, fill = life_stage)) +
-        geom_jitter(width = 0.05, size = 2, alpha = 0.3, shape = 21, stroke=0.2) +
-        geom_point(data = emp, shape = 21,size = 2, stroke = 0.2, color = "black")  +
+p_raw <- ggplot(emp , aes(binned_froh, binned_survival, fill = life_stage)) +
+        #geom_jitter(width = 0.05, size = 2, alpha = 0.3, shape = 21, stroke=0.2) +
+        geom_point(shape = 21, size = 2.5, stroke = 0.4, color = "black")  +
         scale_fill_viridis_d("Life Stage (age)", 
                              labels = c("Lamb (0)", "Early life (1,2)",
                                         "Mid life (3,4)",
@@ -328,7 +331,8 @@ p_raw <- ggplot(all_boot , aes(binned_froh, binned_survival, fill = life_stage))
         scale_x_discrete(labels = c("[0.18,0.20)", "[0.20,0.22)", "[0.22,0.24)", 
                                     "[0.24,0.26)", "[0.26,0.28)", "[0.28,0.51)"),
                          guide = guide_axis(n.dodge = 2)) +
-        theme_simple(grid_lines = FALSE, axis_lines = TRUE) +
+        theme_simple(grid_lines = FALSE, axis_lines = TRUE,
+                     base_family = "Helvetica") +
         theme(axis.line.y = element_blank(),
               axis.text.x = element_text(size = 9))+
         xlab(expression(F[ROH]~class)) +
@@ -339,12 +343,15 @@ p_raw
 
 p_final <- p_froh_across_ages + (p_raw / p_marginal_effs) +
         plot_layout(guides = "collect", widths = c(0.57, 0.43)) &
-        plot_annotation(tag_levels = "A") &
+        plot_annotation(tag_levels = "a") &
         theme(axis.text.y = element_text(size = 11),
               axis.title = element_text(size = 12),
               legend.text = element_text(size = 11),
-              legend.title = element_text(size = 12))
-ggsave("figs/Fig2_inla2.jpg", plot = p_final, height = 6.5, width = 9.5)
+              legend.title = element_text(size = 12),
+              plot.tag = element_text(face = "bold"))
+ggsave("figs/Fig3_inla2.jpg", plot = p_final, height = 6.5, width = 9.5, dpi = 900)
+ggsave("figs/Fig3_inla2.pdf", plot = p_final, height = 6.5, width = 9.5)
+#ggsave("figs/Fig2_inla2_2.jpg", plot = p_final, height = 8.5, width = 12.5)
 
 # library(cowplot)
 # p_final <- cowplot::plot_grid(p_froh_across_ages, 

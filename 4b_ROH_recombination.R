@@ -1,3 +1,6 @@
+# ROH and recombination rate variation analysis
+# Most of this is done in running windows across the genome.
+
 library(data.table)
 library(tidyverse)
 source("theme_simple.R")
@@ -8,7 +11,18 @@ library(gghalves)
 library(lme4)
 library(broom.mixed)
 library(partR2)
-library(DHARMa)
+#library(DHARMa)
+
+
+# check ROH and recombination rate variation for shorter ROH
+# system(paste0("/usr/local/bin/plink --bfile data/sheep_geno_imputed_oar_filt --sheep --out output/ROH/ROH_over_3Mb/roh ",
+#               # "--keep output/ROH/ids_surv.txt ",
+#               "--homozyg --homozyg-window-snp 50 --homozyg-snp 50 --homozyg-kb 3000 ",
+#               "--homozyg-gap 300 --homozyg-density 200 --homozyg-window-missing 2 ",
+#               "--homozyg-het 2 ",
+#               "--homozyg-window-het 2"))
+
+
 # ROH and recombination rate variation analysis --------------------------------
 
 # 1) SNP statistics, heterozygosity
@@ -23,16 +37,17 @@ full_sample <- read.plink(sheep_bed, sheep_bim, sheep_fam)
 snps_stats <- col.summary(full_sample$genotypes)
 snps_stats <- snps_stats %>% as_tibble(rownames = "snp_name")
 snps_stats_full <- full_sample$map %>% 
-        mutate(KB = position / 1000) %>% 
         as_tibble(rownames = "snp_name") %>% 
+        mutate(KB = position / 1000) %>% 
         left_join(snps_stats, by = "snp_name") %>% 
         rename(het = P.AB)
 
 # 2) roh prevalence 
 snp_roh <- fread("output/ROH/roh.hom.summary") %>% 
-                                                mutate(MB = BP / 1000000,
-                                                KB = BP / 1000,
-                                                index = 1:nrow(.))# %>% 
+        mutate(MB = BP / 1000000,
+               KB = BP / 1000,
+               index = 1:nrow(.))
+
 # 3) linkage map from Johnston et al. (2020)
 lmap <- read_delim("data/7_20200504_Full_Linkage_Map.txt", "\t") %>% 
         rename(SNP = SNP.Name)
@@ -41,16 +56,6 @@ lmap <- read_delim("data/7_20200504_Full_Linkage_Map.txt", "\t") %>%
 snp_df <- snp_roh %>% 
         inner_join(lmap, by = "SNP") %>% 
         mutate(KB = BP/1000)
-
-# recombination fraction vs cM position
-ggplot(snp_df, aes(r, cMdiff)) +
-        geom_point() +
-        geom_smooth(method = "lm") +
-        facet_wrap(~CHR)
-
-# 4) islands and deserts
-roh_isl_des <- read_delim(file = "output/roh_islands_deserts.txt", " ") %>% 
-        rename(roh_n = UNAFF_n, roh_mean = UNAFF_mean)
 
 # calculate running windows
 # summed recombination fraction in 500 Kb non-overlapping running windows
@@ -81,16 +86,26 @@ running_roh <- winScan(x = snp_roh,
 
 # mean SNP heterozygosity in 500 Kb non-overlapping running windows.
 running_het <- winScan(x = snps_stats_full,
-                           groups = "chromosome",
-                           position = "KB",
-                           values = c("het"),
-                           win_size = 500,
-                           win_step = 500,
-                           funs = c("mean"),
-                           cores = 8)
+                       groups = "chromosome",
+                       position = "KB",
+                       values = c("het"),
+                       win_size = 500,
+                       win_step = 500,
+                       funs = c("mean"),
+                       cores = 8)
 
 running_het <- running_het %>% 
-                        rename(CHR = chromosome)
+        rename(CHR = chromosome)
+
+# recombination fraction vs cM position
+ggplot(snp_df, aes(r, cMdiff)) +
+        geom_point() +
+        geom_smooth(method = "lm") +
+        facet_wrap(~CHR)
+
+# 4) islands and deserts
+roh_isl_des <- read_delim(file = "output/roh_islands_deserts.txt", " ") %>% 
+        rename(roh_n = UNAFF_n, roh_mean = UNAFF_mean)
 
 # combine roh density in windows calculated from imputed data 
 # and SNP heterozygosity in windows calculated from imputed data 
@@ -111,11 +126,15 @@ run_roh_rec_het <- running_roh %>%
 
 run_roh_rec_het
 
+# create source data file for natcomms
+library(writexl)
+writexl::write_xlsx(run_roh_rec_het, path = "output/source_data_fig2.xlsx")
+
 roh_mod <- run_roh_rec_het %>% 
-               # filter(row_number() %% 5 == 1) %>% 
-                mutate(cM_Mb_std = as.numeric(scale(cM_Mb)),
-                       het_mean_std = as.numeric(scale(het_mean))) %>% 
-                drop_na()
+        # filter(row_number() %% 5 == 1) %>% 
+        mutate(cM_Mb_std = as.numeric(scale(cM_Mb)),
+               het_mean_std = as.numeric(scale(het_mean))) %>% 
+        drop_na()
 
 # model
 mod <- lmer(prop_ROH ~ cM_Mb_std + het_mean_std + (1|CHR), data = roh_mod)
@@ -131,6 +150,8 @@ sum_mod <- tidy(mod, conf.int = TRUE, conf.method = "boot")
 sum_mod[4, "std.error"] <- (sum_mod[4, "conf.high"] - sum_mod[4, "conf.low"])/4
 sum_mod[5, "std.error"] <- (sum_mod[5, "conf.high"] - sum_mod[5, "conf.low"])/4
 
+
+
 library(gt)
 # make table
 sum_mod %>% 
@@ -141,8 +162,11 @@ sum_mod %>%
         setNames(c("effect", "Term", "Estimate", "Std.Error", "CI (2.5%)", "CI (97.5%)")) %>% 
         mutate(Standardization = c("", "(x-mean(x))/sd(x)", "(x-mean(x))/sd(x)", "", ""),
                Info = c("", "continuous", "continuous", "n = 26", ""),
-               R2 = c("", "0.04, 95%CI [0.02, 0.07]", #0.42; 95%CI [0.40, 0.44]", 
-                      "0.38, 95%CI [0.36, 0.40]", "", "")) %>% 
+               R2 = c("", "0.08, 95%CI [0.06, 0.11]", #0.42; 95%CI [0.40, 0.44]", 
+                      "0.17, 95%CI [0.15, 0.19]", "", "")) %>% 
+               
+               # R2 = c("", "0.04, 95%CI [0.02, 0.07]", #0.42; 95%CI [0.40, 0.44]", 
+               #        "0.38, 95%CI [0.36, 0.40]", "", "")) %>% 
         mutate(across(is.numeric, round, 3)) %>% 
         gt(
                 rowname_col = "term",
@@ -153,15 +177,15 @@ sum_mod %>%
                 locations = cells_column_labels(columns = TRUE)
         ) %>% 
         fmt_markdown(columns = TRUE) %>% 
-gtsave("Rec_model_table.png", path = "figs/tables/")
+        gtsave("Rec_model_table_roh_over_3MB.png", path = "figs/tables/")
 
 
 # only deserts/islands
 roh_mod_extreme <- roh_mod %>% filter(extreme %in% c("island", "desert")) %>% 
-                        mutate(extreme_num = ifelse(extreme == "island", 0, 1))
+        mutate(extreme_num = ifelse(extreme == "island", 0, 1))
 mod2 <- lmer(prop_ROH ~ cM_Mb_std + het_mean_std + (1|CHR), data = roh_mod_extreme)
 modR22 <- partR2(mod2, partvars = c("cM_Mb_std", "het_mean_std"), data = roh_mod_extreme,
-                nboot = 1000)
+                 nboot = 1000)
 
 #all in one plot
 coefs <- coef(lm(prop_ROH ~ cM_Mb, data = run_roh_rec_het))
@@ -172,7 +196,7 @@ p_roh_rec <- run_roh_rec_het %>%
         geom_point(shape = 21, stroke = 0.1, alpha = 0.7, size = 2) + #  fill = "#eceff4",
         ylab("% of sheep with ROH") +
         xlab("Recombination rate (cM/Mb)") +
-        theme_simple(axis_lines = TRUE, grid_lines = FALSE) +
+        theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_family = "Helvetica") +
         scale_fill_manual("ROH", values = c("#eceff4", viridis(3)[c(3, 1)]), 
                           breaks = c( "island", "desert")) +
         scale_x_continuous(breaks = seq(from=0, to=9, by = 2), limits = c(0, 8.8)) +
@@ -190,7 +214,7 @@ p_roh_het <- run_roh_rec_het %>%
         geom_point(shape = 21, stroke = 0.1, alpha = 0.7, size = 2) + #  fill = "#eceff4",
         ylab("% of sheep with ROH") +
         xlab("Heterozygosity") +
-        theme_simple(axis_lines = TRUE, grid_lines = FALSE) +
+        theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_family = "Helvetica") +
         scale_fill_manual("ROH", values = c("#eceff4", viridis(3)[c(3, 1)]), 
                           breaks = c( "island", "desert")) +
         scale_x_continuous(breaks = seq(from=0.1, to=0.4, by = 0.1), limits = c(0.025, 0.46)) +
@@ -215,7 +239,7 @@ p_ext_rec <- run_roh_rec_het %>%
                           alpha = 0.8) + 
         scale_fill_manual(values = viridis(3)[c(3, 1)]) +
         scale_y_continuous(breaks = seq(from=0, to=9, by = 2), limits = c(0, 8.8)) +
-        theme_simple(grid_lines = FALSE, axis_lines = TRUE) +
+        theme_simple(grid_lines = FALSE, axis_lines = TRUE, base_family = "Helvetica") +
         xlab("ROH region") +
         ylab("Recombination rate (cM/Mb)") +
         coord_flip() +
@@ -234,7 +258,7 @@ p_ext_het <- run_roh_rec_het %>%
                           alpha = 0.8) + 
         scale_fill_manual(values = viridis(3)[c(3, 1)]) +
         scale_y_continuous(breaks = seq(from=0.1, to=0.4, by = 0.1), limits = c(0.025, 0.46)) +
-        theme_simple(grid_lines = FALSE, axis_lines = TRUE) +
+        theme_simple(grid_lines = FALSE, axis_lines = TRUE, base_family = "Helvetica") +
         xlab("ROH region") +
         ylab("Heterozygosity") + 
         coord_flip() +
@@ -242,12 +266,13 @@ p_ext_het <- run_roh_rec_het %>%
               axis.title.y=element_blank())
 
 p_full <- p_roh_rec + p_roh_het + p_ext_rec +  p_ext_het + 
-        plot_layout(heights = c(1.41803398875, 1)) +
-        plot_annotation(tag_levels = "A") &
-        theme(plot.tag = element_text(face = "bold", vjust = 5))
+        plot_layout(heights = c(1.41803398875, 1),
+                    widths = c(0.5, 0.5)) +
+        plot_annotation(tag_levels = "a") &
+        theme(plot.tag = element_text(face = "bold", vjust = 4))
 p_full 
-ggsave("figs/Fig2_roh_rec.jpg", width = 6, height = 4)
-
+ggsave("figs/Fig2_roh_rec.jpg", width = 5.7, height = 4.3)
+ggsave("figs/Fig2_roh_rec.pdf", width = 5.7, height = 4.3)
 
 
 # supplementary plot
@@ -310,91 +335,5 @@ sum_mod %>%
 
 
 
-
-
-
-#geom_boxplot(outlier.shape = NA)
-
-
-# recombination rate, heterozygosity and roh -----------------------------------
-
-
-
-running_snp_het <- winScan(x = snps_stats_full,
-                           groups = "chromosome",
-                           position = "KB",
-                           values = c("het"),
-                           win_size = 500,
-                           win_step = 500,
-                           funs = c("median", "sum"),
-                           cores = 8)
-
-snp_full <- running_snp %>% 
-        left_join(running_snp_het)
-
-ggplot(snp_full, aes(r_sum, het_median)) +
-        geom_point() +
-        geom_smooth(method = "lm") +
-        facet_wrap(~CHR, scales = "free_x")
-
-p1 <- ggplot(snp_full %>% filter(CHR %in% 1:3), aes(win_mid, het_median)) +
-        geom_smooth() +
-        facet_wrap(~CHR, nrow = 1, scales = "free_x")
-p2 <- ggplot(snp_full %>% filter(CHR %in% 1:3), aes(win_mid, UNAFF_median)) +
-        geom_smooth()+
-        facet_wrap(~CHR, nrow = 1, scales = "free_x")
-
-p1/p2
-
-snp_sub <- snp_full %>% filter(CHR == 1)
-cor(snp_sub$het_median, snp_sub$UNAFF_median, use = "complete.obs")
-
-p1 <- snp_full %>% 
-        mutate(win_num = 1:nrow(.)) %>% 
-        ggplot( aes(win_num, het_median)) +
-        # geom_smooth(n = 4)+
-        stat_smooth(n = 10)
-
-p2 <- snp_full %>% 
-        mutate(win_num = 1:nrow(.)) %>% 
-        ggplot( aes(win_num, UNAFF_median)) +
-        stat_smooth(n = 10)
-
-p1/p2
-
-snps_stats_full %>% 
-        filter(chromosome == 1) %>% 
-        mutate(snp_num = 1:nrow(.)) %>% 
-        ggplot(aes(snp_num, het)) + 
-        geom_line(size = 0.01)
-
-roh_d <- roh_deserts %>% 
-        rename(chromosome = CHR) %>% 
-        left_join(running_snp_het)
-
-roh_i <- roh_islands %>% 
-        rename(chromosome = CHR) %>% 
-        left_join(running_snp_het)
-
-roh_extremes <- bind_rows(roh_d, roh_i, .id = "extremes")
-
-ggplot(roh_extremes, aes(extremes, het_median)) +
-        geom_boxplot() 
-
-
-running_snp %>% 
-        rename(chromosome = CHR) %>% 
-        left_join(roh_extremes, by = c("chromosome", "win_start")) %>% 
-        mutate(extreme = case_when(
-                (extremes == 1) ~ "island",
-                (extremes == 2) ~ "desert"
-        )) %>% 
-        mutate(prop_ROH = (UNAFF_median/5952) * 100) %>% 
-        ggplot(aes(r_sum, prop_ROH, fill = extreme)) +
-        geom_point(shape = 21,  stroke = 0.1, alpha = 0.5, size = 2.5) +
-        ylab("% of sheep with ROH") +
-        xlab("Recombination rate") +
-        theme_simple(axis_lines = TRUE, grid_lines = FALSE) +
-        geom_smooth(method = "lm", se = FALSE, color = "#2e3440", size = 1) 
 
 

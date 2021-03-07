@@ -11,7 +11,6 @@ library(AnimalINLA) # Downloaded from http://www.r-inla.org/related-projects/ani
 library(MCMCglmm)
 library(sjPlot)
 library(performance)
-#library(brinla)
 # data
 load("data/survival_mods_data.RData") 
 load("data/sheep_ped.RData")

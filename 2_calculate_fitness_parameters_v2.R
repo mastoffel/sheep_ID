@@ -7,6 +7,11 @@
 
 # This scripts processes files from the sheep database into annual fitness data
 
+# Note from MAS: This script results in the file 
+# 1_Annual_Fitness_Measures_April_20190501.txt
+# which can be found in the Zenodo data repository 
+# accompanying our manuscript.
+
 library(ggplot2)
 library(plyr)
 library(beepr)

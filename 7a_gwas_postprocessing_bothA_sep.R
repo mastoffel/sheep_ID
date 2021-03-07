@@ -168,7 +168,7 @@ p1 <- gwas_roh %>%
         mutate(estimate = abs(estimate)) %>% 
         ggplot(aes(estimate, fill = direction)) +
         geom_histogram(bins = 500, position="identity") +
-        theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_family = "Lato") +
+        theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_family = "Helvetica") +
         theme(axis.line.y = element_blank()) +
         scale_fill_manual("Direction of\neffect on survival", values = cols) +
         #scale_x_log10(breaks = c(0.001, 0.01, 0.1, 1), labels = c(0.001, 0.01, 0.1, 1),
@@ -202,7 +202,7 @@ p3 <- gwas_roh %>%
         mutate(direction = ifelse(estimate < 0, "negative", "positive")) %>% 
         ggplot(aes(p.value, fill = direction)) +
         geom_histogram(bins = 400, position="identity") +
-        theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_family = "Lato") +
+        theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_family = "Helvetica") +
         scale_fill_manual("Direction of\neffect on survival", values = cols) +
         theme(axis.line.y = element_blank()) +
         scale_x_continuous(limits = c(0, 1),  expand = c(0,0)) +
@@ -264,7 +264,7 @@ gwas_plot <- gwas_roh %>%
         
 
 axisdf <- gwas_plot %>% group_by(chromosome) %>% 
-        summarize(center = (max(positive_cum) + min(positive_cum)) / 2 )
+        summarise(center = (max(positive_cum) + min(positive_cum)) / 2 )
 
 #ggsave("figs/roh_vs_gwas.jpg", width = 10, height = 6)
 
@@ -275,24 +275,32 @@ gwas_plot_roh <- gwas_plot %>%
 # 39149
 # 
 eff_tests <- 2*39149
-pgwas <- ggplot(gwas_plot_roh, aes(x=positive_cum, y=-log10(p.value))) +
+gwas_plot_roh_sub <- gwas_plot_roh #%>% 
+        #sample_n(100000)
+
+pgwas <- ggplot(gwas_plot_roh_sub, aes(x=positive_cum, y=-log10(p.value))) +
         geom_hline(yintercept = -log10(0.05/(eff_tests)), linetype="dashed", color = "grey") +
-        geom_point(data = gwas_plot_roh %>% filter(-log10(p.value) <= -log10(0.05/(eff_tests))),
-                   aes(fill = chromosome %%2 == 0),#shape = roh_prevalence  #fill = chromosome %%2 == 0
-                   size = 1.2, shape = 21, alpha = 1, stroke = 0, color = "black") +
+        #geom_point(data = gwas_plot_roh %>% filter(-log10(p.value) <= -log10(0.05/(eff_tests))),
+        #           aes(fill = chromosome %%2 == 0),#shape = roh_prevalence  #fill = chromosome %%2 == 0
+        #           size = 1.2, shape = 21, alpha = 1, stroke = 0, color = "transparent") +
+        geom_point(data = gwas_plot_roh_sub %>% filter(-log10(p.value) <= -log10(0.05/(eff_tests))),
+                   aes(color = chromosome %%2 == 0),#shape = roh_prevalence  #fill = chromosome %%2 == 0
+                   size = 0.8) +
         # geom_point(data = gwas_plot %>% filter(-log10(p.value) > -log10(0.05/(39149*2))), # aes(fill = direction),  0.00001
         #            fill=alpha(cols[[1]], 0.8), size = 2.5, shape = 21, stroke = 0.1, color = "black") + # "#d8dee9
-        geom_point(data = gwas_plot_roh %>% filter(-log10(p.value) > -log10(0.05/(eff_tests))), aes(fill = direction), # aes(fill = direction),  0.00001
+        geom_point(data = gwas_plot_roh_sub %>% filter(-log10(p.value) > -log10(0.05/(eff_tests))), aes(fill = direction), # aes(fill = direction),  0.00001
                    size = 2, shape = 21, stroke = 0.1, color = "black") + # "#d8dee9"
         scale_x_continuous(labels = chr_labels, breaks= axisdf$center) +
         scale_y_continuous(expand = c(0, 0), limits = c(0,9), labels = as.character(0:8), breaks = 0:8) +
         xlab("Chromosome") + 
         ylab(expression(-log[10](italic(p)))) + ## y label from qqman::qq
-        scale_fill_manual(values = c("#ECEFF4", cols[[1]], cols[[2]],"#d8dee9")) + # #dbe1eb #d1d8e5  "#ECEFF4" #d8dee9
-        theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_family = "Lato") +
+       # scale_fill_manual(values = c("#ECEFF4", cols[[1]], cols[[2]],"#d8dee9")) + # #dbe1eb #d1d8e5  "#ECEFF4" #d8dee9
+        scale_fill_manual(values = c(cols[[1]], cols[[2]])) +
+        scale_color_manual(values = c("#ECEFF4","#d8dee9")) + # #dbe1eb #d1d8e5  "#ECEFF4" #d8dee9
+        theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_family = "Helvetica") +
         theme(axis.text.x = element_text(size = 8),
               axis.ticks = element_line(size = 0.1)) +
-        guides(fill=FALSE) 
+        guides(fill=FALSE, color = FALSE) 
 pgwas 
 
 
@@ -318,7 +326,7 @@ pgwas
 # simple plot without subplots
 p_gwas_simple <- (p1 + p3) / pgwas +
         plot_layout(guides = 'collect', height = c(1, 1.5)) +
-        plot_annotation(tag_levels = 'A') &
+        plot_annotation(tag_levels = 'a') &
         theme(plot.tag = element_text(face = "bold"))
 p_gwas_simple
 

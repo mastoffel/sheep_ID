@@ -345,7 +345,7 @@ p_roh_length <- prop_IBD_df_with_0 %>%
 p_roh_length
 
 ggsave("figs/Fig1B.jpg", p_roh_length, width = 6.3, height = 2.65)
-
+ggsave("figs/Fig1B.pdf", p_roh_length, width = 6.3, height = 2.65)
 #~~~ ROH density ---------------------------------------------------------------
 hom_sum <- fread("output/ROH/roh.hom.summary")
 
