@@ -128,7 +128,7 @@ run_roh_rec_het
 
 # create source data file for natcomms
 library(writexl)
-writexl::write_xlsx(run_roh_rec_het, path = "output/source_data_fig2.xlsx")
+#writexl::write_xlsx(run_roh_rec_het, path = "output/source_data_fig2.xlsx")
 
 roh_mod <- run_roh_rec_het %>% 
         # filter(row_number() %% 5 == 1) %>% 
@@ -189,11 +189,12 @@ modR22 <- partR2(mod2, partvars = c("cM_Mb_std", "het_mean_std"), data = roh_mod
 
 #all in one plot
 coefs <- coef(lm(prop_ROH ~ cM_Mb, data = run_roh_rec_het))
-
+library(viridis)
 viridis(3)
 p_roh_rec <- run_roh_rec_het %>% 
         ggplot(aes(cM_Mb, prop_ROH, fill = extreme)) +
-        geom_point(shape = 21, stroke = 0.1, alpha = 0.7, size = 2) + #  fill = "#eceff4",
+        geom_point(shape = 21, stroke = 0.1, alpha = 0.7, size = 2,
+                   color = "darkgrey") + #  fill = "#eceff4",
         ylab("% of sheep with ROH") +
         xlab("Recombination rate (cM/Mb)") +
         theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_family = "Helvetica") +
@@ -206,12 +207,13 @@ p_roh_rec <- run_roh_rec_het %>%
               axis.title.y=element_text(margin=margin(r=3)))
 
 p_roh_rec
-ggsave("figs/roh_rec.jpg", plot = p_roh_rec, width = 5, height = 3.7)
+#ggsave("figs/roh_rec.jpg", plot = p_roh_rec, width = 5, height = 3.7)
 
 coefs2 <- coef(lm(prop_ROH ~ het_mean, data = run_roh_rec_het))
 p_roh_het <- run_roh_rec_het %>% 
         ggplot(aes(het_mean, prop_ROH,  fill = extreme)) +
-        geom_point(shape = 21, stroke = 0.1, alpha = 0.7, size = 2) + #  fill = "#eceff4",
+        geom_point(shape = 21, stroke = 0.1, alpha = 0.7, size = 2,
+                   color = "darkgrey") + #  fill = "#eceff4",
         ylab("% of sheep with ROH") +
         xlab("Heterozygosity") +
         theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_family = "Helvetica") +
@@ -232,8 +234,9 @@ p_ext_rec <- run_roh_rec_het %>%
         ggplot(aes(extreme, cM_Mb, fill = extreme)) +
         geom_hline(yintercept = mean(run_roh_rec_het$cM_Mb, na.rm = TRUE),
                    linetype = "dashed", color = "#4c566a", size = 0.5) +
-        geom_half_point(side = "r", shape = 21, alpha = 0.9, stroke = 0.1, size = 2,
-                        transformation_params = list(height = 0, width = 1.3, seed = 1)) +
+        geom_half_point(side = "r", shape = 21, alpha = 0.7, stroke = 0.1, size = 2,
+                        transformation_params = list(height = 0, width = 1.3, seed = 1),
+                        color = "darkgrey") +
         geom_half_boxplot(side = "l", outlier.color = NA,
                           width = 0.6, lwd = 0.3, color = "black",
                           alpha = 0.8) + 
@@ -251,8 +254,9 @@ p_ext_het <- run_roh_rec_het %>%
         ggplot(aes(extreme, het_mean, fill = extreme)) +
         geom_hline(yintercept = mean(run_roh_rec_het$het_mean, na.rm = TRUE),
                    linetype = "dashed", color = "#4c566a", size = 0.5) +
-        geom_half_point(side = "r", shape = 21, alpha = 0.9, stroke = 0.1, size = 2,
-                        transformation_params = list(height = 0, width = 1.3, seed = 1)) +
+        geom_half_point(side = "r", shape = 21, alpha = 0.7, stroke = 0.1, size = 2,
+                        transformation_params = list(height = 0, width = 1.3, seed = 1),
+                        color = "darkgrey") +
         geom_half_boxplot(side = "l", outlier.color = NA,
                           width = 0.6, lwd = 0.3, color = "black",
                           alpha = 0.8) + 
@@ -269,10 +273,12 @@ p_full <- p_roh_rec + p_roh_het + p_ext_rec +  p_ext_het +
         plot_layout(heights = c(1.41803398875, 1),
                     widths = c(0.5, 0.5)) +
         plot_annotation(tag_levels = "a") &
-        theme(plot.tag = element_text(face = "bold", vjust = 4))
+        theme(plot.tag = element_text(face = "bold", vjust = 4),
+              axis.title = element_text(size = 10),
+              axis.text = element_text(colour = "black", size = 8))
 p_full 
 ggsave("figs/Fig2_roh_rec.jpg", width = 5.7, height = 4.3)
-ggsave("figs/Fig2_roh_rec.pdf", width = 5.7, height = 4.3)
+ggsave("figs/Fig2_roh_rec.pdf", width = 5.7, height = 4.3, device = cairo_pdf)
 
 
 # supplementary plot

@@ -120,6 +120,8 @@ fitness_data <- annual_fitness %>%
 #        left_join(homs, by = "ID")
 
 # prepare for analysis
+# might have to be modified if not all variables present in
+# fitness data file
 fitness_data <- fitness_data %>% 
         dplyr::rename(birth_year = BIRTHYEAR,
                 sheep_year = SheepYear,

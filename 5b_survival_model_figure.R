@@ -129,13 +129,13 @@ roh_plot2 %>%
         #scale_x_continuous(limits = c(0.199, 0.55)) +
         ylab("Age") + 
         scale_y_discrete(expand = expand_scale(add = c(0.2, 1.01))) +
-        xlab(expression(F[ROH])) + # ~across~age~cohorts
+        xlab(expression(italic(F)[ROH])) + # ~across~age~cohorts
         theme(strip.background = element_blank(),
               panel.grid.major = element_line(colour = "#d8dee9", size = 0.5),
               strip.text = element_text(vjust=2),
               panel.spacing.x = unit(1, "lines"),
               #plot.margin=unit(c(1,0,0,0),"cm"),
-              axis.text = element_text(size = 13),
+              axis.text = element_text(size = 13, color = "black"),
               strip.text.x = element_text(margin = margin(1,0,0,0, "cm")),
               legend.position = "none") -> p_froh_across_ages #+
 #labs(title = "Inbreeding across life in Soay sheep",
@@ -186,7 +186,7 @@ p_surv_mod <- ggplot(fix_eff, aes(mean, Predictor, xmax = upper_CI, xmin = lower
                 axis.line.y = element_blank(),
                 axis.ticks.y = element_blank(),
                 axis.title.y = element_blank(),
-                axis.text.x = element_text(size = 11),
+                axis.text = element_text(size = 12),
                 axis.title.x = element_text(margin=margin(t=8))
         ) +
         xlab("Odds-ratio and 95% CI")-> p_forest
@@ -254,7 +254,7 @@ d <- marg_means %>%
         bind_rows() %>% 
         pmap_df(function(...) {
                 samp <- as.numeric(unlist(list(...)))
-                c(mean = mean(samp), quantile(samp, probs = c(0.05, 0.95)))
+                c(mean = mean(samp), quantile(samp, probs = c(0.025, 0.975)))
         }) %>% 
         bind_cols(combined_df) %>% 
         mutate(life_stage = expand_grid(froh, age)$age) %>% 
@@ -280,19 +280,20 @@ inla_preds <- inla_preds %>%
         mutate(age = factor(age, levels = c("Lamb", "Early life", "Mid life", "Late life")))
 
 p_marginal_effs <- ggplot(inla_preds, aes(froh, prediction)) +
-  
         geom_ribbon(aes(x=froh, ymin = ci_lower, ymax = ci_upper, fill = age, color = age),
-                    alpha = 0.05, linetype = 2, size = 0.2) +
-        geom_line(aes(color = age), size = 0.8) +
+                    alpha = 0.03, linetype = 2, size = 0.2) +
+        geom_line(aes(color = age), size = 0.9, alpha = 1) +
         scale_color_viridis_d("Age", labels = c(0, 1, 4, 7)) +
         scale_fill_viridis_d("Age", labels = c(0, 1, 4, 7)) +
         theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_size = 14,
                      base_family = "Helvetica") +
+        scale_y_continuous(expand = c(0, 0), limits = c(0, 100), breaks = c(0, 25, 50, 75, 100)) +
         theme(axis.line.y = element_blank(),
               legend.position = "none",
-              axis.text.x = element_text(size = 11)) +
-        xlab(expression(F[ROH])) +
-        ylab("Predicted\nsurvival probability (% per year)")
+              #axis.text.x = element_text(size = 11),
+              axis.text = element_text(color = "black", size = 12)) +
+        xlab(expression(italic(F)[ROH])) +
+        ylab("Predicted\nsurvival probability\n(% per year)")
 p_marginal_effs
 
 
@@ -321,7 +322,7 @@ write_xlsx(emp, path = "output/source_data_figure3b.xlsx")
 
 p_raw <- ggplot(emp , aes(binned_froh, binned_survival, fill = life_stage)) +
         #geom_jitter(width = 0.05, size = 2, alpha = 0.3, shape = 21, stroke=0.2) +
-        geom_point(shape = 21, size = 2.5, stroke = 0.4, color = "black")  +
+        geom_point(shape = 21, size = 3, stroke = 0.4, color = "black")  +
         scale_fill_viridis_d("Life Stage (age)", 
                              labels = c("Lamb (0)", "Early life (1,2)",
                                         "Mid life (3,4)",
@@ -334,8 +335,9 @@ p_raw <- ggplot(emp , aes(binned_froh, binned_survival, fill = life_stage)) +
         theme_simple(grid_lines = FALSE, axis_lines = TRUE,
                      base_family = "Helvetica") +
         theme(axis.line.y = element_blank(),
-              axis.text.x = element_text(size = 9))+
-        xlab(expression(F[ROH]~class)) +
+              axis.text.y = element_text(color = "black"),
+              axis.text.x = element_text(color = "black"))+
+        xlab(expression(italic(F)[ROH]~class)) +
         ylab("Survivors (% per year)")
 #geom_line(mapping = aes(group =age), size = 0.2, alpha = 1) 
 p_raw
@@ -344,11 +346,22 @@ p_raw
 p_final <- p_froh_across_ages + (p_raw / p_marginal_effs) +
         plot_layout(guides = "collect", widths = c(0.57, 0.43)) &
         plot_annotation(tag_levels = "a") &
-        theme(axis.text.y = element_text(size = 11),
+        theme(axis.text = element_text(size = 11),
               axis.title = element_text(size = 12),
               legend.text = element_text(size = 11),
               legend.title = element_text(size = 12),
               plot.tag = element_text(face = "bold"))
+
+p_final <- p_froh_across_ages + (p_raw / p_marginal_effs) +
+  plot_layout(guides = "collect", widths = c(0.57, 0.43)) &
+  plot_annotation(tag_levels = "a") &
+  theme(axis.text.y = element_text(size = 12),
+        axis.title = element_text(size = 13),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 13),
+        plot.tag = element_text(face = "bold"))
+p_final
+
 ggsave("figs/Fig3_inla2.jpg", plot = p_final, height = 6.5, width = 9.5, dpi = 900)
 ggsave("figs/Fig3_inla2.pdf", plot = p_final, height = 6.5, width = 9.5)
 #ggsave("figs/Fig2_inla2_2.jpg", plot = p_final, height = 8.5, width = 12.5)

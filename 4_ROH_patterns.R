@@ -97,9 +97,10 @@ p_roh <- ggplot(num_roh_per_ind, aes(n)) +
                      base_family = "Lato") 
 p_roh
 
-p_roh_dist <- p_froh + p_roh + plot_annotation(tag_levels = 'A')
+p_roh_dist <- p_froh + p_roh + plot_annotation(tag_levels = 'a') &
+                theme(plot.tag = element_text(face = "bold"))
 p_roh_dist
-#ggsave("figs/Sup_ROH_dist.jpg", p_roh_dist, width = 7, height = 2.5)
+ggsave("figs/Sup_ROH_dist.jpg", p_roh_dist, width = 7, height = 2.5)
 
 # Supplementary Figure HD vs. imputed individuals ------------------------------
 # this plot does not really work with example data, so please skip
@@ -162,8 +163,8 @@ p_hd <- froh_plot %>%
         scale_y_continuous(expand = c(0, 0)) +
         ggtitle("high-density genotypes")
 
-p_out <- p_hd/p_imp + plot_annotation(tag_levels = "A")
-p_out 
+p_out <- p_hd/p_imp + plot_annotation(tag_levels = 'a') &
+        theme(plot.tag = element_text(face = "bold"))
 ggsave("figs/Sup_imp_vs_hd.jpg", p_out, width = 5.5, height = 4.6)
 
 #~~ ROH for some indiividuals --------------------------------------------------
