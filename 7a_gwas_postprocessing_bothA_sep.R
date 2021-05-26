@@ -72,7 +72,7 @@ full_sample <- read.plink(sheep_bed, sheep_bim, sheep_fam)
 # get snp map and add summary statistics
 snps_map <- full_sample$map %>% as_tibble()
 snps_stats <- col.summary(full_sample$genotypes)
-plot(snps_stats$P.AA, snps_stats$P.BB)
+#plot(snps_stats$P.AA, snps_stats$P.BB)
 snps_stats <- snps_stats %>% as_tibble(rownames = "snp.name")
 snps_map <- snps_map %>% 
         left_join(snps_stats, by = "snp.name")
@@ -169,7 +169,9 @@ p1 <- gwas_roh %>%
         ggplot(aes(estimate, fill = direction)) +
         geom_histogram(bins = 500, position="identity") +
         theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_family = "Helvetica") +
-        theme(axis.line.y = element_blank()) +
+        theme(axis.line.y = element_blank(),
+              axis.text = element_text(color = "black"),
+              ) +
         scale_fill_manual("Direction of\neffect on survival", values = cols) +
         #scale_x_log10(breaks = c(0.001, 0.01, 0.1, 1), labels = c(0.001, 0.01, 0.1, 1),
         #              limits = c(0.00005, 1.1)) +
@@ -204,11 +206,12 @@ p3 <- gwas_roh %>%
         geom_histogram(bins = 400, position="identity") +
         theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_family = "Helvetica") +
         scale_fill_manual("Direction of\neffect on survival", values = cols) +
-        theme(axis.line.y = element_blank()) +
+        theme(axis.line.y = element_blank(),
+              axis.text = element_text(color = "black")) +
         scale_x_continuous(limits = c(0, 1),  expand = c(0,0)) +
         scale_y_continuous(expand = c(0,0)) +
         ylab("SNPs") +
-        xlab("p-value")
+        xlab(expression(italic(p)-value))
 p3
 
 # p4 <- gwas_roh %>% 
@@ -298,7 +301,7 @@ pgwas <- ggplot(gwas_plot_roh_sub, aes(x=positive_cum, y=-log10(p.value))) +
         scale_fill_manual(values = c(cols[[1]], cols[[2]])) +
         scale_color_manual(values = c("#ECEFF4","#d8dee9")) + # #dbe1eb #d1d8e5  "#ECEFF4" #d8dee9
         theme_simple(axis_lines = TRUE, grid_lines = FALSE, base_family = "Helvetica") +
-        theme(axis.text.x = element_text(size = 8),
+        theme(axis.text = element_text(color = "black"), # axis.text.x size 8
               axis.ticks = element_line(size = 0.1)) +
         guides(fill=FALSE, color = FALSE) 
 pgwas 

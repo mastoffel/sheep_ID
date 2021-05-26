@@ -1,8 +1,10 @@
 [![DOI](https://zenodo.org/badge/193667799.svg)](https://zenodo.org/badge/latestdoi/193667799)
 
-### Genetic architecture and lifetime dynamics of inbreeding depression in a wild mammal
-Stoffel, M.A, Johnston, S.E., Pilkington, J.G., Pemberton, J.M  
-*bioRxiv* [https://doi.org/10.1101/2020.05.27.118877](https://doi.org/10.1101/2020.05.27.118877)  
+# Genetic architecture and lifetime dynamics of inbreeding depression in a wild mammal.
+
+### Article
+
+Stoffel, M.A., Johnston, S.E., Pilkington, J.G. et al. Genetic architecture and lifetime dynamics of inbreeding depression in a wild mammal. *Nat Commun* **12**, 2972 (2021). https://doi.org/10.1038/s41467-021-23222-9
 
 ### Overview   
 This repository contains the analysis code for our paper, in order 1-7.  
