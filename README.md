@@ -1,12 +1,21 @@
-[![DOI](https://zenodo.org/badge/193667799.svg)](https://zenodo.org/badge/latestdoi/193667799)
+## Code and example data for:
+  
+Stoffel, MA, Johnston, SE, Pilkington, JG, Pemberton, JM: **Genetic architecture and lifetime dynamics of inbreeding depression in a wild mammal.**  *Nature Communications* **12**, 2972 (2021). https://doi.org/10.1038/s41467-021-23222-9.  
 
-# Genetic architecture and lifetime dynamics of inbreeding depression in a wild mammal.
+</br>
+![](pics/IMG_3281.jpg)
+</br>
 
-### Article
+### Project
+Across the animal and plant kingdoms, matings between relatives often result in reduced fitness of their offspring, a phenomenon termed inbreeding depression. This project aimed at gaining a better understanding of the genetic basis of inbreeding depression by analysing genomic and survival data from a long-term study of wild Soay sheep on the remote Scottish St. Kilda archipelago. At the heart of the analyses are runs of homozygosity, a signature feature of inbred genomes, which we used to pinpoint genetic regions containing deleterious mutations.
 
-Stoffel, M.A., Johnston, S.E., Pilkington, J.G. et al. Genetic architecture and lifetime dynamics of inbreeding depression in a wild mammal. *Nat Commun* **12**, 2972 (2021). https://doi.org/10.1038/s41467-021-23222-9
+<p align="center">
+  <img width="90%" src="pics/Figure1.jpeg">
+</p>
+<p align="center" > <i>Runs of homozygosity among individuals, length classes and across the genome .</i></p>
 
-### Overview   
+
+### Code structure
 This repository contains the analysis code for our paper, in order 1-7.  
 
 *Script 1-3 process data, specifically:*  
@@ -28,8 +37,7 @@ This repository contains the analysis code for our paper, in order 1-7.
 ### Data and reproducibility
 All analysis scripts (4-7b) can be run with data provided in the folders `example_data` and `example_output`. For a smooth experience with running these scripts, download the complete repository and change the names of `example_data` and `example_output` to `data` and `output`, respectively. Examples are based on a random subset of 100 individuals, so results will be different from those reported in the paper.
 
-The full data will be uploaded upon publication to the european variant archive (EVA)
-and Zenodo.
+The full data can be downloaded from Zenodo: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4609701.svg)](https://doi.org/10.5281/zenodo.4609701)
 
 ### Versions and dependencies
 Running the code depends on a series of R packages, which mostly come from CRAN, but some are development versions on GitHub or stored on private websites. The versions of all dependencies are stored alongside the code in the `renv.lock` file. You can either install these packages yourself while running the code, or you can use the `renv` package to setup everything for you. To do so, download or clone this repository somewhere onto your computer. Then install `renv` with:
