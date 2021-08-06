@@ -4,7 +4,7 @@ Stoffel, MA, Johnston, SE, Pilkington, JG, Pemberton, JM: **Genetic architecture
 
 </br>
 
-![](pics/IMG_3281.jpg)
+![](pics/IMG_3171.jpg)
 
 </br>
 
