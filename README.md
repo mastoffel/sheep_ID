@@ -3,7 +3,9 @@
 Stoffel, MA, Johnston, SE, Pilkington, JG, Pemberton, JM: **Genetic architecture and lifetime dynamics of inbreeding depression in a wild mammal.**  *Nature Communications* **12**, 2972 (2021). https://doi.org/10.1038/s41467-021-23222-9.  
 
 </br>
+
 ![](pics/IMG_3281.jpg)
+
 </br>
 
 ### Project
