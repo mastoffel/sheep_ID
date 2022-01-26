@@ -87,7 +87,7 @@ chr_info <- read_delim("data/chromosome_info_oar31.txt", "\t") %>%
         filter(!is.na(chromosome))
 
 # load gwas results 
-#gwas_res <- read_rds("output/gwas_res_oar_long.rds")
+#gwas_res <- read_rds("output/gwas_res_oar_roh_sep.rds")
 
 # put into df
 gwas_full <- gwas_res %>%
